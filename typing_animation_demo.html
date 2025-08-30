@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Демо: Обновленная анимация печати</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .demo-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .demo-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .demo-header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .demo-header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .comparison {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .old-version, .new-version {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .version-title {
+            color: white;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .old-version .version-title {
+            color: #ff6b6b;
+        }
+        
+        .new-version .version-title {
+            color: #4CAF50;
+        }
+        
+        /* Старая версия анимации */
+        .typing-indicator-old {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 10px 15px;
+            margin: 10px auto;
+            font-size: 0.9em;
+            color: #666;
+            display: inline-block;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 300px;
+        }
+        
+        /* Новая версия анимации */
+        .typing-indicator-new {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin: 8px auto;
+            font-size: 0.8em;
+            color: #666;
+            display: inline-block;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 200px;
+        }
+        
+        .typing-dots {
+            display: inline-block;
+            animation: typing 1.4s infinite;
+        }
+        
+        @keyframes typing {
+            0%, 20% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .demo-controls {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .demo-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1em;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+        }
+        
+        .features {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .features h3 {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .feature-list {
+            color: white;
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-list li::before {
+            content: "✅ ";
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🎨 Обновленная анимация печати</h1>
+            <p>Сравнение старой и новой версии индикатора "печатает..."</p>
+        </div>
+        
+        <div class="comparison">
+            <div class="old-version">
+                <div class="version-title">📏 Старая версия</div>
+                <div class="typing-indicator-old">
+                    <span>Анна печатает</span><span class="typing-dots">...</span>
+                </div>
+                <p style="color: white; font-size: 0.9em; margin-top: 15px;">
+                    • Больший размер поля<br>
+                    • Крупный шрифт (0.9em)<br>
+                    • Короткий текст
+                </p>
+            </div>
+            
+            <div class="new-version">
+                <div class="version-title">✨ Новая версия</div>
+                <div class="typing-indicator-new">
+                    <span>Анна печатает сообщение</span><span class="typing-dots">...</span>
+                </div>
+                <p style="color: white; font-size: 0.9em; margin-top: 15px;">
+                    • Компактное поле<br>
+                    • Меньший шрифт (0.8em)<br>
+                    • Более информативный текст
+                </p>
+            </div>
+        </div>
+        
+        <div class="demo-controls">
+            <button class="demo-btn" onclick="showBoth()">👀 Показать обе версии</button>
+            <button class="demo-btn" onclick="hideBoth()">🙈 Скрыть обе версии</button>
+            <button class="demo-btn" onclick="toggleAnimation()">🎬 Включить/выключить анимацию</button>
+        </div>
+        
+        <div class="features">
+            <h3>🚀 Улучшения в новой версии</h3>
+            <ul class="feature-list">
+                <li>Уменьшен размер шрифта с 0.9em до 0.8em</li>
+                <li>Сокращены отступы (padding: 8px 12px вместо 10px 15px)</li>
+                <li>Уменьшены поля (margin: 8px вместо 10px)</li>
+                <li>Добавлено ограничение ширины (max-width: 200px)</li>
+                <li>Уменьшен радиус скругления (12px вместо 15px)</li>
+                <li>Расширен текст: "печатает" → "печатает сообщение"</li>
+                <li>Более компактный и элегантный дизайн</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        let animationEnabled = true;
+        
+        function showBoth() {
+            document.querySelectorAll('.typing-indicator-old, .typing-indicator-new').forEach(el => {
+                el.style.display = 'inline-block';
+            });
+        }
+        
+        function hideBoth() {
+            document.querySelectorAll('.typing-indicator-old, .typing-indicator-new').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+        
+        function toggleAnimation() {
+            const dots = document.querySelectorAll('.typing-dots');
+            if (animationEnabled) {
+                dots.forEach(dot => {
+                    dot.style.animation = 'none';
+                });
+                animationEnabled = false;
+            } else {
+                dots.forEach(dot => {
+                    dot.style.animation = 'typing 1.4s infinite';
+                });
+                animationEnabled = true;
+            }
+        }
+        
+        // Показываем анимации при загрузке
+        window.onload = function() {
+            showBoth();
+        };
+        
+        console.log('🎨 Демо обновленной анимации печати загружено');
+    </script>
+</body>
+</html> 

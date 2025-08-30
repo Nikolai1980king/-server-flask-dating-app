@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест загрузки фотографии</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        input[type="file"]:hover {
+            border-color: #007bff;
+        }
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .preview img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .error {
+            background: #ffe7e7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+        .success {
+            background: #e7ffe7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .console {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Тест загрузки фотографии</h1>
+        
+        <div class="info">
+            <strong>Инструкции:</strong>
+            <ul>
+                <li>Выберите фотографию размером до 50MB</li>
+                <li>Поддерживаемые форматы: PNG, JPG, JPEG, GIF, WebP</li>
+                <li>Фотография будет автоматически сжата до 800x800px</li>
+                <li>Следите за сообщениями в консоли ниже</li>
+            </ul>
+        </div>
+
+        <form id="upload-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="photo">Выберите фотографию:</label>
+                <input type="file" id="photo" name="photo" accept="image/*" onchange="previewPhoto(this)">
+            </div>
+
+            <div class="form-group">
+                <label for="name">Имя (для теста):</label>
+                <input type="text" id="name" name="name" value="Тестовый пользователь" required>
+            </div>
+
+            <div class="form-group">
+                <label for="age">Возраст (для теста):</label>
+                <input type="number" id="age" name="age" value="25" required>
+            </div>
+
+            <div class="form-group">
+                <label for="gender">Пол (для теста):</label>
+                <select id="gender" name="gender" required>
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="hobbies">Хобби (для теста):</label>
+                <input type="text" id="hobbies" name="hobbies" value="Тестирование" required>
+            </div>
+
+            <div class="form-group">
+                <label for="goal">Цель (для теста):</label>
+                <input type="text" id="goal" name="goal" value="Тест" required>
+            </div>
+
+            <div class="form-group">
+                <label for="venue">Место (для теста):</label>
+                <input type="text" id="venue" name="venue" value="Тестовое кафе" required>
+            </div>
+
+            <div class="form-group">
+                <label for="latitude">Широта (для теста):</label>
+                <input type="text" id="latitude" name="latitude" value="55.7558" required>
+            </div>
+
+            <div class="form-group">
+                <label for="longitude">Долгота (для теста):</label>
+                <input type="text" id="longitude" name="longitude" value="37.6176" required>
+            </div>
+
+            <div class="form-group">
+                <label for="venue_lat">Широта места (для теста):</label>
+                <input type="text" id="venue_lat" name="venue_lat" value="55.7558" required>
+            </div>
+
+            <div class="form-group">
+                <label for="venue_lng">Долгота места (для теста):</label>
+                <input type="text" id="venue_lng" name="venue_lng" value="37.6176" required>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="terms_accepted" name="terms_accepted" required>
+                    Согласен с условиями (для теста)
+                </label>
+            </div>
+
+            <div id="preview" class="preview" style="display: none;">
+                <h3>Предварительный просмотр:</h3>
+                <img id="preview-img" src="" alt="Предварительный просмотр">
+                <div id="file-info"></div>
+            </div>
+
+            <button type="submit" id="submit-btn">📤 Загрузить фотографию</button>
+        </form>
+
+        <div id="console" class="console">
+            <strong>Консоль отладки:</strong><br>
+            <div id="console-output"></div>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const console = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            console.innerHTML += `[${timestamp}] ${message}<br>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function previewPhoto(input) {
+            try {
+                log('🔄 Начинаем предварительный просмотр...');
+                
+                const file = input.files[0];
+                if (!file) {
+                    log('❌ Файл не выбран');
+                    return;
+                }
+
+                log(`📸 Файл выбран: ${file.name}`);
+                log(`📏 Размер: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+                log(`🎨 Тип: ${file.type}`);
+
+                // Проверяем размер
+                if (file.size > 50 * 1024 * 1024) {
+                    log('❌ Файл слишком большой! Максимум 50MB');
+                    showError('Файл слишком большой! Максимум 50MB');
+                    return;
+                }
+
+                // Проверяем тип
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    log('❌ Неподдерживаемый тип файла');
+                    showError('Неподдерживаемый тип файла. Используйте: JPG, PNG, GIF, WebP');
+                    return;
+                }
+
+                // Показываем информацию о файле
+                const fileInfo = document.getElementById('file-info');
+                fileInfo.innerHTML = `
+                    <p><strong>Имя:</strong> ${file.name}</p>
+                    <p><strong>Размер:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>Тип:</strong> ${file.type}</p>
+                    <p><strong>Будет сжато до:</strong> 800x800px, 85% JPEG</p>
+                `;
+
+                // Показываем предварительный просмотр
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('preview').style.display = 'block';
+                    log('✅ Предварительный просмотр загружен');
+                };
+                reader.onerror = function(e) {
+                    log('❌ Ошибка чтения файла: ' + e);
+                    showError('Ошибка чтения файла');
+                };
+                reader.readAsDataURL(file);
+
+            } catch (error) {
+                log('❌ Ошибка в previewPhoto: ' + error.message);
+                showError('Ошибка при обработке файла: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.container').insertBefore(errorDiv, document.getElementById('console'));
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.querySelector('.container').insertBefore(successDiv, document.getElementById('console'));
+            
+            setTimeout(() => {
+                successDiv.remove();
+            }, 5000);
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            try {
+                log('🔄 Отправка формы...');
+                
+                const formData = new FormData(this);
+                const submitBtn = document.getElementById('submit-btn');
+                submitBtn.disabled = true;
+                submitBtn.textContent = '📤 Отправка...';
+
+                // Логируем данные формы
+                log('📁 Данные формы:');
+                for (let [key, value] of formData.entries()) {
+                    if (key === 'photo') {
+                        log(`📸 ${key}: ${value.name} (${value.size} байт)`);
+                    } else {
+                        log(`📝 ${key}: ${value}`);
+                    }
+                }
+
+                // Отправляем запрос
+                fetch('/create', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    log(`📊 Статус ответа: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    log(`📄 Ответ сервера: ${JSON.stringify(data)}`);
+                    
+                    if (data.success) {
+                        showSuccess('✅ Фотография успешно загружена!');
+                        log('✅ Загрузка завершена успешно');
+                    } else {
+                        showError('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        log('❌ Ошибка сервера: ' + (data.error || 'Неизвестная ошибка'));
+                    }
+                })
+                .catch(error => {
+                    log('❌ Ошибка сети: ' + error.message);
+                    showError('Ошибка сети: ' + error.message);
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '📤 Загрузить фотографию';
+                });
+
+            } catch (error) {
+                log('❌ Ошибка в обработке формы: ' + error.message);
+                showError('Ошибка в обработке формы: ' + error.message);
+                document.getElementById('submit-btn').disabled = false;
+                document.getElementById('submit-btn').textContent = '📤 Загрузить фотографию';
+            }
+        });
+
+        // Инициализация
+        log('🚀 Тестовая страница загружена');
+        log('📱 Готов к тестированию загрузки фотографий');
+    </script>
+</body>
+</html> 

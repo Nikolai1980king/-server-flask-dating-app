@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Демо: Исправление счетчика лайков</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .demo-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .demo-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .demo-header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .demo-header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .problem-section, .solution-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .problem-section h2 {
+            color: #ff6b6b;
+            margin-bottom: 15px;
+        }
+        
+        .solution-section h2 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+        
+        .problem-list, .solution-list {
+            color: white;
+            list-style: none;
+            padding: 0;
+        }
+        
+        .problem-list li, .solution-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .problem-list li:last-child, .solution-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .problem-list li::before {
+            content: "❌ ";
+            margin-right: 10px;
+        }
+        
+        .solution-list li::before {
+            content: "✅ ";
+            margin-right: 10px;
+        }
+        
+        .demo-navbar {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .demo-navbar a {
+            font-size: 2em;
+            margin: 0 10px;
+            text-decoration: none;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ff6b6b;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 7px;
+            font-size: 0.8em;
+            min-width: 20px;
+            text-align: center;
+        }
+        
+        .demo-controls {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .demo-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1em;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+        }
+        
+        .demo-btn.danger {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ff8e8e 100%);
+        }
+        
+        .demo-btn.danger:hover {
+            box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
+        }
+        
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            color: white;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        
+        .status.success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .status.error {
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🔧 Исправление счетчика лайков</h1>
+            <p>Решение проблемы с мерцающим счетчиком лайков</p>
+        </div>
+        
+        <div class="problem-section">
+            <h2>❌ Проблема</h2>
+            <ul class="problem-list">
+                <li>Счетчик лайков то появляется, то исчезает</li>
+                <li>При просмотре страницы "Меня лайкнули" счетчик обнуляется</li>
+                <li>Через несколько секунд счетчик снова появляется</li>
+                <li>Пользователь видит мерцающий счетчик</li>
+                <li>Плохой пользовательский опыт</li>
+            </ul>
+        </div>
+        
+        <div class="solution-section">
+            <h2>✅ Решение</h2>
+            <ul class="solution-list">
+                <li>Добавлен API endpoint `/api/mark_likes_read`</li>
+                <li>Счетчик обнуляется только при загрузке страницы "Меня лайкнули"</li>
+                <li>JavaScript автоматически вызывает API при загрузке страницы</li>
+                <li>Счетчик остается обнуленным после просмотра</li>
+                <li>Стабильное поведение без мерцания</li>
+            </ul>
+        </div>
+        
+        <div class="demo-navbar">
+            <h3 style="margin-bottom: 15px; color: #333;">Демо навбара</h3>
+            <a href="#" title="Посетители">👥</a>
+            <a href="#" title="Меня лайкнули" id="likes-link">
+                ❤️
+                <span class="badge" id="like-badge" style="display: none;">0</span>
+            </a>
+            <a href="#" title="Мои мэтчи">🤝</a>
+            <a href="#" title="Мои сообщения">✉️</a>
+        </div>
+        
+        <div class="status" id="status">
+            Готов к демонстрации
+        </div>
+        
+        <div class="demo-controls">
+            <button class="demo-btn" onclick="simulateLike()">❤️ Симулировать лайк</button>
+            <button class="demo-btn" onclick="viewLikes()">👀 Просмотреть лайки</button>
+            <button class="demo-btn danger" onclick="resetDemo()">🔄 Сбросить демо</button>
+        </div>
+        
+        <div class="solution-section">
+            <h2>🔧 Технические детали</h2>
+            <ul class="solution-list">
+                <li><strong>API Endpoint:</strong> <code>POST /api/mark_likes_read</code></li>
+                <li><strong>Автоматический вызов:</strong> При загрузке страницы "Меня лайкнули"</li>
+                <li><strong>Обновление UI:</strong> Скрытие бейджа в навбаре</li>
+                <li><strong>Стабильность:</strong> Счетчик остается обнуленным</li>
+                <li><strong>Производительность:</strong> Минимальные запросы к серверу</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        let likeCount = 0;
+        let isViewed = false;
+        
+        function updateStatus(message, type = '') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+        
+        function updateBadge() {
+            const badge = document.getElementById('like-badge');
+            if (likeCount > 0 && !isViewed) {
+                badge.textContent = likeCount;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        function simulateLike() {
+            likeCount++;
+            isViewed = false;
+            updateBadge();
+            updateStatus(`Симулирован лайк! Счетчик: ${likeCount}`, 'error');
+        }
+        
+        function viewLikes() {
+            isViewed = true;
+            updateBadge();
+            updateStatus('Лайки просмотрены! Счетчик обнулен.', 'success');
+        }
+        
+        function resetDemo() {
+            likeCount = 0;
+            isViewed = false;
+            updateBadge();
+            updateStatus('Демо сброшено. Готов к новой демонстрации.');
+        }
+        
+        // Инициализация
+        updateBadge();
+        console.log('🔧 Демо исправления счетчика лайков загружено');
+    </script>
+</body>
+</html> 

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Простой тест</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: #fff;
+        }
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Простой тест сервера</h1>
+    
+    <div class="status">
+        <h3>✅ Сервер работает</h3>
+        <p>Эта страница загрузилась, значит сервер работает нормально.</p>
+    </div>
+
+    <div style="text-align: center;">
+        <a href="/" class="test-btn">🏠 Главная</a>
+        <a href="/create" class="test-btn">📝 Создать анкету</a>
+        <a href="/restore_profile" class="test-btn">🔍 Восстановить анкету</a>
+        <a href="/test_cookie_fix.html" class="test-btn">🍪 Тест Cookie</a>
+    </div>
+
+    <script>
+        console.log('✅ Простая тестовая страница загружена');
+        
+        // Проверяем cookie
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+        
+        const userCookie = getCookie('user_id');
+        console.log('🍪 user_id cookie:', userCookie);
+        
+        if (userCookie) {
+            console.log('✅ Cookie найден, можно проверить анкету');
+        } else {
+            console.log('❌ Cookie не найден');
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🎈 Тест интеграции парсинга балунов</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            color: white;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+
+        .map-container {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 15px;
+        }
+
+        .form-section {
+            margin: 20px 0;
+        }
+
+        input, textarea, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #333;
+            font-size: 1em;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-blue {
+            background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+        }
+
+        .btn-blue:hover {
+            box-shadow: 0 4px 16px rgba(33,150,243,0.3);
+        }
+
+        .venue-input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+        }
+
+        .venue-input-container input {
+            flex: 1;
+            margin: 0;
+        }
+
+        .parsed-links-container {
+            margin: 15px 0;
+            display: none;
+        }
+
+        .parsed-links {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            color: #333;
+        }
+
+        .parsed-links div {
+            margin: 8px 0;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .location-info {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            color: #333;
+        }
+
+        .instructions {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .instructions h3 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎈 Тест интеграции парсинга балунов</h1>
+        
+        <div class="instructions">
+            <h3>📋 Инструкции по тестированию:</h3>
+            <ol>
+                <li><strong>Определите местоположение:</strong> Нажмите кнопку "📍 Определить мое местоположение"</li>
+                <li><strong>Найдите заведение:</strong> Кликните на любое заведение на карте (кафе, ресторан, бар)</li>
+                <li><strong>Откроется балун:</strong> Дождитесь открытия балуна с информацией о заведении</li>
+                <li><strong>Автоматический парсинг:</strong> Система автоматически извлечет название и ссылки</li>
+                <li><strong>Ручной парсинг:</strong> Или нажмите кнопку "🔍 Парсить балун" для принудительного парсинга</li>
+            </ol>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="location-info" id="location-info" style="display: none;">
+                <strong>📍 Выбранное местоположение:</strong><br>
+                <span id="location-address">Не выбрано</span><br>
+                <small>Координаты: <span id="location-coords">-</span></small>
+            </div>
+            <div style="text-align: center; margin: 10px 0;">
+                <button type="button" class="btn" onclick="getCurrentLocation()">📍 Определить мое местоположение</button>
+                <button type="button" class="btn btn-blue" onclick="clearLocation()">🗑️ Очистить</button>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>🏢 Информация о заведении</h3>
+            
+            <div class="venue-input-container">
+                <input type="text" id="venue-input" placeholder="Название заведения (кафе, ресторан и т.д.)" readonly>
+                <button type="button" class="btn" onclick="parseBalloonAndFillVenue()">🔍 Парсить балун</button>
+            </div>
+
+            <div class="parsed-links-container" id="parsed-links-container">
+                <label style="color: #fff; font-weight: bold;">🔗 Найденные ссылки в балуне:</label>
+                <div class="parsed-links" id="parsed-links">
+                    <!-- Здесь будут отображаться найденные ссылки -->
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>📝 Дополнительная информация</h3>
+            <input type="text" placeholder="Ваше имя" value="Тестовый пользователь">
+            <input type="number" placeholder="Возраст" value="25">
+            <select>
+                <option value="">Выберите пол</option>
+                <option value="male" selected>Мужской</option>
+                <option value="female">Женский</option>
+                <option value="other">Другое</option>
+            </select>
+            <textarea placeholder="Ваши увлечения" rows="3">Тестирование, программирование</textarea>
+            <textarea placeholder="Цель знакомства" rows="3">Тестирование функциональности</textarea>
+        </div>
+    </div>
+
+    <script>
+        let myMap, myPlacemark;
+        let currentLocation = null;
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва по умолчанию
+                    zoom: 10,
+                    controls: ['zoomControl', 'fullscreenControl']
+                });
+
+                myMap.events.add('click', function (e) {
+                    var coords = e.get('coords');
+                    setLocation(coords[0], coords[1]);
+                });
+
+                // Добавляем обработчик для открытия балунов
+                myMap.events.add('balloonopen', function (e) {
+                    console.log('🎈 Балун открыт, начинаем парсинг...');
+                    // Добавляем небольшую задержку для полной загрузки балуна
+                    setTimeout(function() {
+                        parseBalloonAndFillVenue();
+                    }, 500);
+                });
+            });
+        }
+
+        function setLocation(lat, lng) {
+            currentLocation = {lat: lat, lng: lng};
+
+            // Удаляем предыдущую метку
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+            }
+
+            // Добавляем новую метку
+            myPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Выбранное местоположение'
+            }, {
+                preset: 'islands#redDotIcon'
+            });
+
+            myMap.geoObjects.add(myPlacemark);
+            myMap.setCenter([lat, lng], 15);
+
+            // Показываем местоположение в интерфейсе
+            document.getElementById('location-address').textContent = 'Местоположение определено';
+            document.getElementById('location-coords').textContent = 'Координаты: ' + lat.toFixed(4) + ', ' + lng.toFixed(4);
+            document.getElementById('location-info').style.display = 'block';
+        }
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        setLocation(lat, lng);
+                    },
+                    function(error) {
+                        alert('Не удалось получить местоположение. Попробуйте еще раз.');
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 5000,
+                        maximumAge: 300000
+                    }
+                );
+            } else {
+                alert('Геолокация не поддерживается вашим браузером. Попробуйте другой браузер.');
+            }
+        }
+
+        function clearLocation() {
+            currentLocation = null;
+            document.getElementById('location-info').style.display = 'none';
+            document.getElementById('venue-input').value = '';
+            document.getElementById('parsed-links-container').style.display = 'none';
+
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+                myPlacemark = null;
+            }
+        }
+
+        // Функция парсинга балуна
+        function extractNameFromBalloon() {
+            try {
+                console.log('🔍 Начинаем парсинг балуна...');
+                
+                // Ищем балун по всем возможным селекторам
+                let balloonContent = document.querySelector('.ymaps-2-1-79-balloon');
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('.ymaps-balloon');
+                }
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('.balloon');
+                }
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('[class*="balloon"]');
+                }
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('[class*="ymaps"]');
+                }
+                
+                if (!balloonContent) {
+                    console.log('❌ Балун не найден');
+                    return { name: null, links: [] };
+                }
+                
+                console.log('✅ Балун найден:', balloonContent.className);
+                
+                // Получаем HTML контент
+                const htmlContent = balloonContent.innerHTML;
+                console.log('📏 Размер HTML:', htmlContent.length, 'символов');
+                
+                // Ищем все ссылки в балуне
+                const links = balloonContent.querySelectorAll('a');
+                console.log('🔗 Найдено ссылок:', links.length);
+                
+                const foundLinks = [];
+                
+                if (links.length > 0) {
+                    for (let i = 0; i < links.length; i++) {
+                        const link = links[i];
+                        const linkText = link.textContent.trim();
+                        console.log(`🔗 Ссылка ${i + 1}: "${linkText}"`);
+                        foundLinks.push(linkText);
+                        
+                        // Проверяем, что это не служебная ссылка
+                        if (isValidVenueName(linkText)) {
+                            console.log(`✅ Найдено название в ссылке: "${linkText}"`);
+                            return { name: linkText, links: foundLinks };
+                        }
+                    }
+                }
+                
+                // Ищем заголовки
+                const headers = balloonContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                console.log('📋 Найдено заголовков:', headers.length);
+                
+                for (let header of headers) {
+                    const headerText = header.textContent.trim();
+                    console.log(`📋 Заголовок: "${headerText}"`);
+                    foundLinks.push(headerText);
+                    
+                    if (isValidVenueName(headerText)) {
+                        console.log(`✅ Найдено название в заголовке: "${headerText}"`);
+                        return { name: headerText, links: foundLinks };
+                    }
+                }
+                
+                // Ищем элементы с классами name/title
+                const nameElements = balloonContent.querySelectorAll('[class*="name"], [class*="title"]');
+                console.log('🏷️ Найдено элементов с name/title:', nameElements.length);
+                
+                for (let element of nameElements) {
+                    const elementText = element.textContent.trim();
+                    console.log(`🏷️ Элемент с name/title: "${elementText}"`);
+                    foundLinks.push(elementText);
+                    
+                    if (isValidVenueName(elementText)) {
+                        console.log(`✅ Найдено название в элементе с name/title: "${elementText}"`);
+                        return { name: elementText, links: foundLinks };
+                    }
+                }
+                
+                // Последняя попытка - ищем первый значимый текстовый элемент
+                const allElements = balloonContent.querySelectorAll('*');
+                console.log('🔍 Всего элементов в балуне:', allElements.length);
+                
+                for (let element of allElements) {
+                    const text = element.textContent.trim();
+                    if (isValidVenueName(text)) {
+                        console.log(`✅ Найдено название в текстовом элементе: "${text}"`);
+                        foundLinks.push(text);
+                        return { name: text, links: foundLinks };
+                    }
+                }
+                
+                console.log('❌ Название не найдено');
+                return { name: null, links: foundLinks };
+                
+            } catch (error) {
+                console.log('❌ Ошибка при парсинге:', error);
+                return { name: null, links: [] };
+            }
+        }
+
+        // Функция валидации названия заведения
+        function isValidVenueName(name) {
+            return name && name.length > 2 && name.length < 100 &&
+                !name.includes('Share') && !name.includes('Поделиться') &&
+                !name.includes('Телефон') && !name.includes('Адрес') &&
+                !name.includes('Часы') && !name.includes('Рейтинг') &&
+                !name.includes('Открыто') && !name.includes('Закрыто') &&
+                !name.includes('www.') && !name.includes('http') &&
+                !name.includes('+7') && !name.includes('8-') &&
+                !name.match(/^\d+$/) && !name.match(/^\d+\.\d+$/) &&
+                !name.includes('отзыв') && !name.includes('отзывов') &&
+                !name.includes('Показать') && !name.includes('Написать') &&
+                !name.includes('Позвонить') && !name.includes('Поделиться');
+        }
+
+        // Функция отображения найденных ссылок
+        function displayParsedLinks(links) {
+            const container = document.getElementById('parsed-links-container');
+            const linksDiv = document.getElementById('parsed-links');
+            
+            if (links && links.length > 0) {
+                linksDiv.innerHTML = links.map((link, index) => 
+                    `<div><strong>${index + 1}.</strong> ${link}</div>`
+                ).join('');
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        // Функция парсинга балуна и заполнения поля заведения
+        function parseBalloonAndFillVenue() {
+            console.log('=== ПАРСИНГ БАЛУНА ===');
+            
+            const result = extractNameFromBalloon();
+            
+            if (result.name) {
+                document.getElementById('venue-input').value = result.name;
+                console.log('✅ Название заведения заполнено:', result.name);
+            } else {
+                console.log('❌ Название заведения не найдено');
+            }
+            
+            if (result.links && result.links.length > 0) {
+                displayParsedLinks(result.links);
+                console.log('🔗 Отображены найденные ссылки:', result.links);
+            } else {
+                console.log('❌ Ссылки не найдены');
+                document.getElementById('parsed-links-container').style.display = 'none';
+            }
+            
+            console.log('=====================');
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+            console.log('🚀 Тестовая страница загружена');
+        };
+    </script>
+</body>
+</html> 

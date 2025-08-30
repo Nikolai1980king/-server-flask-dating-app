@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простой тест карты</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .map-container {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #333;
+            margin: 20px 0;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Простой тест карты</h1>
+    
+    <div id="status" class="status info">
+        🔄 Загружаем карту...
+    </div>
+    
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+    
+    <div id="console-output">
+        <h3>Консоль:</h3>
+        <div id="console-content"></div>
+    </div>
+
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <script>
+        function log(message) {
+            const consoleContent = document.getElementById('console-content');
+            const time = new Date().toLocaleTimeString();
+            consoleContent.innerHTML += `<div>[${time}] ${message}</div>`;
+            console.log(message);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        log('📄 Страница загружена');
+        
+        // Проверяем загрузку API
+        if (typeof ymaps !== 'undefined') {
+            log('✅ API Яндекс.Карт загружен');
+            initMap();
+        } else {
+            log('❌ API Яндекс.Карт не загружен');
+            updateStatus('❌ API Яндекс.Карт не загружен', 'error');
+            
+            // Проверяем через 3 секунды
+            setTimeout(function() {
+                if (typeof ymaps !== 'undefined') {
+                    log('✅ API Яндекс.Карт загружен (с задержкой)');
+                    initMap();
+                } else {
+                    log('❌ API Яндекс.Карт все еще не загружен');
+                    updateStatus('❌ Не удалось загрузить API Яндекс.Карт', 'error');
+                }
+            }, 3000);
+        }
+        
+        function initMap() {
+            log('🚀 Начинаем инициализацию карты...');
+            
+            ymaps.ready(function () {
+                log('✅ ymaps.ready() выполнен');
+                
+                try {
+                    const map = new ymaps.Map('map', {
+                        center: [55.76, 37.64], // Москва
+                        zoom: 10,
+                        controls: ['zoomControl', 'fullscreenControl']
+                    });
+                    
+                    log('✅ Карта создана успешно');
+                    updateStatus('✅ Карта загружена успешно!', 'success');
+                    
+                    // Добавляем метку
+                    const placemark = new ymaps.Placemark([55.76, 37.64], {
+                        balloonContent: 'Тестовая метка'
+                    });
+                    map.geoObjects.add(placemark);
+                    log('✅ Тестовая метка добавлена');
+                    
+                } catch (error) {
+                    log(`❌ Ошибка при создании карты: ${error.message}`);
+                    updateStatus(`❌ Ошибка: ${error.message}`, 'error');
+                }
+            });
+        }
+        
+        // Обработчик ошибок
+        window.addEventListener('error', function(e) {
+            log(`❌ Ошибка JavaScript: ${e.message}`);
+        });
+    </script>
+</body>
+</html> 

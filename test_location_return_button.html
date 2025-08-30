@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест кнопки "Я тут"</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .test-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .feature-box {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .feature-box h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+        }
+
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .test-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .demo-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .demo-box h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .demo-button {
+            position: relative;
+            display: inline-block;
+            background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(33, 150, 243, 0.3);
+            font-weight: bold;
+        }
+
+        .demo-button:hover {
+            box-shadow: 0 4px 16px rgba(33, 150, 243, 0.5);
+            transform: translateY(-2px) scale(1.05);
+            background: linear-gradient(90deg, #1976D2 0%, #42A5F5 100%);
+        }
+
+        .map-demo {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            border-radius: 10px;
+            position: relative;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1976d2;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .instruction-list {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .instruction-list h3 {
+            color: #FFC107;
+            margin-bottom: 15px;
+        }
+
+        .instruction-list ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instruction-list li {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .instruction-list li:before {
+            content: "📍";
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>📍 Тест кнопки "Я тут"</h2>
+        
+        <div class="feature-box">
+            <h3>🎯 Новая функция</h3>
+            <p>Добавлена маленькая кнопка "📍 Я тут" в правом верхнем углу карты, которая позволяет быстро вернуться к своему местоположению.</p>
+        </div>
+
+        <div class="demo-box">
+            <h3>🎨 Демонстрация кнопки</h3>
+            <div class="map-demo">
+                <div style="position: absolute; top: 10px; right: 10px;">
+                    <button class="demo-button">📍 Я тут</button>
+                </div>
+                Карта с кнопкой "Я тут"
+            </div>
+            <p><strong>Кнопка появляется:</strong> После определения местоположения пользователя</p>
+            <p><strong>Расположение:</strong> Правый верхний угол карты</p>
+            <p><strong>Цвет:</strong> Синий градиент с эффектами при наведении</p>
+        </div>
+
+        <div class="instruction-list">
+            <h3>🧪 Как протестировать:</h3>
+            <ul>
+                <li>Откройте страницу создания анкеты</li>
+                <li>Разрешите геолокацию в браузере</li>
+                <li>Дождитесь определения местоположения</li>
+                <li>Убедитесь, что кнопка "📍 Я тут" появилась на карте</li>
+                <li>Переместите карту в другое место (прокрутите, увеличьте/уменьшите)</li>
+                <li>Нажмите кнопку "📍 Я тут"</li>
+                <li>Проверьте, что карта вернулась к вашему местоположению</li>
+            </ul>
+        </div>
+
+        <div class="feature-box">
+            <h3>⚡ Функциональность</h3>
+            <ul>
+                <li><strong>Быстрый возврат:</strong> Один клик возвращает к местоположению</li>
+                <li><strong>Умная логика:</strong> Если местоположение не определено, определяет заново</li>
+                <li><strong>Красивый дизайн:</strong> Современный стиль с анимациями</li>
+                <li><strong>Удобное расположение:</strong> Не мешает работе с картой</li>
+                <li><strong>Отзывчивость:</strong> Эффекты при наведении и нажатии</li>
+            </ul>
+        </div>
+
+        <div class="demo-box">
+            <h3>🔧 Технические детали</h3>
+            <ul>
+                <li><strong>CSS класс:</strong> <code>.location-return-btn</code></li>
+                <li><strong>JavaScript функция:</strong> <code>returnToMyLocation()</code></li>
+                <li><strong>Позиционирование:</strong> <code>position: absolute; top: 10px; right: 10px;</code></li>
+                <li><strong>Z-index:</strong> <code>z-index: 1000;</code> (поверх карты)</li>
+                <li><strong>Отображение:</strong> <code>display: none;</code> по умолчанию, показывается после определения местоположения</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" class="test-btn">🚀 Открыть страницу создания анкеты</a>
+            <a href="/" class="test-btn">🏠 На главную</a>
+        </div>
+    </div>
+
+    <script>
+        console.log('📍 Страница тестирования кнопки "Я тут" загружена');
+        console.log('💡 Проверьте, что кнопка появляется после определения местоположения');
+        
+        // Демонстрация эффекта кнопки
+        document.querySelector('.demo-button').addEventListener('click', function() {
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 150);
+        });
+    </script>
+</body>
+</html> 

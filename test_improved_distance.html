@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест улучшенного расчета расстояния</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            color: white;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .test-section h3 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+
+        input, button {
+            padding: 12px;
+            margin: 10px 5px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 14px;
+        }
+
+        button {
+            background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .result {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: #f44336;
+        }
+
+        .info {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            color: #2196F3;
+        }
+
+        .venue-input {
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .coordinates-display {
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        .venue-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .venue-btn {
+            background: linear-gradient(90deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .venue-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест улучшенного расчета расстояния</h1>
+
+        <div class="test-section">
+            <h3>📍 Шаг 1: Выберите ваше местоположение</h3>
+            <p>Кликните на карте, чтобы выбрать ваше местоположение:</p>
+            <div id="map"></div>
+            <div id="location-info" class="info" style="display: none;">
+                <strong>Выбранное местоположение:</strong>
+                <div id="coordinates" class="coordinates-display"></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🏪 Шаг 2: Тестируем популярные заведения</h3>
+            <p>Быстрый тест с популярными сетями:</p>
+            <div class="venue-buttons">
+                <button class="venue-btn" onclick="testVenue('Пятерочка')">Пятерочка</button>
+                <button class="venue-btn" onclick="testVenue('Магнит')">Магнит</button>
+                <button class="venue-btn" onclick="testVenue('Макдональдс')">Макдональдс</button>
+                <button class="venue-btn" onclick="testVenue('KFC')">KFC</button>
+                <button class="venue-btn" onclick="testVenue('Бургер Кинг')">Бургер Кинг</button>
+                <button class="venue-btn" onclick="testVenue('Кофейня')">Кофейня</button>
+                <button class="venue-btn" onclick="testVenue('Кафе Уютное')">Кафе Уютное</button>
+                <button class="venue-btn" onclick="testVenue('Ресторан Вкусно')">Ресторан Вкусно</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Шаг 3: Введите название заведения</h3>
+            <p>Введите название кафе, ресторана или другого заведения:</p>
+            <input type="text" id="venue-input" class="venue-input" placeholder="Например: Кафе Уютное, Пятерочка, Макдональдс">
+            <button onclick="calculateDistance()">Рассчитать расстояние</button>
+            <div id="distance-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Результаты тестирования</h3>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>ℹ️ Информация о улучшениях</h3>
+            <ul style="color: #fff; text-align: left;">
+                <li>✅ Ограничение поиска районом 5-10 км</li>
+                <li>✅ Улучшенный поиск для популярных сетей</li>
+                <li>✅ Максимальное расстояние 10 км</li>
+                <li>✅ Поиск ближайшего заведения из нескольких вариантов</li>
+                <li>✅ Отладочная информация в консоли</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let myMap, myPlacemark;
+        let currentLocation = null;
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва по умолчанию
+                    zoom: 10,
+                    controls: ['zoomControl', 'fullscreenControl']
+                });
+
+                myMap.events.add('click', function (e) {
+                    var coords = e.get('coords');
+                    setLocation(coords[0], coords[1]);
+                });
+            });
+        }
+
+        function setLocation(lat, lng) {
+            currentLocation = {lat: lat, lng: lng};
+
+            // Удаляем предыдущую метку
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+            }
+
+            // Добавляем новую метку
+            myPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Ваше местоположение'
+            }, {
+                preset: 'islands#redDotIcon'
+            });
+
+            myMap.geoObjects.add(myPlacemark);
+            myMap.setCenter([lat, lng], 15);
+
+            // Показываем информацию о местоположении
+            document.getElementById('coordinates').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            document.getElementById('location-info').style.display = 'block';
+
+            console.log('📍 Местоположение установлено:', lat, lng);
+        }
+
+        function calculateDistance() {
+            const venueName = document.getElementById('venue-input').value.trim();
+            
+            if (!venueName) {
+                showResult('Введите название заведения', 'error');
+                return;
+            }
+
+            if (!currentLocation) {
+                showResult('Сначала выберите местоположение на карте', 'error');
+                return;
+            }
+
+            showResult('Рассчитываем расстояние...', 'info');
+
+            fetch('/api/calculate-venue-distance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    venue_name: venueName,
+                    user_lat: currentLocation.lat,
+                    user_lon: currentLocation.lng
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult(`✅ ${data.venue_with_distance}`, 'result');
+                    addTestResult(venueName, data.venue_with_distance, 'success');
+                } else {
+                    showResult(`❌ Ошибка: ${data.error}`, 'error');
+                    addTestResult(venueName, data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showResult(`❌ Ошибка сети: ${error.message}`, 'error');
+                addTestResult(venueName, `Ошибка сети: ${error.message}`, 'error');
+            });
+        }
+
+        function testVenue(venueName) {
+            document.getElementById('venue-input').value = venueName;
+            calculateDistance();
+        }
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('distance-result');
+            resultDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function addTestResult(venueName, result, status) {
+            const resultsDiv = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            const statusIcon = status === 'success' ? '✅' : '❌';
+            
+            const resultItem = document.createElement('div');
+            resultItem.className = status === 'success' ? 'result' : 'error';
+            resultItem.innerHTML = `
+                <strong>${statusIcon} ${venueName}</strong><br>
+                <small>Время: ${timestamp}</small><br>
+                Результат: ${result}
+            `;
+            
+            resultsDiv.appendChild(resultItem);
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html> 

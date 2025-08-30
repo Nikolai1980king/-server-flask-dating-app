@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест анимации печати</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .chat-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .chat-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            color: white;
+            max-width: 80%;
+        }
+        
+        .my-message {
+            background: rgba(76, 175, 80, 0.3);
+            margin-left: auto;
+        }
+        
+        .their-message {
+            background: rgba(102, 126, 234, 0.3);
+        }
+        
+        .typing-indicator {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin: 8px;
+            font-size: 0.8em;
+            color: #666;
+            display: none;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            align-self: flex-start;
+            max-width: 200px;
+        }
+        
+        .typing-indicator.show {
+            display: block;
+        }
+        
+        .typing-dots {
+            display: inline-block;
+            animation: typing 1.4s infinite;
+        }
+        
+        @keyframes typing {
+            0%, 20% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .typing-indicator {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #message-input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1em;
+        }
+        
+        #message-input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .send-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+        }
+        
+        .test-controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .test-btn {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ff8e8e 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+        
+        .test-btn:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🧪 Тест анимации печати</h1>
+            <p>Проверка работы индикатора "печатает..."</p>
+        </div>
+        
+        <div class="messages" id="messages">
+            <div class="message their-message">
+                Привет! Как дела?
+            </div>
+            <div class="message my-message">
+                Привет! Все хорошо, спасибо!
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typing-indicator">
+            <span>Собеседник печатает сообщение</span><span class="typing-dots">...</span>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="message-input" placeholder="Введите сообщение..." maxlength="400">
+            <button class="send-btn" onclick="sendMessage()">Отправить</button>
+        </div>
+        
+        <div class="test-controls">
+            <button class="test-btn" onclick="showTyping()">👆 Показать "печатает..."</button>
+            <button class="test-btn" onclick="hideTyping()">👆 Скрыть "печатает..."</button>
+            <button class="test-btn" onclick="simulateTyping()">⌨️ Симуляция печати</button>
+        </div>
+    </div>
+    
+    <script>
+        const typingIndicator = document.getElementById('typing-indicator');
+        const messageInput = document.getElementById('message-input');
+        let typingTimeout;
+        
+        // Функция показа индикатора печати
+        function showTyping() {
+            typingIndicator.classList.add('show');
+            console.log('✅ Индикатор печати показан');
+        }
+        
+        // Функция скрытия индикатора печати
+        function hideTyping() {
+            typingIndicator.classList.remove('show');
+            console.log('✅ Индикатор печати скрыт');
+        }
+        
+        // Функция симуляции печати
+        function simulateTyping() {
+            console.log('⌨️ Симуляция печати...');
+            showTyping();
+            
+            // Скрываем через 3 секунды
+            setTimeout(() => {
+                hideTyping();
+                console.log('✅ Симуляция печати завершена');
+            }, 3000);
+        }
+        
+        // Функция отправки сообщения
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (message) {
+                const messagesContainer = document.getElementById('messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message my-message';
+                messageDiv.textContent = message;
+                messagesContainer.appendChild(messageDiv);
+                
+                input.value = '';
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                console.log('📤 Сообщение отправлено:', message);
+            }
+        }
+        
+        // Обработчик Enter для отправки сообщения
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Обработчик ввода для симуляции отправки уведомления о печати
+        messageInput.addEventListener('input', function() {
+            console.log('⌨️ Пользователь печатает...');
+            // Здесь в реальном приложении будет отправляться уведомление о печати
+        });
+        
+        // Обработчик отправки формы для скрытия индикатора
+        document.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('📤 Форма отправлена, скрываем индикатор печати');
+            hideTyping();
+        });
+        
+        console.log('🧪 Тест анимации печати загружен');
+        console.log('💡 Используйте кнопки для тестирования анимации');
+    </script>
+</body>
+</html> 

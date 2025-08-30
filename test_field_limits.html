@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест ограничений полей</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        
+        .form-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        input, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1em;
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+
+        
+        .field-container {
+            position: relative;
+        }
+        
+        .test-info {
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>🧪 Тест ограничений полей</h2>
+        
+        <div class="test-info">
+            <h3>📋 Ограничения:</h3>
+            <ul>
+                <li><strong>Имя:</strong> максимум 12 символов</li>
+                <li><strong>Увлечения:</strong> максимум 70 символов</li>
+                <li><strong>Цель знакомства:</strong> максимум 70 символов</li>
+            </ul>
+            <p>💡 Попробуйте ввести больше символов, чем разрешено!</p>
+        </div>
+        
+        <form>
+            <div class="field-container">
+                <input type="text" name="name" placeholder="Ваше имя" maxlength="12" oninput="checkFieldLength(this, 12)">
+            </div>
+            
+            <div class="field-container">
+                <textarea name="hobbies" placeholder="Ваши увлечения" maxlength="70" oninput="checkFieldLength(this, 70)"></textarea>
+            </div>
+            
+            <div class="field-container">
+                <textarea name="goal" placeholder="Цель знакомства" maxlength="70" oninput="checkFieldLength(this, 70)"></textarea>
+            </div>
+        </form>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" style="color: #4CAF50; text-decoration: none; font-weight: bold;">← Вернуться к созданию анкеты</a>
+        </div>
+    </div>
+    
+    <script>
+        function checkFieldLength(field, maxLength) {
+            // Функциональность ограничений сохранена, но без визуальных счетчиков
+        }
+    </script>
+</body>
+</html> 

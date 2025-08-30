@@ -1,0 +1,24 @@
+# Flask Configuration
+FLASK_ENV=production
+SECRET_KEY=your-super-secret-key-change-this-in-production
+
+# Database Configuration
+DATABASE_URL=postgresql://flaskapp:password@localhost:5432/flaskapp
+
+# PostgreSQL Configuration (for Docker)
+POSTGRES_DB=flaskapp
+POSTGRES_USER=flaskapp
+POSTGRES_PASSWORD=your-secure-password
+
+# File Upload Configuration
+MAX_CONTENT_LENGTH=1073741824
+
+# Application Settings
+MAX_REGISTRATION_DISTANCE=3000
+PROFILE_LIFETIME_HOURS=24
+
+# Redis Configuration (for Socket.IO)
+REDIS_URL=redis://localhost:6379/0
+
+# Yandex Maps API Key (если используется)
+YANDEX_MAPS_API_KEY=your-yandex-maps-api-key 

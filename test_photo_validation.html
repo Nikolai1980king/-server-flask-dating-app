@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест валидации фотографий</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .form-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        input, textarea, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1em;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .modern-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .modern-btn:hover {
+            box-shadow: 0 8px 30px rgba(76, 175, 80, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .warning-box {
+            margin: 10px 0; 
+            padding: 15px; 
+            background: rgba(255, 193, 7, 0.1); 
+            border-radius: 10px; 
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+
+        .warning-text {
+            color: #ffc107; 
+            font-size: 0.9em;
+        }
+
+        .info-box {
+            margin: 10px 0; 
+            padding: 15px; 
+            background: rgba(0, 123, 255, 0.1); 
+            border-radius: 10px; 
+            border: 1px solid rgba(0, 123, 255, 0.3);
+        }
+
+        .info-text {
+            color: #007bff; 
+            font-size: 0.9em;
+        }
+
+        .back-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            box-shadow: 0 4px 14px rgba(108,117,125,0.2);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .back-btn:hover {
+            box-shadow: 0 6px 20px rgba(108,117,125,0.3);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>📸 Тест валидации фотографий</h2>
+        
+        <div class="info-box">
+            <div class="info-text">
+                <strong>ℹ️ Что тестируется:</strong><br>
+                • Принятие любых изображений (включая скриншоты)<br>
+                • Автоматическое сжатие до 800x800 пикселей<br>
+                • Сохранение в формате JPEG с качеством 85%<br>
+                • Единообразный размер всех фотографий<br>
+                • Поддержка файлов до 100MB
+            </div>
+        </div>
+
+        <form action="/create" method="post" enctype="multipart/form-data" id="test-form">
+            <input type="text" name="name" placeholder="Ваше имя" required>
+            <input type="number" name="age" placeholder="Ваш возраст" required>
+            
+            <select name="gender" required>
+                <option value="">Выберите пол</option>
+                <option value="male">Мужской</option>
+                <option value="female">Женский</option>
+            </select>
+            
+            <textarea name="hobbies" placeholder="Ваши увлечения" required></textarea>
+            
+            <select name="goal" required>
+                <option value="">Цель знакомства</option>
+                <option value="friendship">Дружба</option>
+                <option value="relationship">Отношения</option>
+                <option value="marriage">Брак</option>
+            </select>
+
+            <input type="hidden" name="latitude" value="55.7558">
+            <input type="hidden" name="longitude" value="37.6176">
+            <input type="hidden" name="venue" value="Тестовое кафе">
+            <input type="hidden" name="venue_lat" value="55.7558">
+            <input type="hidden" name="venue_lng" value="37.6176">
+
+            <input type="file" name="photo" accept="image/*" required>
+            
+            <div class="info-box">
+                <div class="info-text">
+                    📸 <strong>Информация:</strong> Принимаются любые изображения!<br>
+                    ✅ Принимаются: Screenshot_2025-01-01.jpg, Снимок экрана.png, photo.jpg, my_photo.png<br>
+                    🔧 Все изображения автоматически сжимаются до 800x800 пикселей
+                </div>
+            </div>
+
+            <div class="info-box">
+                <div class="info-text">
+                    <strong>📋 Инструкция для тестирования:</strong><br>
+                    1. Загрузите любой файл изображения (включая скриншоты) - должен обработаться успешно<br>
+                    2. Попробуйте загрузить большой файл (до 100MB) - должен обработаться<br>
+                    3. Проверьте, что фото сжалось до 800x800 пикселей<br>
+                    4. Откройте консоль браузера для просмотра информации о файле
+                </div>
+            </div>
+
+            <button type="submit" class="modern-btn">Создать тестовую анкету</button>
+        </form>
+        
+        <a href="/" class="back-btn">← На главную</a>
+    </div>
+
+    <script>
+        document.getElementById('test-form').addEventListener('submit', function(e) {
+            const fileInput = document.querySelector('input[type="file"]');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                console.log('📸 Загружаемый файл:', file.name, 'Размер:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+            }
+        });
+    </script>
+</body>
+</html> 

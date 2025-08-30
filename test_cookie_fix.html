@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест исправления Cookie</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .test-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .status-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .status-box h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .error-box {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .error-box h3 {
+            color: #F44336;
+            margin-bottom: 15px;
+        }
+
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .test-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .debug-info {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .debug-info h4 {
+            color: #FFC107;
+            margin-bottom: 10px;
+        }
+
+        .cookie-info {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .cookie-info h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+        }
+
+        .cookie-value {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🍪 Тест исправления Cookie</h2>
+        
+        <div class="status-box">
+            <h3>✅ Проблема решена</h3>
+            <p>Исправлена проблема с повторным созданием анкеты и ошибкой "Cookie: не найден".</p>
+        </div>
+
+        <div class="cookie-info">
+            <h3>📊 Информация о Cookie</h3>
+            <p><strong>Текущий user_id cookie:</strong></p>
+            <div class="cookie-value" id="cookie-display">Проверяется...</div>
+            <p><strong>Статус:</strong> <span id="cookie-status">Проверяется...</span></p>
+        </div>
+
+        <div class="debug-info">
+            <h4>🔧 Функции для тестирования:</h4>
+            <ul>
+                <li><strong>checkCookie()</strong> - Проверить текущий cookie</li>
+                <li><strong>clearCookie()</strong> - Очистить cookie</li>
+                <li><strong>testCreateProfile()</strong> - Тест создания анкеты</li>
+                <li><strong>testMultipleProfiles()</strong> - Тест создания нескольких анкет</li>
+            </ul>
+        </div>
+
+        <div class="error-box">
+            <h3>❌ Если проблема остается:</h3>
+            <ul>
+                <li>Проверьте консоль браузера на ошибки</li>
+                <li>Убедитесь, что сервер перезапущен</li>
+                <li>Попробуйте очистить cookie и создать анкету заново</li>
+                <li>Проверьте, что все поля формы заполнены</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="checkCookie()" class="test-btn">🔍 Проверить Cookie</button>
+            <button onclick="clearCookie()" class="test-btn">🗑️ Очистить Cookie</button>
+            <button onclick="testCreateProfile()" class="test-btn">📝 Тест создания анкеты</button>
+            <button onclick="testMultipleProfiles()" class="test-btn">🔄 Тест нескольких анкет</button>
+            <a href="/create" class="test-btn">🚀 Открыть создание анкеты</a>
+            <a href="/" class="test-btn">🏠 На главную</a>
+        </div>
+    </div>
+
+    <script>
+        // Функция для получения cookie по имени
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Функция для проверки cookie
+        function checkCookie() {
+            const userCookie = getCookie('user_id');
+            const cookieDisplay = document.getElementById('cookie-display');
+            const cookieStatus = document.getElementById('cookie-status');
+            
+            if (userCookie) {
+                cookieDisplay.textContent = userCookie;
+                cookieStatus.textContent = '✅ Найден';
+                cookieStatus.style.color = '#4CAF50';
+                console.log('✅ Cookie найден:', userCookie);
+            } else {
+                cookieDisplay.textContent = 'Не найден';
+                cookieStatus.textContent = '❌ Не найден';
+                cookieStatus.style.color = '#F44336';
+                console.log('❌ Cookie не найден');
+            }
+        }
+
+        // Функция для очистки cookie
+        function clearCookie() {
+            fetch('/clear_cookie')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('✅ Cookie очищен');
+                        alert('Cookie очищен! Теперь можно создать новую анкету.');
+                        checkCookie();
+                    } else {
+                        console.log('❌ Ошибка очистки cookie');
+                        alert('Ошибка очистки cookie');
+                    }
+                })
+                .catch(error => {
+                    console.log('❌ Ошибка запроса:', error);
+                    alert('Ошибка запроса');
+                });
+        }
+
+        // Функция для тестирования создания анкеты
+        function testCreateProfile() {
+            console.log('🧪 Тестирование создания анкеты...');
+            
+            // Проверяем, есть ли cookie
+            const userCookie = getCookie('user_id');
+            if (userCookie) {
+                console.log('✅ Cookie найден, можно создавать анкету');
+                window.location.href = '/create';
+            } else {
+                console.log('❌ Cookie не найден, сначала нужно получить cookie');
+                // Переходим на главную страницу, где должен установиться cookie
+                window.location.href = '/';
+            }
+        }
+
+        // Функция для тестирования создания нескольких анкет
+        function testMultipleProfiles() {
+            console.log('🔄 Тестирование создания нескольких анкет...');
+            
+            // Сначала очищаем cookie
+            clearCookie();
+            
+            // Через 1 секунду переходим к созданию анкеты
+            setTimeout(() => {
+                window.location.href = '/create';
+            }, 1000);
+        }
+
+        // Проверяем cookie при загрузке страницы
+        window.onload = function() {
+            console.log('🍪 Страница загружена, проверяем cookie...');
+            checkCookie();
+        };
+
+        // Проверяем cookie каждые 5 секунд
+        setInterval(checkCookie, 5000);
+        
+        console.log('🧪 Страница тестирования cookie загружена');
+        console.log('💡 Доступные функции: checkCookie(), clearCookie(), testCreateProfile(), testMultipleProfiles()');
+    </script>
+</body>
+</html> 

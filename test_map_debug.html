@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Тест карты</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        #map { 
+            width: 100%; 
+            height: 400px; 
+            border: 2px solid #ccc;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест карты Яндекс</h1>
+    
+    <div id="status" class="status info">Загрузка...</div>
+    
+    <button onclick="initMap()">Инициализировать карту</button>
+    <button onclick="checkYmaps()">Проверить ymaps</button>
+    <button onclick="getLocation()">Получить геолокацию</button>
+    
+    <div id="map"></div>
+    
+    <div id="debug-info"></div>
+
+    <script>
+        let myMap = null;
+        let myPlacemark = null;
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function addDebugInfo(info) {
+            const debug = document.getElementById('debug-info');
+            const div = document.createElement('div');
+            div.style.padding = '5px';
+            div.style.margin = '2px 0';
+            div.style.backgroundColor = '#f8f9fa';
+            div.style.borderLeft = '3px solid #007bff';
+            div.textContent = new Date().toLocaleTimeString() + ': ' + info;
+            debug.appendChild(div);
+        }
+        
+        function checkYmaps() {
+            addDebugInfo('Проверка ymaps...');
+            
+            if (typeof ymaps === 'undefined') {
+                updateStatus('❌ ymaps не загружен', 'error');
+                addDebugInfo('ymaps не определен');
+                return false;
+            }
+            
+            updateStatus('✅ ymaps загружен', 'success');
+            addDebugInfo('ymaps определен: ' + typeof ymaps);
+            addDebugInfo('ymaps.ready: ' + typeof ymaps.ready);
+            
+            return true;
+        }
+        
+        function initMap() {
+            addDebugInfo('Инициализация карты...');
+            
+            if (!checkYmaps()) {
+                return;
+            }
+            
+            try {
+                ymaps.ready(function () {
+                    addDebugInfo('ymaps.ready выполнен');
+                    
+                    try {
+                        myMap = new ymaps.Map('map', {
+                            center: [55.76, 37.64], // Москва
+                            zoom: 10,
+                            controls: ['zoomControl', 'fullscreenControl']
+                        });
+                        
+                        updateStatus('✅ Карта инициализирована', 'success');
+                        addDebugInfo('Карта создана успешно');
+                        
+                        // Добавляем метку
+                        myPlacemark = new ymaps.Placemark([55.76, 37.64], {
+                            balloonContent: 'Тестовая метка'
+                        }, {
+                            preset: 'islands#redDotIcon'
+                        });
+                        
+                        myMap.geoObjects.add(myPlacemark);
+                        addDebugInfo('Метка добавлена');
+                        
+                    } catch (mapError) {
+                        updateStatus('❌ Ошибка создания карты: ' + mapError.message, 'error');
+                        addDebugInfo('Ошибка карты: ' + mapError.message);
+                    }
+                });
+                
+            } catch (readyError) {
+                updateStatus('❌ Ошибка ymaps.ready: ' + readyError.message, 'error');
+                addDebugInfo('Ошибка ymaps.ready: ' + readyError.message);
+            }
+        }
+        
+        function getLocation() {
+            addDebugInfo('Запрос геолокации...');
+            
+            if (!navigator.geolocation) {
+                updateStatus('❌ Геолокация не поддерживается', 'error');
+                addDebugInfo('Геолокация недоступна');
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    updateStatus(`✅ Геолокация: ${lat.toFixed(6)}, ${lng.toFixed(6)}`, 'success');
+                    addDebugInfo(`Координаты: ${lat}, ${lng}`);
+                    
+                    if (myMap) {
+                        myMap.setCenter([lat, lng], 15);
+                        addDebugInfo('Карта центрирована на вашем местоположении');
+                    }
+                },
+                function(error) {
+                    updateStatus('❌ Ошибка геолокации: ' + error.message, 'error');
+                    addDebugInfo('Ошибка геолокации: ' + error.message);
+                },
+                {
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                    maximumAge: 60000
+                }
+            );
+        }
+        
+        // Автоматическая проверка при загрузке
+        window.onload = function() {
+            addDebugInfo('Страница загружена');
+            
+            // Проверяем ymaps через 2 секунды
+            setTimeout(function() {
+                checkYmaps();
+            }, 2000);
+            
+            // Автоматически инициализируем карту через 3 секунды
+            setTimeout(function() {
+                initMap();
+            }, 3000);
+        };
+    </script>
+</body>
+</html> 

@@ -2175,6 +2175,66 @@ def create_profile():
     ''', navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css)
 
 
+# Функции для работы с настройками пользователя
+def get_user_settings(user_id):
+    """Получает настройки пользователя из базы данных"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect('dating_app.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT sound_notifications FROM user_settings WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        conn.close()
+        
+        if result:
+            return {'sound_notifications': bool(result[0])}
+        else:
+            # Создаем настройки по умолчанию
+            return {'sound_notifications': True}
+            
+    except Exception as e:
+        print(f"❌ Ошибка получения настроек для {user_id}: {e}")
+        return {'sound_notifications': True}
+
+
+def update_user_settings(user_id, sound_notifications):
+    """Обновляет настройки пользователя в базе данных"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect('dating_app.db')
+        cursor = conn.cursor()
+        
+        # Проверяем, есть ли уже настройки для пользователя
+        cursor.execute('SELECT id FROM user_settings WHERE user_id = ?', (user_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Обновляем существующие настройки
+            cursor.execute('''
+                UPDATE user_settings 
+                SET sound_notifications = ?, updated_at = ? 
+                WHERE user_id = ?
+            ''', (1 if sound_notifications else 0, datetime.utcnow(), user_id))
+        else:
+            # Создаем новые настройки
+            cursor.execute('''
+                INSERT INTO user_settings (user_id, sound_notifications, created_at, updated_at) 
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, 1 if sound_notifications else 0, datetime.utcnow(), datetime.utcnow()))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Ошибка обновления настроек для {user_id}: {e}")
+        return False
+
+
 def require_profile(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
@@ -3819,43 +3879,56 @@ def chat(other_user_id):
 
                 // Функция воспроизведения звука колокольчика
                 function playNotificationSound() {
-                    if (!chatUserInteracted) {
-                        chatUserInteracted = true;
-                    }
-                    
-                    try {
-                        if (!chatAudioContext) {
-                            initChatAudio();
-                        }
-                        
-                        if (chatAudioContext && chatAudioContext.state === 'suspended') {
-                            chatAudioContext.resume();
-                        }
-                        
-                        const oscillator = chatAudioContext.createOscillator();
-                        const gainNode = chatAudioContext.createGain();
-                        
-                        // Классический звук колокольчика
-                        oscillator.type = 'sine';
-                        oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
-                        oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
-                        oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
-                        oscillator.frequency.setValueAtTime(400, chatAudioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
-                        
-                        gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.5);
-                        
-                        oscillator.connect(gainNode);
-                        gainNode.connect(chatAudioContext.destination);
-                        
-                        oscillator.start(chatAudioContext.currentTime);
-                        oscillator.stop(chatAudioContext.currentTime + 0.5); // Длительность 0.5 секунды
-                        
-                        console.log('🔔 Звук колокольчика воспроизведен при новом сообщении');
-                        
-                    } catch (error) {
-                        console.error('❌ Ошибка воспроизведения звука:', error);
-                    }
+                    // Проверяем настройки пользователя перед воспроизведением
+                    fetch('/api/get_settings')
+                        .then(response => response.json())
+                        .then(settings => {
+                            if (!settings.sound_notifications) {
+                                console.log('🔕 Звук отключен в настройках');
+                                return;
+                            }
+                            
+                            if (!chatUserInteracted) {
+                                chatUserInteracted = true;
+                            }
+                            
+                            try {
+                                if (!chatAudioContext) {
+                                    initChatAudio();
+                                }
+                                
+                                if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                                    chatAudioContext.resume();
+                                }
+                                
+                                const oscillator = chatAudioContext.createOscillator();
+                                const gainNode = chatAudioContext.createGain();
+                                
+                                // Классический звук колокольчика
+                                oscillator.type = 'sine';
+                                oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
+                                oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                                oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                                oscillator.frequency.setValueAtTime(400, chatAudioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                                
+                                gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
+                                gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.5);
+                                
+                                oscillator.connect(gainNode);
+                                gainNode.connect(chatAudioContext.destination);
+                                
+                                oscillator.start(chatAudioContext.currentTime);
+                                oscillator.stop(chatAudioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                                
+                                console.log('🔔 Звук колокольчика воспроизведен при новом сообщении');
+                                
+                            } catch (error) {
+                                console.error('❌ Ошибка воспроизведения звука:', error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('❌ Ошибка получения настроек:', error);
+                        });
                 }
 
                 // Функция добавления сообщения
@@ -4617,6 +4690,34 @@ def terms():
     ''')
 
 
+@app.route('/api/update_settings', methods=['POST'])
+@require_profile
+def api_update_settings():
+    """API для обновления настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    data = request.get_json()
+    
+    if not data or 'sound_notifications' not in data:
+        return jsonify({"error": "Неверные данные"}), 400
+    
+    sound_enabled = data['sound_notifications']
+    success = update_user_settings(user_id, sound_enabled)
+    
+    if success:
+        return jsonify({"success": True, "sound_notifications": sound_enabled})
+    else:
+        return jsonify({"error": "Ошибка обновления настроек"}), 500
+
+
+@app.route('/api/get_settings')
+@require_profile
+def api_get_settings():
+    """API для получения настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    settings = get_user_settings(user_id)
+    return jsonify(settings)
+
+
 @app.route('/settings')
 @require_profile
 def settings():
@@ -4693,16 +4794,84 @@ def settings():
             <div class="settings-card">
                 <div class="setting-item">
                     <div>
-                        <div class="setting-label">🔔 Тест звука</div>
-                        <div class="setting-description">Нажмите на колокольчик, чтобы услышать классический звук</div>
+                        <div class="setting-label">🔔 Звуковые уведомления</div>
+                        <div class="setting-description">Включить/выключить звук при получении сообщений</div>
                     </div>
-                    <button class="bell-button" onclick="playBellSound()">🔔</button>
+                    <button id="sound-toggle" class="bell-button" onclick="toggleSound()">🔔</button>
                 </div>
             </div>
             
             <script>
                 let audioContext = null;
                 let userInteracted = false;
+                let soundEnabled = true;
+                
+                // Загружаем настройки при загрузке страницы
+                window.addEventListener('load', function() {
+                    loadSettings();
+                });
+                
+                // Загрузка настроек
+                function loadSettings() {
+                    fetch('/api/get_settings')
+                        .then(response => response.json())
+                        .then(settings => {
+                            soundEnabled = settings.sound_notifications;
+                            updateBellAppearance();
+                            console.log('📋 Настройки загружены:', settings);
+                        })
+                        .catch(error => {
+                            console.error('❌ Ошибка загрузки настроек:', error);
+                        });
+                }
+                
+                // Обновление внешнего вида колокольчика
+                function updateBellAppearance() {
+                    const bellButton = document.getElementById('sound-toggle');
+                    if (soundEnabled) {
+                        bellButton.textContent = '🔔';
+                        bellButton.style.filter = 'none';
+                        bellButton.style.background = '#ff6b6b';
+                    } else {
+                        bellButton.textContent = '🔕';
+                        bellButton.style.filter = 'grayscale(100%)';
+                        bellButton.style.background = '#666';
+                    }
+                }
+                
+                // Переключение звука
+                function toggleSound() {
+                    soundEnabled = !soundEnabled;
+                    
+                    // Обновляем внешний вид
+                    updateBellAppearance();
+                    
+                    // Сохраняем настройки
+                    fetch('/api/update_settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            sound_notifications: soundEnabled
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('✅ Настройки сохранены:', data);
+                            // Воспроизводим звук только если включен
+                            if (soundEnabled) {
+                                playBellSound();
+                            }
+                        } else {
+                            console.error('❌ Ошибка сохранения настроек:', data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Ошибка сохранения настроек:', error);
+                    });
+                }
                 
                 // Инициализация аудио
                 function initAudio() {
@@ -4752,7 +4921,6 @@ def settings():
                         
                     } catch (error) {
                         console.error('❌ Ошибка воспроизведения звука:', error);
-                        alert('Ошибка воспроизведения звука: ' + error.message);
                     }
                 }
                 

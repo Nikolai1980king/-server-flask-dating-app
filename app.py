@@ -3879,7 +3879,7 @@ def chat(other_user_id):
 
                 // Переменные для звука в чате
                 let chatAudioContext = null;
-                let userInteracted = false;
+                let chatUserInteracted = false;
 
                 // Инициализация аудио контекста для чата
                 function initChatAudio() {
@@ -3929,14 +3929,14 @@ def chat(other_user_id):
 
                 // Отмечаем взаимодействие пользователя в чате
                 document.addEventListener('click', () => {
-                    userInteracted = true;
+                    chatUserInteracted = true;
                     if (chatAudioContext && chatAudioContext.state === 'suspended') {
                         chatAudioContext.resume();
                     }
                 });
                 
                 document.addEventListener('keydown', () => {
-                    userInteracted = true;
+                    chatUserInteracted = true;
                     if (chatAudioContext && chatAudioContext.state === 'suspended') {
                         chatAudioContext.resume();
                     }

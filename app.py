@@ -178,6 +178,7 @@ notifications = defaultdict(list)
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
+user_settings = defaultdict(dict)  # user_id -> settings dict
 
 
 def add_notification(user_id, message):
@@ -222,6 +223,20 @@ def get_unread_matches_count(user_id):
     return len(new_matches[user_id])
 
 
+def get_user_settings(user_id):
+    """Получить настройки пользователя"""
+    if user_id not in user_settings:
+        user_settings[user_id] = {
+            'sound_notifications': True  # По умолчанию включены
+        }
+    return user_settings[user_id]
+
+
+def update_user_settings(user_id, settings):
+    """Обновить настройки пользователя"""
+    user_settings[user_id].update(settings)
+
+
 def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unread_matches=0):
     avatar_html = ''
     if user_id and Profile.query.get(user_id):
@@ -244,6 +259,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             ✉️
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
+        <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
     </nav>
     <div style="height:48px"></div>
     <script>
@@ -293,6 +309,38 @@ def api_unread():
         "unread_likes": get_unread_likes_count(user_id) if user_id else 0,
         "unread_matches": get_unread_matches_count(user_id) if user_id else 0
     })
+
+
+@app.route('/api/get_settings')
+def api_get_settings():
+    """API для получения настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    try:
+        settings = get_user_settings(user_id)
+        return jsonify(settings), 200
+    except Exception as e:
+        return jsonify({"error": "Ошибка при получении настроек"}), 500
+
+
+@app.route('/api/update_settings', methods=['POST'])
+def api_update_settings():
+    """API для обновления настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Нет данных"}), 400
+
+        update_user_settings(user_id, data)
+        return jsonify({"success": True, "message": "Настройки обновлены"}), 200
+    except Exception as e:
+        return jsonify({"error": "Ошибка при обновлении настроек"}), 500
 
 
 @app.route('/api/mark_messages_read/<string:other_user_id>', methods=['POST'])
@@ -3303,6 +3351,188 @@ def delete_profile(id):
     return redirect(url_for('home'))
 
 
+@app.route('/settings')
+@require_profile
+def settings():
+    user_id = request.cookies.get('user_id')
+    settings = get_user_settings(user_id)
+    navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Настройки</title>
+            <style>
+                {{ get_starry_night_css()|safe }}
+                body { max-width: 600px; margin: 0 auto; padding: 20px; }
+                h1 { 
+                    color: #fff; 
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                    margin-bottom: 25px;
+                    font-size: 1.8em;
+                }
+                .settings-card { 
+                    background: #030202; 
+                    border-radius: 15px; 
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
+                    padding: 25px; 
+                    margin-bottom: 20px;
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
+                }
+                .setting-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px 0;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                .setting-item:last-child {
+                    border-bottom: none;
+                }
+                .setting-label {
+                    font-size: 1.1em;
+                    font-weight: 500;
+                }
+                .setting-description {
+                    font-size: 0.9em;
+                    color: #ccc;
+                    margin-top: 5px;
+                }
+                .toggle-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 60px;
+                    height: 34px;
+                }
+                .toggle-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #ccc;
+                    transition: .4s;
+                    border-radius: 34px;
+                }
+                .slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 26px;
+                    width: 26px;
+                    left: 4px;
+                    bottom: 4px;
+                    background-color: white;
+                    transition: .4s;
+                    border-radius: 50%;
+                }
+                input:checked + .slider {
+                    background-color: #ff6b6b;
+                }
+                input:checked + .slider:before {
+                    transform: translateX(26px);
+                }
+                .test-sound-btn {
+                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 0.9em;
+                    cursor: pointer;
+                    margin-left: 15px;
+                    transition: all 0.3s ease;
+                }
+                .test-sound-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                }
+                .back-btn {
+                    background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 25px;
+                    box-shadow: 0 4px 14px rgba(108,117,125,0.2);
+                    font-size: 1.1em;
+                    cursor: pointer;
+                    transition: box-shadow 0.2s, transform 0.2s;
+                    text-decoration: none;
+                    display: inline-block;
+                    margin-top: 20px;
+                }
+                .back-btn:hover {
+                    box-shadow: 0 8px 24px rgba(108,117,125,0.3);
+                    transform: translateY(-2px) scale(1.03);
+                }
+            </style>
+            <script>
+                function toggleSoundNotifications(checkbox) {
+                    const enabled = checkbox.checked;
+                    fetch('/api/update_settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            sound_notifications: enabled
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Настройки обновлены');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка при обновлении настроек:', error);
+                    });
+                }
+                
+                function playNotificationSound() {
+                    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                    audio.play().catch(e => console.log('Ошибка воспроизведения звука:', e));
+                }
+            </script>
+        </head>
+        <body>
+            {{ navbar|safe }}
+            <h1>⚙️ Настройки</h1>
+            
+            <div class="settings-card">
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">🔔 Звуковые уведомления</div>
+                        <div class="setting-description">Включить звук при получении новых сообщений</div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="sound-toggle" 
+                                   {% if settings.sound_notifications %}checked{% endif %}
+                                   onchange="toggleSoundNotifications(this)">
+                            <span class="slider"></span>
+                        </label>
+                        <button class="test-sound-btn" onclick="playNotificationSound()">Тест</button>
+                    </div>
+                </div>
+            </div>
+            
+            <a href="/" class="back-btn">← На главную</a>
+        </body>
+        </html>
+    ''', settings=settings, navbar=navbar, get_starry_night_css=get_starry_night_css)
+
+
 @app.route('/my_matches')
 @require_profile
 def my_matches():
@@ -3842,11 +4072,32 @@ def chat(other_user_id):
                                 // Если есть новые сообщения от собеседника, отмечаем их как прочитанные
                                 if (hasNewMessagesFromOther) {
                                     markMessagesAsRead(other_user_id);
+                                    // Воспроизводим звук уведомления
+                                    playNotificationSound();
                                 }
                             }
                         })
                         .catch(error => {
                             console.error('Ошибка при получении новых сообщений:', error);
+                        });
+                }
+
+                // Функция воспроизведения звука уведомления
+                function playNotificationSound() {
+                    // Проверяем настройки пользователя
+                    fetch('/api/get_settings')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.sound_notifications) {
+                                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                                audio.play().catch(e => console.log('Ошибка воспроизведения звука:', e));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Ошибка при получении настроек:', error);
+                            // Если не удалось получить настройки, воспроизводим звук по умолчанию
+                            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                            audio.play().catch(e => console.log('Ошибка воспроизведения звука:', e));
                         });
                 }
 
@@ -3858,6 +4109,8 @@ def chat(other_user_id):
                         lastMessageCount++;
                         // Автоматически отмечаем сообщение как прочитанное
                         markMessagesAsRead(other_user_id);
+                        // Воспроизводим звук уведомления
+                        playNotificationSound();
                     }
                 });
 

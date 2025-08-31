@@ -2171,7 +2171,7 @@ def view_visitors():
                     font-size: 1.1em;
                 }
                 .visitor-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -2196,8 +2196,8 @@ def view_visitors():
                     height: 80px;
                 }
                 .visitor-info { flex: 1; }
-                .visitor-card h2 { margin: 0 0 5px 0; }
-                .visitor-card p { margin: 5px 0; color: #666; }
+                .visitor-card h2 { margin: 0 0 5px 0; color: #fff; }
+                .visitor-card p { margin: 5px 0; color: #fff; }
                 .like-btn {
                     background: none;
                     border: none;

@@ -3803,6 +3803,61 @@ def chat(other_user_id):
                 const socket = io();
                 socket.emit('join', {room: chat_key});
 
+                // Переменные для звука
+                let chatAudioContext = null;
+                let chatUserInteracted = false;
+
+                // Инициализация аудио для чата
+                function initChatAudio() {
+                    try {
+                        chatAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст инициализирован в чате');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в чате:', error.message);
+                    }
+                }
+
+                // Функция воспроизведения звука колокольчика
+                function playNotificationSound() {
+                    if (!chatUserInteracted) {
+                        chatUserInteracted = true;
+                    }
+                    
+                    try {
+                        if (!chatAudioContext) {
+                            initChatAudio();
+                        }
+                        
+                        if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                            chatAudioContext.resume();
+                        }
+                        
+                        const oscillator = chatAudioContext.createOscillator();
+                        const gainNode = chatAudioContext.createGain();
+                        
+                        // Классический звук колокольчика
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
+                        oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                        oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                        oscillator.frequency.setValueAtTime(400, chatAudioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                        
+                        gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.5);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(chatAudioContext.destination);
+                        
+                        oscillator.start(chatAudioContext.currentTime);
+                        oscillator.stop(chatAudioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                        
+                        console.log('🔔 Звук колокольчика воспроизведен при новом сообщении');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука:', error);
+                    }
+                }
+
                 // Функция добавления сообщения
                 function addMessage(msg, sender, timestamp = null) {
                     // Проверяем, нет ли уже такого сообщения на странице
@@ -3828,6 +3883,11 @@ def chat(other_user_id):
 
                     document.getElementById('messages').appendChild(div);
                     window.scrollTo(0, document.body.scrollHeight);
+
+                    // Воспроизводим звук только для сообщений от собеседника
+                    if (sender !== user_id) {
+                        playNotificationSound();
+                    }
                 }
 
                 // Функция отметки сообщений как прочитанные
@@ -3885,6 +3945,8 @@ def chat(other_user_id):
                                     if (msg.sender !== user_id) {
                                         addMessage(msg.text, msg.sender, msg.timestamp);
                                         hasNewMessagesFromOther = true;
+                                        // Воспроизводим звук для новых сообщений от собеседника
+                                        playNotificationSound();
                                     }
                                 });
 
@@ -3912,6 +3974,8 @@ def chat(other_user_id):
                         lastMessageCount++;
                         // Автоматически отмечаем сообщение как прочитанное
                         markMessagesAsRead(other_user_id);
+                        // Воспроизводим звук для новых сообщений от собеседника
+                        playNotificationSound();
                     }
                 });
 
@@ -3997,6 +4061,15 @@ def chat(other_user_id):
                     window.scrollTo(0, document.body.scrollHeight);
                     // Отмечаем все сообщения от собеседника как прочитанные при загрузке чата
                     markMessagesAsRead(other_user_id);
+                });
+
+                // Отмечаем взаимодействие пользователя для активации аудио
+                document.addEventListener('click', () => {
+                    chatUserInteracted = true;
+                    if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                        chatAudioContext.resume();
+                    }
+                });
                 });
             </script>
         </body>

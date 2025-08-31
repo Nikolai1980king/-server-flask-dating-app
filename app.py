@@ -4070,7 +4070,6 @@ def chat(other_user_id):
                         chatAudioContext.resume();
                     }
                 });
-                });
             </script>
         </body>
         </html>

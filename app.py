@@ -271,18 +271,18 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     </nav>
     <div style="height:48px"></div>
     <script>
-    // Глобальные переменные для звука
-    let audioContext = null;
+    // Глобальные переменные для звука в навигации
+    let navAudioContext = null;
     let previousMessageCount = 0;
     let userInteracted = false;
     
-    // Инициализация аудио контекста
-    function initAudio() {
+    // Инициализация аудио контекста для навигации
+    function initNavAudio() {
         try {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            console.log('✅ Аудио контекст инициализирован');
+            navAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('✅ Аудио контекст навигации инициализирован');
         } catch (error) {
-            console.log('⚠️ Аудио не поддерживается:', error.message);
+            console.log('⚠️ Аудио не поддерживается в навигации:', error.message);
         }
     }
     
@@ -303,28 +303,28 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 }
                 
                 try {
-                    if (!audioContext) {
-                        initAudio();
+                    if (!navAudioContext) {
+                        initNavAudio();
                     }
                     
-                    if (audioContext && audioContext.state === 'suspended') {
-                        audioContext.resume();
+                    if (navAudioContext && navAudioContext.state === 'suspended') {
+                        navAudioContext.resume();
                     }
                     
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
+                    const oscillator = navAudioContext.createOscillator();
+                    const gainNode = navAudioContext.createGain();
                     
                     // Настройки звука для сообщений
                     oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime); // 600 Гц для сообщений
-                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime); // Громкость 20%
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    oscillator.frequency.setValueAtTime(600, navAudioContext.currentTime); // 600 Гц для сообщений
+                    gainNode.gain.setValueAtTime(0.2, navAudioContext.currentTime); // Громкость 20%
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, navAudioContext.currentTime + 0.3);
                     
                     oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
+                    gainNode.connect(navAudioContext.destination);
                     
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.3); // Длительность 0.3 секунды
+                    oscillator.start(navAudioContext.currentTime);
+                    oscillator.stop(navAudioContext.currentTime + 0.3); // Длительность 0.3 секунды
                     
                     console.log('🔔 Звук сообщения воспроизведен');
                     
@@ -353,28 +353,28 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 }
                 
                 try {
-                    if (!audioContext) {
-                        initAudio();
+                    if (!navAudioContext) {
+                        initNavAudio();
                     }
                     
-                    if (audioContext && audioContext.state === 'suspended') {
-                        audioContext.resume();
+                    if (navAudioContext && navAudioContext.state === 'suspended') {
+                        navAudioContext.resume();
                     }
                     
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
+                    const oscillator = navAudioContext.createOscillator();
+                    const gainNode = navAudioContext.createGain();
                     
                     // Настройки звука для лайков
                     oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц для лайков
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    oscillator.frequency.setValueAtTime(800, navAudioContext.currentTime); // 800 Гц для лайков
+                    gainNode.gain.setValueAtTime(0.3, navAudioContext.currentTime); // Громкость 30%
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, navAudioContext.currentTime + 0.5);
                     
                     oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
+                    gainNode.connect(navAudioContext.destination);
                     
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                    oscillator.start(navAudioContext.currentTime);
+                    oscillator.stop(navAudioContext.currentTime + 0.5); // Длительность 0.5 секунды
                     
                     console.log('❤️ Звук лайка воспроизведен');
                     
@@ -390,15 +390,15 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     // Отмечаем взаимодействие пользователя
     document.addEventListener('click', () => {
         userInteracted = true;
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
+        if (navAudioContext && navAudioContext.state === 'suspended') {
+            navAudioContext.resume();
         }
     });
     
     document.addEventListener('keydown', () => {
         userInteracted = true;
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
+        if (navAudioContext && navAudioContext.state === 'suspended') {
+            navAudioContext.resume();
         }
     });
     

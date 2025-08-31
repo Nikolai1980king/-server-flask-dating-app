@@ -179,6 +179,22 @@ notifications = defaultdict(list)
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
 
+# Глобальные переменные для настроек пользователей
+user_settings = defaultdict(dict)
+
+def get_user_settings(user_id):
+    """Получить настройки пользователя"""
+    if not user_id:
+        return {'sound_notifications': True}  # По умолчанию включено
+    return user_settings.get(user_id, {'sound_notifications': True})
+
+def update_user_settings(user_id, settings):
+    """Обновить настройки пользователя"""
+    if not user_id:
+        return False
+    user_settings[user_id].update(settings)
+    return True
+
 
 def add_notification(user_id, message):
     notifications[user_id].append({
@@ -251,6 +267,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             ✉️
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
+        <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
     </nav>
     <div style="height:48px"></div>
     <script>
@@ -271,77 +288,103 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     
     // Функция воспроизведения звука сообщения
     function playMessageSound() {
-        // Проверяем, что страница видима и пользователь взаимодействовал
-        if (document.visibilityState !== 'visible' || !userInteracted) {
-            return;
-        }
-        
-        try {
-            if (!audioContext) {
-                initAudio();
-            }
-            
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-            
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            // Настройки звука для сообщений
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(600, audioContext.currentTime); // 600 Гц для сообщений
-            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime); // Громкость 20%
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.3); // Длительность 0.3 секунды
-            
-            console.log('🔔 Звук сообщения воспроизведен');
-            
-        } catch (error) {
-            console.error('❌ Ошибка воспроизведения звука сообщения:', error);
-        }
+        // Проверяем настройки звука
+        fetch('/api/get_settings')
+            .then(response => response.json())
+            .then(settings => {
+                if (!settings.sound_notifications) {
+                    console.log('🔇 Звук отключен в настройках');
+                    return;
+                }
+                
+                // Проверяем, что страница видима и пользователь взаимодействовал
+                if (document.visibilityState !== 'visible' || !userInteracted) {
+                    return;
+                }
+                
+                try {
+                    if (!audioContext) {
+                        initAudio();
+                    }
+                    
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    // Настройки звука для сообщений
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime); // 600 Гц для сообщений
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime); // Громкость 20%
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3); // Длительность 0.3 секунды
+                    
+                    console.log('🔔 Звук сообщения воспроизведен');
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка воспроизведения звука сообщения:', error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Ошибка получения настроек:', error);
+            });
     }
     
     // Функция воспроизведения звука лайка
     function playLikeSound() {
-        if (document.visibilityState !== 'visible' || !userInteracted) {
-            return;
-        }
-        
-        try {
-            if (!audioContext) {
-                initAudio();
-            }
-            
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-            
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            // Настройки звука для лайков
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц для лайков
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
-            
-            console.log('❤️ Звук лайка воспроизведен');
-            
-        } catch (error) {
-            console.error('❌ Ошибка воспроизведения звука лайка:', error);
-        }
+        // Проверяем настройки звука
+        fetch('/api/get_settings')
+            .then(response => response.json())
+            .then(settings => {
+                if (!settings.sound_notifications) {
+                    console.log('🔇 Звук отключен в настройках');
+                    return;
+                }
+                
+                if (document.visibilityState !== 'visible' || !userInteracted) {
+                    return;
+                }
+                
+                try {
+                    if (!audioContext) {
+                        initAudio();
+                    }
+                    
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    // Настройки звука для лайков
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц для лайков
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                    
+                    console.log('❤️ Звук лайка воспроизведен');
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка воспроизведения звука лайка:', error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Ошибка получения настроек:', error);
+            });
     }
     
     // Отмечаем взаимодействие пользователя
@@ -464,6 +507,34 @@ def api_mark_likes_read():
 
     except Exception as e:
         return jsonify({"error": f"Ошибка при отметке лайков: {str(e)}"}), 500
+
+
+@app.route('/api/update_settings', methods=['POST'])
+def api_update_settings():
+    """API для обновления настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    try:
+        data = request.get_json()
+        if update_user_settings(user_id, data):
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "Не удалось обновить настройки"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Ошибка при обновлении настроек: {str(e)}"}), 500
+
+
+@app.route('/api/get_settings')
+def api_get_settings():
+    """API для получения настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({'sound_notifications': True})  # По умолчанию включено
+    
+    settings = get_user_settings(user_id)
+    return jsonify(settings)
 
 
 @app.route('/api/mark_messages_read/<string:other_user_id>', methods=['POST'])
@@ -3932,40 +4003,53 @@ def chat(other_user_id):
 
                 // Функция воспроизведения звука сообщения
                 function playMessageSound() {
-                    // Проверяем, что страница видима и пользователь взаимодействовал
-                    if (document.visibilityState !== 'visible' || !userInteracted) {
-                        return;
-                    }
-                    
-                    try {
-                        if (!audioContext) {
-                            initAudio();
-                        }
-                        
-                        if (audioContext && audioContext.state === 'suspended') {
-                            audioContext.resume();
-                        }
-                        
-                        const oscillator = audioContext.createOscillator();
-                        const gainNode = audioContext.createGain();
-                        
-                        // Настройки звука для сообщений
-                        oscillator.type = 'sine';
-                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
-                        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                        
-                        oscillator.connect(gainNode);
-                        gainNode.connect(audioContext.destination);
-                        
-                        oscillator.start(audioContext.currentTime);
-                        oscillator.stop(audioContext.currentTime + 0.3);
-                        
-                        console.log('🔔 Звук сообщения воспроизведен в чате');
-                        
-                    } catch (error) {
-                        console.error('❌ Ошибка воспроизведения звука в чате:', error);
-                    }
+                    // Проверяем настройки звука
+                    fetch('/api/get_settings')
+                        .then(response => response.json())
+                        .then(settings => {
+                            if (!settings.sound_notifications) {
+                                console.log('🔇 Звук отключен в настройках');
+                                return;
+                            }
+                            
+                            // Проверяем, что страница видима и пользователь взаимодействовал
+                            if (document.visibilityState !== 'visible' || !userInteracted) {
+                                return;
+                            }
+                            
+                            try {
+                                if (!audioContext) {
+                                    initAudio();
+                                }
+                                
+                                if (audioContext && audioContext.state === 'suspended') {
+                                    audioContext.resume();
+                                }
+                                
+                                const oscillator = audioContext.createOscillator();
+                                const gainNode = audioContext.createGain();
+                                
+                                // Настройки звука для сообщений
+                                oscillator.type = 'sine';
+                                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                                
+                                oscillator.connect(gainNode);
+                                gainNode.connect(audioContext.destination);
+                                
+                                oscillator.start(audioContext.currentTime);
+                                oscillator.stop(audioContext.currentTime + 0.3);
+                                
+                                console.log('🔔 Звук сообщения воспроизведен в чате');
+                                
+                            } catch (error) {
+                                console.error('❌ Ошибка воспроизведения звука в чате:', error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('❌ Ошибка получения настроек:', error);
+                        });
                 }
 
                 // Отмечаем взаимодействие пользователя
@@ -4285,6 +4369,221 @@ def get_photo_url(profile):
             os.path.join(app.config['UPLOAD_FOLDER'], profile.photo)):
         return url_for('static', filename='uploads/' + profile.photo)
     return PLACEHOLDER_PHOTO
+
+
+@app.route('/settings')
+@require_profile
+def settings():
+    user_id = request.cookies.get('user_id')
+    settings = get_user_settings(user_id)
+    navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Настройки</title>
+            <style>
+                {{ get_starry_night_css()|safe }}
+                body { max-width: 500px; margin: 0 auto; padding: 20px; }
+                h1 { 
+                    color: #fff; 
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                    margin-bottom: 25px;
+                    font-size: 1.8em;
+                    text-align: center;
+                }
+                .settings-card {
+                    background: #030202;
+                    border-radius: 15px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    padding: 25px;
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
+                }
+                .setting-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px 0;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                .setting-item:last-child {
+                    border-bottom: none;
+                }
+                .setting-label {
+                    font-size: 1.1em;
+                    color: #fff;
+                }
+                .toggle-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 60px;
+                    height: 34px;
+                }
+                .toggle-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #ccc;
+                    transition: .4s;
+                    border-radius: 34px;
+                }
+                .slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 26px;
+                    width: 26px;
+                    left: 4px;
+                    bottom: 4px;
+                    background-color: white;
+                    transition: .4s;
+                    border-radius: 50%;
+                }
+                input:checked + .slider {
+                    background-color: #ff6b6b;
+                }
+                input:checked + .slider:before {
+                    transform: translateX(26px);
+                }
+                .test-button {
+                    background: #ff6b6b;
+                    color: #fff;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 0.9em;
+                    margin-left: 10px;
+                }
+                .test-button:hover {
+                    background: #ff5252;
+                }
+                .setting-description {
+                    font-size: 0.9em;
+                    color: #ccc;
+                    margin-top: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            {{ navbar|safe }}
+            <h1>⚙️ Настройки</h1>
+            <div class="settings-card">
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">🔔 Звуковые уведомления</div>
+                        <div class="setting-description">Включить звук при получении сообщений и лайков</div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="sound-toggle" {% if settings.sound_notifications %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                        <button class="test-button" onclick="testSound()">Тест</button>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+                let audioContext = null;
+                let userInteracted = false;
+                
+                // Инициализация аудио
+                function initAudio() {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст инициализирован в настройках');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в настройках:', error.message);
+                    }
+                }
+                
+                // Функция тестирования звука
+                function testSound() {
+                    if (!userInteracted) {
+                        userInteracted = true;
+                    }
+                    
+                    try {
+                        if (!audioContext) {
+                            initAudio();
+                        }
+                        
+                        if (audioContext && audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+                        
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5);
+                        
+                        console.log('🔔 Тестовый звук воспроизведен');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка тестового звука:', error);
+                        alert('Ошибка воспроизведения звука: ' + error.message);
+                    }
+                }
+                
+                // Обработчик изменения настроек
+                document.getElementById('sound-toggle').addEventListener('change', function() {
+                    const soundEnabled = this.checked;
+                    
+                    fetch('/api/update_settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            sound_notifications: soundEnabled
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('✅ Настройки обновлены:', soundEnabled ? 'звук включен' : 'звук выключен');
+                        } else {
+                            console.error('❌ Ошибка обновления настроек');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Ошибка запроса:', error);
+                    });
+                });
+                
+                // Отмечаем взаимодействие пользователя
+                document.addEventListener('click', () => {
+                    userInteracted = true;
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                });
+            </script>
+        </body>
+        </html>
+    ''', navbar=navbar, settings=settings, get_starry_night_css=get_starry_night_css)
 
 
 @app.route('/test-geolocation')

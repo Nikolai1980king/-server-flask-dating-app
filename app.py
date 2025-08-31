@@ -194,18 +194,28 @@ def get_user_settings(user_id):
     if not user_id:
         return {'sound_notifications': True}  # По умолчанию включено
     
-    # Ищем настройки в базе данных
-    user_setting = UserSettings.query.filter_by(user_id=user_id).first()
-    
-    if user_setting:
-        settings = {'sound_notifications': user_setting.sound_notifications}
-        print(f"📋 Получены настройки из БД для пользователя {user_id}: {settings}")
-        return settings
-    else:
-        # Если настроек нет, создаем с настройками по умолчанию
-        default_settings = {'sound_notifications': True}
-        print(f"📋 Созданы настройки по умолчанию для пользователя {user_id}: {default_settings}")
-        return default_settings
+    try:
+        # Используем прямой SQL-запрос
+        import sqlite3
+        conn = sqlite3.connect('dating_app.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT sound_notifications FROM user_settings WHERE user_id = ?", (user_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            settings = {'sound_notifications': bool(result[0])}
+            print(f"📋 Получены настройки из БД для пользователя {user_id}: {settings}")
+            return settings
+        else:
+            # Если настроек нет, создаем с настройками по умолчанию
+            default_settings = {'sound_notifications': True}
+            print(f"📋 Созданы настройки по умолчанию для пользователя {user_id}: {default_settings}")
+            return default_settings
+            
+    except Exception as e:
+        print(f"❌ Ошибка при получении настроек: {e}")
+        return {'sound_notifications': True}
 
 def update_user_settings(user_id, settings):
     """Обновить настройки пользователя в базе данных"""
@@ -213,30 +223,39 @@ def update_user_settings(user_id, settings):
         return False
     
     try:
-        # Ищем существующие настройки
-        user_setting = UserSettings.query.filter_by(user_id=user_id).first()
+        # Используем прямой SQL-запрос
+        import sqlite3
+        from datetime import datetime
         
-        if user_setting:
+        conn = sqlite3.connect('dating_app.db')
+        cursor = conn.cursor()
+        
+        # Проверяем, существуют ли настройки
+        cursor.execute("SELECT id FROM user_settings WHERE user_id = ?", (user_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
             # Обновляем существующие настройки
             if 'sound_notifications' in settings:
-                user_setting.sound_notifications = settings['sound_notifications']
-            user_setting.updated_at = datetime.utcnow()
-            print(f"🔄 Обновлены настройки в БД для пользователя {user_id}: {settings}")
+                cursor.execute(
+                    "UPDATE user_settings SET sound_notifications = ?, updated_at = ? WHERE user_id = ?",
+                    (settings['sound_notifications'], datetime.utcnow(), user_id)
+                )
+                print(f"🔄 Обновлены настройки в БД для пользователя {user_id}: {settings}")
         else:
             # Создаем новые настройки
             sound_notifications = settings.get('sound_notifications', True)
-            user_setting = UserSettings(
-                user_id=user_id,
-                sound_notifications=sound_notifications
+            cursor.execute(
+                "INSERT INTO user_settings (user_id, sound_notifications, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (user_id, sound_notifications, datetime.utcnow(), datetime.utcnow())
             )
-            db.session.add(user_setting)
             print(f"🆕 Созданы новые настройки в БД для пользователя {user_id}: {settings}")
         
-        db.session.commit()
+        conn.commit()
+        conn.close()
         return True
         
     except Exception as e:
-        db.session.rollback()
         print(f"❌ Ошибка при обновлении настроек в БД: {str(e)}")
         return False
 

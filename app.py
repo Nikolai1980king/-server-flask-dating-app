@@ -4377,7 +4377,7 @@ def settings():
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background-color: #ccc;
+                    background-color: #666;
                     transition: .4s;
                     border-radius: 34px;
                 }
@@ -4388,29 +4388,18 @@ def settings():
                     width: 26px;
                     left: 4px;
                     bottom: 4px;
-                    background-color: white;
+                    background-color: #fff;
                     transition: .4s;
                     border-radius: 50%;
                 }
                 input:checked + .slider {
-                    background-color: #ff6b6b;
+                    background-color: #fff;
                 }
                 input:checked + .slider:before {
                     transform: translateX(26px);
+                    background-color: #666;
                 }
-                .test-button {
-                    background: #ff6b6b;
-                    color: #fff;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-size: 0.9em;
-                    margin-left: 10px;
-                }
-                .test-button:hover {
-                    background: #ff5252;
-                }
+
                 .setting-description {
                     font-size: 0.9em;
                     color: #ccc;
@@ -4432,7 +4421,6 @@ def settings():
                             <input type="checkbox" id="sound-toggle" {% if settings.sound_notifications %}checked{% endif %}>
                             <span class="slider"></span>
                         </label>
-                        <button class="test-button" onclick="testSound()">🔔 Тест</button>
                     </div>
                 </div>
             </div>
@@ -4451,45 +4439,7 @@ def settings():
                     }
                 }
                 
-                // Функция тестирования звука
-                function testSound() {
-                    if (!userInteracted) {
-                        userInteracted = true;
-                    }
-                    
-                    try {
-                        if (!audioContext) {
-                            initAudio();
-                        }
-                        
-                        if (audioContext && audioContext.state === 'suspended') {
-                            audioContext.resume();
-                        }
-                        
-                        const oscillator = audioContext.createOscillator();
-                        const gainNode = audioContext.createGain();
-                        
-                        oscillator.type = 'sine';
-                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-                        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2);
-                        
-                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-                        
-                        oscillator.connect(gainNode);
-                        gainNode.connect(audioContext.destination);
-                        
-                        oscillator.start(audioContext.currentTime);
-                        oscillator.stop(audioContext.currentTime + 0.4);
-                        
-                        console.log('🔔 Тестовый звук "трынь" воспроизведен');
-                        
-                    } catch (error) {
-                        console.error('❌ Ошибка тестового звука:', error);
-                        alert('Ошибка воспроизведения звука: ' + error.message);
-                    }
-                }
+
                 
                 // Обработчик изменения настроек
                 document.getElementById('sound-toggle').addEventListener('change', function() {

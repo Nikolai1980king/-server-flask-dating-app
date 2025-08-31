@@ -4089,47 +4089,75 @@ def chat(other_user_id):
                 function playNotificationSound() {
                     console.log('🔊 Попытка воспроизведения звука уведомления...');
                     
-                    // Сначала пробуем воспроизвести звук напрямую (для отладки)
                     try {
-                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                        // Создаем простой звук с помощью Web Audio API
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
                         
-                        // Устанавливаем громкость
-                        audio.volume = 0.5;
+                        // Настраиваем звук
+                        oscillator.type = 'sine'; // Синусоидальный звук
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // Частота 800 Гц
                         
-                        // Добавляем обработчики событий для отладки
-                        audio.addEventListener('canplaythrough', () => {
-                            console.log('✅ Аудио готово к воспроизведению');
-                        });
+                        // Настраиваем громкость
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5); // Затухание
                         
-                        audio.addEventListener('error', (e) => {
-                            console.error('❌ Ошибка загрузки аудио:', e);
-                        });
+                        // Подключаем узлы
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
                         
-                        audio.addEventListener('play', () => {
-                            console.log('🎵 Звук начал воспроизводиться');
-                        });
+                        // Воспроизводим звук
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
                         
-                        audio.addEventListener('ended', () => {
-                            console.log('🔇 Звук закончился');
-                        });
+                        console.log('✅ Звук успешно воспроизведен через Web Audio API');
                         
-                        // Пробуем воспроизвести
-                        const playPromise = audio.play();
-                        if (playPromise !== undefined) {
-                            playPromise
-                                .then(() => {
-                                    console.log('✅ Звук успешно воспроизведен');
-                                })
-                                .catch(error => {
-                                    console.error('❌ Ошибка воспроизведения звука:', error);
-                                    // Показываем уведомление пользователю о необходимости разрешить звук
-                                    if (error.name === 'NotAllowedError') {
-                                        alert('Для получения звуковых уведомлений разрешите воспроизведение звука в браузере');
-                                    }
-                                });
-                        }
                     } catch (error) {
-                        console.error('❌ Ошибка создания аудио объекта:', error);
+                        console.error('❌ Ошибка Web Audio API:', error);
+                        
+                        // Fallback: пробуем создать простой звук через HTML5 Audio
+                        try {
+                            // Создаем простой звук с помощью data URL
+                            const audio = new Audio();
+                            
+                            // Создаем простой звук программно
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = 44100; // 1 секунда при 44.1 кГц
+                            canvas.height = 1;
+                            
+                            const imageData = ctx.createImageData(canvas.width, canvas.height);
+                            const data = imageData.data;
+                            
+                            // Создаем простой тон
+                            for (let i = 0; i < canvas.width; i++) {
+                                const value = Math.sin(i * 0.1) * 127 + 128; // Синусоида
+                                data[i * 4] = value; // R
+                                data[i * 4 + 1] = value; // G
+                                data[i * 4 + 2] = value; // B
+                                data[i * 4 + 3] = 255; // A
+                            }
+                            
+                            ctx.putImageData(imageData, 0, 0);
+                            
+                            // Конвертируем в data URL
+                            const dataURL = canvas.toDataURL('image/png');
+                            
+                            audio.src = dataURL;
+                            audio.volume = 0.3;
+                            
+                            audio.play().then(() => {
+                                console.log('✅ Звук воспроизведен через fallback метод');
+                            }).catch(fallbackError => {
+                                console.error('❌ Ошибка fallback метода:', fallbackError);
+                                // Показываем уведомление пользователю
+                                alert('Звуковые уведомления недоступны в вашем браузере');
+                            });
+                            
+                        } catch (fallbackError) {
+                            console.error('❌ Ошибка создания fallback звука:', fallbackError);
+                        }
                     }
                 }
 
@@ -4231,17 +4259,31 @@ def chat(other_user_id):
                 function initAudio() {
                     try {
                         // Создаем простой звук для инициализации
-                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-                        audio.volume = 0.1; // Очень тихий звук для инициализации
+                        // Создаем простой звук с помощью Web Audio API
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
                         
-                        // Пробуем воспроизвести короткий звук для активации аудио
-                        audio.play().then(() => {
-                            console.log('✅ Аудио контекст инициализирован');
-                            audio.pause();
-                            audio.currentTime = 0;
-                        }).catch(error => {
-                            console.log('⚠️ Аудио контекст не инициализирован:', error.message);
-                        });
+                        // Настраиваем звук
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                        
+                        // Настраиваем громкость
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                        
+                        // Подключаем узлы
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        // Воспроизводим короткий звук для инициализации
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.1);
+                        
+                        console.log('✅ Web Audio API инициализирован');
+                    } catch (error) {
+                        console.log('⚠️ Web Audio API не поддерживается:', error.message);
+                    }
                     } catch (error) {
                         console.log('⚠️ Ошибка инициализации аудио:', error.message);
                     }

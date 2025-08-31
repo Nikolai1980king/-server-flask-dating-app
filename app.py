@@ -186,7 +186,10 @@ def get_user_settings(user_id):
     """Получить настройки пользователя"""
     if not user_id:
         return {'sound_notifications': True}  # По умолчанию включено
-    return user_settings.get(user_id, {'sound_notifications': True})
+    
+    settings = user_settings.get(user_id, {'sound_notifications': True})
+    print(f"📋 Получены настройки для пользователя {user_id}: {settings}")
+    return settings
 
 def update_user_settings(user_id, settings):
     """Обновить настройки пользователя"""
@@ -287,12 +290,14 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     
     // Функция воспроизведения звука "трынь"
     function playNotificationSound() {
+        console.log('🔔 Попытка воспроизвести звук...');
         // Проверяем настройки звука
         fetch('/api/get_settings')
             .then(response => response.json())
             .then(settings => {
+                console.log('📋 Текущие настройки звука:', settings);
                 if (!settings.sound_notifications) {
-                    console.log('🔇 Звук отключен в настройках');
+                    console.log('🔇 Звук отключен в настройках - воспроизведение отменено');
                     return;
                 }
                 
@@ -463,11 +468,16 @@ def api_update_settings():
 
     try:
         data = request.get_json()
+        print(f"🔧 Обновление настроек для пользователя {user_id}: {data}")
+        
         if update_user_settings(user_id, data):
+            print(f"✅ Настройки успешно обновлены для пользователя {user_id}")
             return jsonify({"success": True})
         else:
+            print(f"❌ Не удалось обновить настройки для пользователя {user_id}")
             return jsonify({"error": "Не удалось обновить настройки"}), 500
     except Exception as e:
+        print(f"❌ Ошибка при обновлении настроек: {str(e)}")
         return jsonify({"error": f"Ошибка при обновлении настроек: {str(e)}"}), 500
 
 
@@ -4444,6 +4454,7 @@ def settings():
                 // Обработчик изменения настроек
                 document.getElementById('sound-toggle').addEventListener('change', function() {
                     const soundEnabled = this.checked;
+                    console.log('🔄 Переключатель изменен на:', soundEnabled ? 'ВКЛ' : 'ВЫКЛ');
                     
                     fetch('/api/update_settings', {
                         method: 'POST',
@@ -4458,8 +4469,14 @@ def settings():
                     .then(data => {
                         if (data.success) {
                             console.log('✅ Настройки обновлены:', soundEnabled ? 'звук включен' : 'звук выключен');
+                            // Проверяем, что настройки действительно сохранились
+                            fetch('/api/get_settings')
+                                .then(response => response.json())
+                                .then(settings => {
+                                    console.log('🔍 Проверка сохраненных настроек:', settings);
+                                });
                         } else {
-                            console.error('❌ Ошибка обновления настроек');
+                            console.error('❌ Ошибка обновления настроек:', data.error);
                         }
                     })
                     .catch(error => {

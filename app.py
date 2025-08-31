@@ -2137,21 +2137,12 @@ def require_profile(view_func):
 def view_visitors():
     user_id = request.cookies.get('user_id')
     # Получаем фильтры из query-параметров
-    age_from = request.args.get('age_from', type=int)
-    age_to = request.args.get('age_to', type=int)
-    name_query = request.args.get('name', '').strip().lower()
-    hobby_query = request.args.get('hobby', '').strip().lower()
+    venue_query = request.args.get('venue', '').strip().lower()
     gender_query = request.args.get('gender', '')
     # Фильтруем профили
     other_profiles = [p for p in Profile.query.all() if p.id != user_id]
-    if age_from is not None:
-        other_profiles = [p for p in other_profiles if str(p.age).isdigit() and int(p.age) >= age_from]
-    if age_to is not None:
-        other_profiles = [p for p in other_profiles if str(p.age).isdigit() and int(p.age) <= age_to]
-    if name_query:
-        other_profiles = [p for p in other_profiles if name_query in p.name.lower()]
-    if hobby_query:
-        other_profiles = [p for p in other_profiles if hobby_query in p.hobbies.lower()]
+    if venue_query:
+        other_profiles = [p for p in other_profiles if p.venue and venue_query in p.venue.lower()]
     if gender_query:
         other_profiles = [p for p in other_profiles if p.gender == gender_query]
     # liked_ids теперь из базы
@@ -2236,7 +2227,7 @@ def view_visitors():
                     text-align: left;
                 }
                 .filter-form {
-                    background: rgba(255, 255, 255, 0.95);
+                    background: #030202;
                     border-radius: 15px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
                     padding: 20px 25px 15px 25px;
@@ -2250,7 +2241,7 @@ def view_visitors():
                 }
                 .filter-form label {
                     font-size: 0.95em;
-                    color: #444;
+                    color: #fff;
                     margin-right: 6px;
                 }
                 .filter-form input, .filter-form select {
@@ -2329,10 +2320,7 @@ def view_visitors():
         <body>
             {{ navbar|safe }}
             <form class="filter-form" method="get">
-                <label>Возраст от <input type="number" name="age_from" min="16" max="120" value="{{ request.args.get('age_from', '') }}"></label>
-                <label>до <input type="number" name="age_to" min="16" max="120" value="{{ request.args.get('age_to', '') }}"></label>
-                <label>Имя <input type="text" name="name" value="{{ request.args.get('name', '') }}" placeholder="Имя"></label>
-                <label>Интересы <input type="text" name="hobby" value="{{ request.args.get('hobby', '') }}" placeholder="Ключевое слово"></label>
+                <label>Заведение <input type="text" name="venue" value="{{ request.args.get('venue', '') }}" placeholder="Название заведения"></label>
                 <label>Пол
                     <select name="gender">
                         <option value="">Любой</option>

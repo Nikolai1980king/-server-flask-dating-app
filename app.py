@@ -3966,7 +3966,10 @@ def chat(other_user_id):
             </div>
             <form id="chat-form" autocomplete="off">
                 <textarea id="message-input" name="message" placeholder="Ваше сообщение..." maxlength="400" required></textarea>
-                <button type="submit" class="modern-btn">Отправить</button>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="submit" class="modern-btn">Отправить</button>
+                    <button type="button" onclick="playNotificationSound()" style="background: linear-gradient(90deg, #28a745 0%, #20c997 100%); color: white; border: none; padding: 15px 20px; border-radius: 25px; cursor: pointer; font-size: 0.9em;">🔊 Тест звука</button>
+                </div>
             </form>
             <script>
                 const user_id = "{{ user_id }}";
@@ -4084,21 +4087,50 @@ def chat(other_user_id):
 
                 // Функция воспроизведения звука уведомления
                 function playNotificationSound() {
-                    // Проверяем настройки пользователя
-                    fetch('/api/get_settings')
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.sound_notifications) {
-                                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-                                audio.play().catch(e => console.log('Ошибка воспроизведения звука:', e));
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Ошибка при получении настроек:', error);
-                            // Если не удалось получить настройки, воспроизводим звук по умолчанию
-                            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-                            audio.play().catch(e => console.log('Ошибка воспроизведения звука:', e));
+                    console.log('🔊 Попытка воспроизведения звука уведомления...');
+                    
+                    // Сначала пробуем воспроизвести звук напрямую (для отладки)
+                    try {
+                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                        
+                        // Устанавливаем громкость
+                        audio.volume = 0.5;
+                        
+                        // Добавляем обработчики событий для отладки
+                        audio.addEventListener('canplaythrough', () => {
+                            console.log('✅ Аудио готово к воспроизведению');
                         });
+                        
+                        audio.addEventListener('error', (e) => {
+                            console.error('❌ Ошибка загрузки аудио:', e);
+                        });
+                        
+                        audio.addEventListener('play', () => {
+                            console.log('🎵 Звук начал воспроизводиться');
+                        });
+                        
+                        audio.addEventListener('ended', () => {
+                            console.log('🔇 Звук закончился');
+                        });
+                        
+                        // Пробуем воспроизвести
+                        const playPromise = audio.play();
+                        if (playPromise !== undefined) {
+                            playPromise
+                                .then(() => {
+                                    console.log('✅ Звук успешно воспроизведен');
+                                })
+                                .catch(error => {
+                                    console.error('❌ Ошибка воспроизведения звука:', error);
+                                    // Показываем уведомление пользователю о необходимости разрешить звук
+                                    if (error.name === 'NotAllowedError') {
+                                        alert('Для получения звуковых уведомлений разрешите воспроизведение звука в браузере');
+                                    }
+                                });
+                        }
+                    } catch (error) {
+                        console.error('❌ Ошибка создания аудио объекта:', error);
+                    }
                 }
 
                 // Socket.IO обработчики
@@ -4191,11 +4223,37 @@ def chat(other_user_id):
                     }
                 });
 
+                // Инициализация звука при загрузке страницы
+                let audioContext = null;
+                let audioBuffer = null;
+                
+                // Функция инициализации аудио контекста
+                function initAudio() {
+                    try {
+                        // Создаем простой звук для инициализации
+                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                        audio.volume = 0.1; // Очень тихий звук для инициализации
+                        
+                        // Пробуем воспроизвести короткий звук для активации аудио
+                        audio.play().then(() => {
+                            console.log('✅ Аудио контекст инициализирован');
+                            audio.pause();
+                            audio.currentTime = 0;
+                        }).catch(error => {
+                            console.log('⚠️ Аудио контекст не инициализирован:', error.message);
+                        });
+                    } catch (error) {
+                        console.log('⚠️ Ошибка инициализации аудио:', error.message);
+                    }
+                }
+
                 // Автоматическая прокрутка к последнему сообщению при загрузке
                 window.addEventListener('load', function() {
                     window.scrollTo(0, document.body.scrollHeight);
                     // Отмечаем все сообщения от собеседника как прочитанные при загрузке чата
                     markMessagesAsRead(other_user_id);
+                    // Инициализируем аудио
+                    initAudio();
                 });
             </script>
         </body>

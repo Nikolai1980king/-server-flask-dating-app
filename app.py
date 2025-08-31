@@ -254,6 +254,111 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     </nav>
     <div style="height:48px"></div>
     <script>
+    // Глобальные переменные для звука
+    let audioContext = null;
+    let previousMessageCount = 0;
+    let userInteracted = false;
+    
+    // Инициализация аудио контекста
+    function initAudio() {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('✅ Аудио контекст инициализирован');
+        } catch (error) {
+            console.log('⚠️ Аудио не поддерживается:', error.message);
+        }
+    }
+    
+    // Функция воспроизведения звука сообщения
+    function playMessageSound() {
+        // Проверяем, что страница видима и пользователь взаимодействовал
+        if (document.visibilityState !== 'visible' || !userInteracted) {
+            return;
+        }
+        
+        try {
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            // Настройки звука для сообщений
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime); // 600 Гц для сообщений
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime); // Громкость 20%
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3); // Длительность 0.3 секунды
+            
+            console.log('🔔 Звук сообщения воспроизведен');
+            
+        } catch (error) {
+            console.error('❌ Ошибка воспроизведения звука сообщения:', error);
+        }
+    }
+    
+    // Функция воспроизведения звука лайка
+    function playLikeSound() {
+        if (document.visibilityState !== 'visible' || !userInteracted) {
+            return;
+        }
+        
+        try {
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            // Настройки звука для лайков
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц для лайков
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+            
+            console.log('❤️ Звук лайка воспроизведен');
+            
+        } catch (error) {
+            console.error('❌ Ошибка воспроизведения звука лайка:', error);
+        }
+    }
+    
+    // Отмечаем взаимодействие пользователя
+    document.addEventListener('click', () => {
+        userInteracted = true;
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    });
+    
+    document.addEventListener('keydown', () => {
+        userInteracted = true;
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    });
+    
     function markLikesAsRead() {
         // Отмечаем все лайки как прочитанные при клике на иконку
         fetch('/api/mark_likes_read', {
@@ -284,21 +389,31 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 let msgBadge = document.getElementById('msg-badge');
                 if (msgBadge) {
                     if (data.unread_messages > 0) {
+                        // Звук при появлении новых сообщений
+                        if (previousMessageCount === 0 && data.unread_messages > 0) {
+                            playMessageSound();
+                        }
                         msgBadge.innerText = data.unread_messages;
                         msgBadge.style.display = '';
                     } else {
                         msgBadge.style.display = 'none';
                     }
                 }
+                
                 let likeBadge = document.getElementById('like-badge');
                 if (likeBadge) {
                     if (data.unread_likes > 0) {
+                        // Звук при появлении новых лайков
+                        if (likeBadge.style.display === 'none') {
+                            playLikeSound();
+                        }
                         likeBadge.innerText = data.unread_likes;
                         likeBadge.style.display = '';
                     } else {
                         likeBadge.style.display = 'none';
                     }
                 }
+                
                 let matchBadge = document.getElementById('match-badge');
                 if (matchBadge) {
                     if (data.unread_matches > 0) {
@@ -308,6 +423,9 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                         matchBadge.style.display = 'none';
                     }
                 }
+                
+                // Обновляем счетчик сообщений для следующей проверки
+                previousMessageCount = data.unread_messages;
             });
     }, 5000);
     </script>
@@ -3798,6 +3916,73 @@ def chat(other_user_id):
                 let lastMessageCount = {{ messages_db|length }};
                 let lastMessageTimestamp = "{{ messages_db[-1].timestamp.isoformat() if messages_db else '' }}";
 
+                // Переменные для звука
+                let audioContext = null;
+                let userInteracted = false;
+
+                // Инициализация аудио контекста
+                function initAudio() {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст инициализирован в чате');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в чате:', error.message);
+                    }
+                }
+
+                // Функция воспроизведения звука сообщения
+                function playMessageSound() {
+                    // Проверяем, что страница видима и пользователь взаимодействовал
+                    if (document.visibilityState !== 'visible' || !userInteracted) {
+                        return;
+                    }
+                    
+                    try {
+                        if (!audioContext) {
+                            initAudio();
+                        }
+                        
+                        if (audioContext && audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+                        
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        // Настройки звука для сообщений
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.3);
+                        
+                        console.log('🔔 Звук сообщения воспроизведен в чате');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука в чате:', error);
+                    }
+                }
+
+                // Отмечаем взаимодействие пользователя
+                document.addEventListener('click', () => {
+                    userInteracted = true;
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                });
+                
+                document.addEventListener('keydown', () => {
+                    userInteracted = true;
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                });
+
                 // Инициализация Socket.IO
                 const socket = io();
                 socket.emit('join', {room: chat_key});
@@ -3895,6 +4080,8 @@ def chat(other_user_id):
                                 // Если есть новые сообщения от собеседника, отмечаем их как прочитанные
                                 if (hasNewMessagesFromOther) {
                                     markMessagesAsRead(other_user_id);
+                                    // Воспроизводим звук уведомления
+                                    playMessageSound();
                                 }
                             }
                         })
@@ -3911,6 +4098,8 @@ def chat(other_user_id):
                         lastMessageCount++;
                         // Автоматически отмечаем сообщение как прочитанное
                         markMessagesAsRead(other_user_id);
+                        // Воспроизводим звук уведомления
+                        playMessageSound();
                     }
                 });
 

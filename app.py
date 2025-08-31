@@ -2891,7 +2891,7 @@ def my_likes():
                     font-size: 1.1em;
                 }
                 .like-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -2903,6 +2903,7 @@ def my_likes():
                     transition: all 0.3s ease;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 .like-card:hover { 
                     transform: translateY(-3px) scale(1.02);
@@ -2910,8 +2911,8 @@ def my_likes():
                 }
                 .like-card img { max-width: 80px; border-radius: 10px; margin-right: 15px; object-fit: cover; height: 80px; }
                 .like-info { flex: 1; }
-                .like-card h2 { margin: 0 0 5px 0; color: #333; }
-                .like-card p { margin: 5px 0; color: #666; }
+                .like-card h2 { margin: 0 0 5px 0; color: #fff; }
+                .like-card p { margin: 5px 0; color: #fff; }
                 .like-btn { background: none; border: none; cursor: pointer; outline: none; font-size: 2em; position: absolute; top: 10px; right: 18px; z-index: 2; padding: 0; transition: transform 0.1s; }
                 .like-btn:active { transform: scale(1.2); }
                 .like-heart { color: #bbb; transition: color 0.2s; text-shadow: 0 2px 8px rgba(255,107,107,0.12); }

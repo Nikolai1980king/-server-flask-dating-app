@@ -2401,7 +2401,7 @@ def my_profile():
                 {{ get_starry_night_css()|safe }}
                 body { text-align: center; padding: 20px; }
                 .card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     max-width: 400px; 
@@ -2409,6 +2409,7 @@ def my_profile():
                     padding: 25px;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 img { max-width: 100%; border-radius: 10px; }
                 .modern-btn {
@@ -3057,7 +3058,7 @@ def view_profile(id):
                 {{ get_starry_night_css()|safe }}
                 body { text-align: center; padding: 20px; }
                 .card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     max-width: 400px; 
@@ -3065,6 +3066,7 @@ def view_profile(id):
                     padding: 25px;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 img { max-width: 100%; border-radius: 10px; }
                 .modern-btn {
@@ -3337,7 +3339,7 @@ def my_matches():
                     font-size: 1.1em;
                 }
                 .match-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -3348,6 +3350,7 @@ def my_matches():
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
                     transition: all 0.3s ease;
+                    color: #fff;
                 }
                 .match-card:hover {
                     transform: translateY(-3px) scale(1.02);
@@ -3393,10 +3396,10 @@ def my_matches():
                         <div class="match-info">
                             <h2 style="margin: 0 0 10px 0;">{{ profile.name }}, {{ profile.age }}</h2>
                             {% if profile.city %}
-                            <p style="color: #666; margin: 5px 0;">📍 {{ profile.city }}</p>
+                            <p style="color: #fff; margin: 5px 0;">📍 {{ profile.city }}</p>
                             {% endif %}
                             {% if profile.venue %}
-                            <p style="color: #666; margin: 5px 0;">🏪 {{ profile.venue }}</p>
+                            <p style="color: #fff; margin: 5px 0;">🏪 {{ profile.venue }}</p>
                             {% endif %}
                         </div>
                         <a href="/chat/{{ profile.id }}" class="modern-btn">Чат</a>
@@ -3458,7 +3461,7 @@ def my_messages():
                     font-size: 1.1em;
                 }
                 .chat-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -3469,6 +3472,7 @@ def my_messages():
                     transition: all 0.3s ease;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 .chat-card:hover {
                     transform: translateY(-3px) scale(1.02);
@@ -3483,8 +3487,8 @@ def my_messages():
                     border: 2px solid #667eea;
                 }
                 .chat-info { flex: 1; }
-                .chat-card h2 { margin: 0 0 5px 0; color: #333; }
-                .chat-card p { margin: 5px 0; color: #666; }
+                .chat-card h2 { margin: 0 0 5px 0; color: #fff; }
+                .chat-card p { margin: 5px 0; color: #fff; }
                 .unread-badge {
                     background: #ff6b6b;
                     color: white;

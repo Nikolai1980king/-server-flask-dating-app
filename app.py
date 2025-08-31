@@ -1,4 +1,5 @@
 # нужно вводить https://192.168.255.137
+# Тестовое изменение для демонстрации коммита
 
 from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify
 from flask_socketio import SocketIO, emit, join_room
@@ -229,7 +230,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
         avatar_html += f'<img src="{photo_url}" alt="Аватар" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #6c757d;vertical-align:middle;">'
         avatar_html += '</a>'
     return render_template_string('''
-    <nav id="navbar" style="position:fixed;top:0;left:0;width:100%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.07);z-index:100;display:flex;justify-content:center;align-items:center;padding:8px 0;">
+    <nav id="navbar" style="position:fixed;top:0;left:0;width:100%;background:#0a0909;box-shadow:0 2px 8px rgba(0,0,0,0.07);z-index:100;display:flex;justify-content:center;align-items:center;padding:8px 0;">
         {{ avatar_html|safe }}
         <a href="/visitors" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='visitors' else ''}}" title="Посетители">👥</a>
         <a href="/my_likes" style="font-size:2em;margin:0 10px;position:relative;{{'font-weight:bold;color:#ff6b6b;' if active=='likes' else ''}}" title="Меня лайкнули">

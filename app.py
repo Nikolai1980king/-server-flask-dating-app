@@ -215,7 +215,14 @@ def get_unread_likes_count(user_id):
     # Получаем id просмотренных
     viewed = read_likes.get(user_id, set())
     # Считаем только непросмотренные
-    return len(all_likes - viewed)
+    unread_count = len(all_likes - viewed)
+    
+    # Дополнительная проверка: если счетчик отрицательный, сбрасываем его
+    if unread_count < 0:
+        read_likes[user_id] = set()
+        unread_count = len(all_likes)
+    
+    return unread_count
 
 
 def get_unread_matches_count(user_id):
@@ -233,7 +240,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     <nav id="navbar" style="position:fixed;top:0;left:0;width:100%;background:#0a0909;box-shadow:0 2px 8px rgba(0,0,0,0.07);z-index:100;display:flex;justify-content:center;align-items:center;padding:8px 0;">
         {{ avatar_html|safe }}
         <a href="/visitors" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='visitors' else ''}}" title="Посетители">👥</a>
-        <a href="/my_likes" style="font-size:2em;margin:0 10px;position:relative;{{'font-weight:bold;color:#ff6b6b;' if active=='likes' else ''}}" title="Меня лайкнули">
+        <a href="/my_likes" style="font-size:2em;margin:0 10px;position:relative;{{'font-weight:bold;color:#ff6b6b;' if active=='likes' else ''}}" title="Меня лайкнули" onclick="markLikesAsRead()">
             ❤️
             <span id="like-badge" style="display:{% if unread_likes > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_likes if unread_likes > 0 else '' }}</span>
         </a>
@@ -247,6 +254,29 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     </nav>
     <div style="height:48px"></div>
     <script>
+    function markLikesAsRead() {
+        // Отмечаем все лайки как прочитанные при клике на иконку
+        fetch('/api/mark_likes_read', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Скрываем счетчик лайков
+                let likeBadge = document.getElementById('like-badge');
+                if (likeBadge) {
+                    likeBadge.style.display = 'none';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при отметке лайков как прочитанных:', error);
+        });
+    }
+    
     setInterval(function() {
         fetch('/api/unread')
             .then(r => r.json())
@@ -293,6 +323,29 @@ def api_unread():
         "unread_likes": get_unread_likes_count(user_id) if user_id else 0,
         "unread_matches": get_unread_matches_count(user_id) if user_id else 0
     })
+
+
+@app.route('/api/mark_likes_read', methods=['POST'])
+def api_mark_likes_read():
+    """API для отметки всех лайков как прочитанных"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    try:
+        # Получаем все лайки, которые получил пользователь
+        all_likes = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
+        # Добавляем их в просмотренные
+        read_likes[user_id].update(all_likes)
+        
+        return jsonify({
+            "success": True,
+            "marked_read": len(all_likes),
+            "unread_likes": get_unread_likes_count(user_id)
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Ошибка при отметке лайков: {str(e)}"}), 500
 
 
 @app.route('/api/mark_messages_read/<string:other_user_id>', methods=['POST'])
@@ -2865,8 +2918,8 @@ def my_likes():
         if liker_profile:
             liked_me_profiles.append(liker_profile)
             liked_me_ids.add(liker_profile.id)
-    # Сбросить счетчик лайков
-    read_likes[user_id] = liked_me_ids
+    # Сбросить счетчик лайков - добавляем все текущие лайки в просмотренные
+    read_likes[user_id].update(liked_me_ids)
     navbar = render_navbar(user_id, active='likes', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id))
     return render_template_string('''

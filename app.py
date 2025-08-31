@@ -251,6 +251,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             ✉️
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
+        <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
     </nav>
     <div style="height:48px"></div>
     <script>
@@ -4542,6 +4543,158 @@ def terms():
         </body>
         </html>
     ''')
+
+
+@app.route('/settings')
+@require_profile
+def settings():
+    user_id = request.cookies.get('user_id')
+    navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Настройки</title>
+            <style>
+                {{ get_starry_night_css()|safe }}
+                body { max-width: 500px; margin: 0 auto; padding: 20px; }
+                h1 { 
+                    color: #fff; 
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                    margin-bottom: 25px;
+                    font-size: 1.8em;
+                    text-align: center;
+                }
+                .settings-card {
+                    background: #030202;
+                    border-radius: 15px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    padding: 25px;
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
+                }
+                .setting-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px 0;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                .setting-item:last-child {
+                    border-bottom: none;
+                }
+                .setting-label {
+                    font-size: 1.1em;
+                    color: #fff;
+                }
+                .bell-button {
+                    background: #ff6b6b;
+                    color: #fff;
+                    border: none;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 1.2em;
+                    transition: all 0.3s ease;
+                }
+                .bell-button:hover {
+                    background: #ff5252;
+                    transform: scale(1.05);
+                }
+                .bell-button:active {
+                    transform: scale(0.95);
+                }
+                .setting-description {
+                    font-size: 0.9em;
+                    color: #ccc;
+                    margin-top: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            {{ navbar|safe }}
+            <h1>⚙️ Настройки</h1>
+            <div class="settings-card">
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">🔔 Тест звука</div>
+                        <div class="setting-description">Нажмите на колокольчик, чтобы услышать классический звук</div>
+                    </div>
+                    <button class="bell-button" onclick="playBellSound()">🔔</button>
+                </div>
+            </div>
+            
+            <script>
+                let audioContext = null;
+                let userInteracted = false;
+                
+                // Инициализация аудио
+                function initAudio() {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст инициализирован в настройках');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в настройках:', error.message);
+                    }
+                }
+                
+                // Функция воспроизведения классического звука колокольчика
+                function playBellSound() {
+                    if (!userInteracted) {
+                        userInteracted = true;
+                    }
+                    
+                    try {
+                        if (!audioContext) {
+                            initAudio();
+                        }
+                        
+                        if (audioContext && audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+                        
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        // Классический звук колокольчика
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                        oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                        
+                        console.log('🔔 Классический звук колокольчика воспроизведен');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука:', error);
+                        alert('Ошибка воспроизведения звука: ' + error.message);
+                    }
+                }
+                
+                // Отмечаем взаимодействие пользователя
+                document.addEventListener('click', () => {
+                    userInteracted = true;
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                });
+            </script>
+        </body>
+        </html>
+    ''', navbar=navbar, get_starry_night_css=get_starry_night_css)
 
 
 def cleanup_expired_profiles():

@@ -2276,6 +2276,35 @@ def view_visitors():
                 }
             </style>
             <script>
+                function showNotification(message, type = 'info') {
+                    // Удаляем существующие уведомления
+                    const existingNotifications = document.querySelectorAll('.notification');
+                    existingNotifications.forEach(notification => notification.remove());
+                    
+                    // Создаем новое уведомление
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.textContent = message;
+                    
+                    // Добавляем в body
+                    document.body.appendChild(notification);
+                    
+                    // Показываем уведомление
+                    setTimeout(() => {
+                        notification.classList.add('show');
+                    }, 100);
+                    
+                    // Скрываем через 3 секунды
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.parentNode.removeChild(notification);
+                            }
+                        }, 300);
+                    }, 3000);
+                }
+                
                 function toggleLike(profileId, btn) {
                     event.stopPropagation();
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
@@ -2283,9 +2312,10 @@ def view_visitors():
                         .then(data => {
                             if (data.liked) {
                                 btn.classList.add('liked');
+                                showNotification('❤️ Лайк отправлен!', 'success');
                             } else if (data.already_liked) {
                                 btn.classList.add('liked');
-                                alert('Вы уже лайкали эту анкету!');
+                                showNotification('💔 Вы уже лайкали эту анкету!', 'warning');
                             } else {
                                 btn.classList.remove('liked');
                             }
@@ -2899,8 +2929,73 @@ def my_likes():
                 .like-heart.liked { color: #ff6b6b; }
                 .back-btn { background: linear-gradient(90deg, #6c757d 0%, #495057 100%); color: white; border: none; padding: 12px 24px; border-radius: 25px; box-shadow: 0 4px 14px rgba(108,117,125,0.2); font-size: 1.1em; cursor: pointer; transition: box-shadow 0.2s, transform 0.2s; text-decoration: none; display: inline-block; margin-top: 20px; }
                 .back-btn:hover { box-shadow: 0 8px 24px rgba(108,117,125,0.3); transform: translateY(-2px) scale(1.03); }
+                
+                /* Стили для уведомлений */
+                .notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    color: white;
+                    font-weight: bold;
+                    z-index: 1000;
+                    transform: translateX(400px);
+                    transition: transform 0.3s ease;
+                    max-width: 300px;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                }
+                
+                .notification.show {
+                    transform: translateX(0);
+                }
+                
+                .notification.success {
+                    background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+                }
+                
+                .notification.error {
+                    background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
+                }
+                
+                .notification.info {
+                    background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+                }
+                
+                .notification.warning {
+                    background: linear-gradient(90deg, #ff9800 0%, #ffb74d 100%);
+                }
             </style>
             <script>
+                function showNotification(message, type = 'info') {
+                    // Удаляем существующие уведомления
+                    const existingNotifications = document.querySelectorAll('.notification');
+                    existingNotifications.forEach(notification => notification.remove());
+                    
+                    // Создаем новое уведомление
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.textContent = message;
+                    
+                    // Добавляем в body
+                    document.body.appendChild(notification);
+                    
+                    // Показываем уведомление
+                    setTimeout(() => {
+                        notification.classList.add('show');
+                    }, 100);
+                    
+                    // Скрываем через 3 секунды
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.parentNode.removeChild(notification);
+                            }
+                        }, 300);
+                    }, 3000);
+                }
+                
                 function toggleLike(profileId, btn) {
                     event.stopPropagation();
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
@@ -2908,9 +3003,10 @@ def my_likes():
                         .then(data => {
                             if (data.liked) {
                                 btn.classList.add('liked');
+                                showNotification('❤️ Лайк отправлен!', 'success');
                             } else if (data.already_liked) {
                                 btn.classList.add('liked');
-                                alert('Вы уже лайкали эту анкету!');
+                                showNotification('💔 Вы уже лайкали эту анкету!', 'warning');
                             } else {
                                 btn.classList.remove('liked');
                             }

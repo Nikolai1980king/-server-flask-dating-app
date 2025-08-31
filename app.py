@@ -2376,7 +2376,6 @@ def toggle_like(profile_id):
         return jsonify({'liked': False, 'already_liked': True, 'likes_count': likes_count})
     # Новый лайк
     db.session.add(Like(user_id=user_id, liked_id=profile_id))
-    profile.likes = Like.query.filter_by(liked_id=profile_id).count() + 1
     db.session.commit()
     check_for_matches(user_id)
     likes_count = Like.query.filter_by(liked_id=profile_id).count()
@@ -3018,10 +3017,10 @@ def my_likes():
                         <h2>{{ profile.name }}, {{ profile.age }}</h2>
                             <p>{{ profile.hobbies[:50] }}{% if profile.hobbies|length > 50 %}...{% endif %}</p>
                             {% if profile.city %}
-                            <p style="color: #666; font-size: 0.9em;">📍 {{ profile.city }}</p>
+                            <p style="color: #fff; font-size: 0.9em;">📍 {{ profile.city }}</p>
                             {% endif %}
                             {% if profile.venue %}
-                            <p style="color: #666; font-size: 0.9em;">🏪 {{ profile.venue }}</p>
+                            <p style="color: #fff; font-size: 0.9em;">🏪 {{ profile.venue }}</p>
                             {% endif %}
                         </div>
                         <button class="like-btn" title="Лайк" onclick="toggleLike('{{ profile.id }}', this.querySelector('span'))">
@@ -3276,9 +3275,6 @@ def like_profile(id):
     
     try:
         db.session.add(Like(user_id=user_id, liked_id=id))
-        profile = Profile.query.get(id)
-        if profile:
-            profile.likes += 1
         db.session.commit()
         check_for_matches(user_id)
         return jsonify({'success': True, 'message': 'Лайк отправлен'}), 200

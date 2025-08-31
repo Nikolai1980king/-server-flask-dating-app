@@ -345,6 +345,9 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
         });
     }
     
+    // Переменная для отслеживания предыдущего количества сообщений
+    let previousMessageCount = 0;
+    
     setInterval(function() {
         fetch('/api/unread')
             .then(r => r.json())
@@ -352,6 +355,11 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 let msgBadge = document.getElementById('msg-badge');
                 if (msgBadge) {
                     if (data.unread_messages > 0) {
+                        // Проверяем, появились ли новые сообщения
+                        if (previousMessageCount === 0 && data.unread_messages > 0) {
+                            // Воспроизводим звук колокольчика при появлении новых сообщений
+                            playNotificationSound();
+                        }
                         msgBadge.innerText = data.unread_messages;
                         msgBadge.style.display = '';
                     } else {
@@ -376,6 +384,9 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                         matchBadge.style.display = 'none';
                     }
                 }
+                
+                // Обновляем счетчик для следующей проверки
+                previousMessageCount = data.unread_messages;
             });
     }, 5000);
     </script>
@@ -3866,6 +3877,71 @@ def chat(other_user_id):
                 let lastMessageCount = {{ messages_db|length }};
                 let lastMessageTimestamp = "{{ messages_db[-1].timestamp.isoformat() if messages_db else '' }}";
 
+                // Переменные для звука в чате
+                let chatAudioContext = null;
+                let userInteracted = false;
+
+                // Инициализация аудио контекста для чата
+                function initChatAudio() {
+                    try {
+                        chatAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст чата инициализирован');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в чате:', error.message);
+                    }
+                }
+
+                // Функция воспроизведения звука "трынь" в чате
+                function playNotificationSound() {
+                    try {
+                        if (!chatAudioContext) {
+                            initChatAudio();
+                        }
+                        
+                        if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                            chatAudioContext.resume();
+                        }
+                        
+                        const oscillator = chatAudioContext.createOscillator();
+                        const gainNode = chatAudioContext.createGain();
+                        
+                        // Настройки звука "трынь" - классический уведомительный звук
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
+                        oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                        oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                        
+                        gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.4);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(chatAudioContext.destination);
+                        
+                        oscillator.start(chatAudioContext.currentTime);
+                        oscillator.stop(chatAudioContext.currentTime + 0.4); // Длительность 0.4 секунды
+                        
+                        console.log('🔔 Звук "трынь" воспроизведен в чате');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука в чате:', error);
+                    }
+                }
+
+                // Отмечаем взаимодействие пользователя в чате
+                document.addEventListener('click', () => {
+                    userInteracted = true;
+                    if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                        chatAudioContext.resume();
+                    }
+                });
+                
+                document.addEventListener('keydown', () => {
+                    userInteracted = true;
+                    if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                        chatAudioContext.resume();
+                    }
+                });
+
                 // Инициализация Socket.IO
                 const socket = io();
                 socket.emit('join', {room: chat_key});
@@ -3979,6 +4055,8 @@ def chat(other_user_id):
                         lastMessageCount++;
                         // Автоматически отмечаем сообщение как прочитанное
                         markMessagesAsRead(other_user_id);
+                        // Воспроизводим звук колокольчика при получении сообщения от собеседника
+                        playNotificationSound();
                     }
                 });
 

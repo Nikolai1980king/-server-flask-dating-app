@@ -3690,20 +3690,7 @@ def chat(other_user_id):
                     box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
                 }
 
-                .char-counter {
-                    font-size: 0.8em;
-                    color: #666;
-                    text-align: right;
-                    margin-bottom: 10px;
-                    width: 100%;
-                    max-width: 500px;
-                }
-                .char-counter.warning {
-                    color: #ff9800;
-                }
-                .char-counter.danger {
-                    color: #f44336;
-                }
+
                 .typing-indicator {
                     background: rgba(255, 255, 255, 0.9);
                     border-radius: 15px;
@@ -3760,7 +3747,6 @@ def chat(other_user_id):
             </div>
             <form id="chat-form" autocomplete="off">
                 <textarea id="message-input" name="message" placeholder="Ваше сообщение..." maxlength="400" required></textarea>
-                <div class="char-counter" id="char-counter">0/400</div>
                 <button type="submit" class="modern-btn">Отправить</button>
             </form>
             <script>
@@ -3927,31 +3913,7 @@ def chat(other_user_id):
                 let typingTimer;
                 const typingIndicator = document.getElementById('typing-indicator');
 
-                // Обновление счетчика символов
-                function updateCharCounter() {
-                    const input = document.getElementById('message-input');
-                    const counter = document.getElementById('char-counter');
-                    const length = input.value.length;
-                    const maxLength = 400;
-                    
-                    counter.textContent = `${length}/${maxLength}`;
-                    
-                    // Убираем старые классы
-                    counter.classList.remove('warning', 'danger');
-                    
-                    // Добавляем классы в зависимости от количества символов
-                    if (length >= maxLength * 0.9) { // 90% от максимума
-                        counter.classList.add('warning');
-                    }
-                    if (length >= maxLength) { // Достигнут максимум
-                        counter.classList.add('danger');
-                    }
-                }
-
                 document.getElementById('message-input').addEventListener('input', function() {
-                    // Обновляем счетчик символов
-                    updateCharCounter();
-                    
                     if (this.value.trim()) {
                         socket.emit('typing', {room: chat_key, user: user_id, isTyping: true});
 
@@ -3992,8 +3954,6 @@ def chat(other_user_id):
                     window.scrollTo(0, document.body.scrollHeight);
                     // Отмечаем все сообщения от собеседника как прочитанные при загрузке чата
                     markMessagesAsRead(other_user_id);
-                    // Инициализируем счетчик символов
-                    updateCharCounter();
                 });
             </script>
         </body>

@@ -172,92 +172,12 @@ class Like(db.Model):
     liked_id = db.Column(db.String, nullable=False)
 
 
-class UserSettings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String, nullable=False, unique=True)
-    sound_notifications = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 # Удаляю in-memory структуру сообщений:
 # messages = defaultdict(list)
 notifications = defaultdict(list)
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
-
-
-
-def get_user_settings(user_id):
-    """Получить настройки пользователя из базы данных"""
-    if not user_id:
-        return {'sound_notifications': True}  # По умолчанию включено
-    
-    try:
-        # Используем прямой SQL-запрос
-        import sqlite3
-        conn = sqlite3.connect('dating_app.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT sound_notifications FROM user_settings WHERE user_id = ?", (user_id,))
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            settings = {'sound_notifications': bool(result[0])}
-            print(f"📋 Получены настройки из БД для пользователя {user_id}: {settings}")
-            return settings
-        else:
-            # Если настроек нет, создаем с настройками по умолчанию
-            default_settings = {'sound_notifications': True}
-            print(f"📋 Созданы настройки по умолчанию для пользователя {user_id}: {default_settings}")
-            return default_settings
-            
-    except Exception as e:
-        print(f"❌ Ошибка при получении настроек: {e}")
-        return {'sound_notifications': True}
-
-def update_user_settings(user_id, settings):
-    """Обновить настройки пользователя в базе данных"""
-    if not user_id:
-        return False
-    
-    try:
-        # Используем прямой SQL-запрос
-        import sqlite3
-        from datetime import datetime
-        
-        conn = sqlite3.connect('dating_app.db')
-        cursor = conn.cursor()
-        
-        # Проверяем, существуют ли настройки
-        cursor.execute("SELECT id FROM user_settings WHERE user_id = ?", (user_id,))
-        existing = cursor.fetchone()
-        
-        if existing:
-            # Обновляем существующие настройки
-            if 'sound_notifications' in settings:
-                cursor.execute(
-                    "UPDATE user_settings SET sound_notifications = ?, updated_at = ? WHERE user_id = ?",
-                    (settings['sound_notifications'], datetime.utcnow(), user_id)
-                )
-                print(f"🔄 Обновлены настройки в БД для пользователя {user_id}: {settings}")
-        else:
-            # Создаем новые настройки
-            sound_notifications = settings.get('sound_notifications', True)
-            cursor.execute(
-                "INSERT INTO user_settings (user_id, sound_notifications, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                (user_id, sound_notifications, datetime.utcnow(), datetime.utcnow())
-            )
-            print(f"🆕 Созданы новые настройки в БД для пользователя {user_id}: {settings}")
-        
-        conn.commit()
-        conn.close()
-        return True
-        
-    except Exception as e:
-        print(f"❌ Ошибка при обновлении настроек в БД: {str(e)}")
-        return False
 
 
 def add_notification(user_id, message):
@@ -331,90 +251,9 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             ✉️
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
-        <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
     </nav>
     <div style="height:48px"></div>
     <script>
-    // Переменные для звука
-    let audioContext = null;
-    let userInteracted = false;
-    
-    // Инициализация аудио контекста
-    function initAudio() {
-        try {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            console.log('✅ Аудио контекст инициализирован');
-        } catch (error) {
-            console.log('⚠️ Аудио не поддерживается:', error.message);
-        }
-    }
-    
-    // Функция воспроизведения звука "трынь"
-    function playNotificationSound() {
-        console.log('🔔 Попытка воспроизвести звук...');
-        // Проверяем настройки звука
-        fetch('/api/get_settings')
-            .then(response => response.json())
-            .then(settings => {
-                console.log('📋 Текущие настройки звука:', settings);
-                if (!settings.sound_notifications) {
-                    console.log('🔇 Звук отключен в настройках - воспроизведение отменено');
-                    return;
-                }
-                
-                try {
-                    if (!audioContext) {
-                        initAudio();
-                    }
-                    
-                    if (audioContext && audioContext.state === 'suspended') {
-                        audioContext.resume();
-                    }
-                    
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    
-                    // Настройки звука "трынь" - классический уведомительный звук
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
-                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
-                    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
-                    
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.4); // Длительность 0.4 секунды
-                    
-                    console.log('🔔 Звук "трынь" воспроизведен');
-                    
-                } catch (error) {
-                    console.error('❌ Ошибка воспроизведения звука:', error);
-                }
-            })
-            .catch(error => {
-                console.error('❌ Ошибка получения настроек:', error);
-            });
-    }
-    
-    // Отмечаем взаимодействие пользователя
-    document.addEventListener('click', () => {
-        userInteracted = true;
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-    });
-    
-    document.addEventListener('keydown', () => {
-        userInteracted = true;
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-    });
-    
     function markLikesAsRead() {
         // Отмечаем все лайки как прочитанные при клике на иконку
         fetch('/api/mark_likes_read', {
@@ -438,9 +277,6 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
         });
     }
     
-    // Переменная для отслеживания предыдущего количества сообщений
-    let previousMessageCount = 0;
-    
     setInterval(function() {
         fetch('/api/unread')
             .then(r => r.json())
@@ -448,11 +284,6 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 let msgBadge = document.getElementById('msg-badge');
                 if (msgBadge) {
                     if (data.unread_messages > 0) {
-                        // Проверяем, появились ли новые сообщения
-                        if (previousMessageCount === 0 && data.unread_messages > 0) {
-                            // Воспроизводим звук колокольчика при появлении новых сообщений
-                            playNotificationSound();
-                        }
                         msgBadge.innerText = data.unread_messages;
                         msgBadge.style.display = '';
                     } else {
@@ -477,9 +308,6 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                         matchBadge.style.display = 'none';
                     }
                 }
-                
-                // Обновляем счетчик для следующей проверки
-                previousMessageCount = data.unread_messages;
             });
     }, 5000);
     </script>
@@ -518,39 +346,6 @@ def api_mark_likes_read():
 
     except Exception as e:
         return jsonify({"error": f"Ошибка при отметке лайков: {str(e)}"}), 500
-
-
-@app.route('/api/update_settings', methods=['POST'])
-def api_update_settings():
-    """API для обновления настроек пользователя"""
-    user_id = request.cookies.get('user_id')
-    if not user_id:
-        return jsonify({"error": "Пользователь не авторизован"}), 401
-
-    try:
-        data = request.get_json()
-        print(f"🔧 Обновление настроек для пользователя {user_id}: {data}")
-        
-        if update_user_settings(user_id, data):
-            print(f"✅ Настройки успешно обновлены для пользователя {user_id}")
-            return jsonify({"success": True})
-        else:
-            print(f"❌ Не удалось обновить настройки для пользователя {user_id}")
-            return jsonify({"error": "Не удалось обновить настройки"}), 500
-    except Exception as e:
-        print(f"❌ Ошибка при обновлении настроек: {str(e)}")
-        return jsonify({"error": f"Ошибка при обновлении настроек: {str(e)}"}), 500
-
-
-@app.route('/api/get_settings')
-def api_get_settings():
-    """API для получения настроек пользователя"""
-    user_id = request.cookies.get('user_id')
-    if not user_id:
-        return jsonify({'sound_notifications': True})  # По умолчанию включено
-    
-    settings = get_user_settings(user_id)
-    return jsonify(settings)
 
 
 @app.route('/api/mark_messages_read/<string:other_user_id>', methods=['POST'])
@@ -4003,84 +3798,6 @@ def chat(other_user_id):
                 let lastMessageCount = {{ messages_db|length }};
                 let lastMessageTimestamp = "{{ messages_db[-1].timestamp.isoformat() if messages_db else '' }}";
 
-                // Переменные для звука в чате
-                let chatAudioContext = null;
-                let chatUserInteracted = false;
-
-                // Инициализация аудио контекста для чата
-                function initChatAudio() {
-                    try {
-                        chatAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        console.log('✅ Аудио контекст чата инициализирован');
-                    } catch (error) {
-                        console.log('⚠️ Аудио не поддерживается в чате:', error.message);
-                    }
-                }
-
-                // Функция воспроизведения звука "трынь" в чате
-                function playNotificationSound() {
-                    // Проверяем настройки звука
-                    fetch('/api/get_settings')
-                        .then(response => response.json())
-                        .then(settings => {
-                            if (!settings.sound_notifications) {
-                                console.log('🔇 Звук отключен в настройках');
-                                return;
-                            }
-                            
-                            try {
-                                if (!chatAudioContext) {
-                                    initChatAudio();
-                                }
-                                
-                                if (chatAudioContext && chatAudioContext.state === 'suspended') {
-                                    chatAudioContext.resume();
-                                }
-                                
-                                const oscillator = chatAudioContext.createOscillator();
-                                const gainNode = chatAudioContext.createGain();
-                                
-                                // Настройки звука "трынь" - классический уведомительный звук
-                                oscillator.type = 'sine';
-                                oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
-                                oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
-                                oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
-                                
-                                gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
-                                gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.4);
-                                
-                                oscillator.connect(gainNode);
-                                gainNode.connect(chatAudioContext.destination);
-                                
-                                oscillator.start(chatAudioContext.currentTime);
-                                oscillator.stop(chatAudioContext.currentTime + 0.4); // Длительность 0.4 секунды
-                                
-                                console.log('🔔 Звук "трынь" воспроизведен в чате');
-                                
-                            } catch (error) {
-                                console.error('❌ Ошибка воспроизведения звука в чате:', error);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('❌ Ошибка получения настроек:', error);
-                        });
-                }
-
-                // Отмечаем взаимодействие пользователя в чате
-                document.addEventListener('click', () => {
-                    chatUserInteracted = true;
-                    if (chatAudioContext && chatAudioContext.state === 'suspended') {
-                        chatAudioContext.resume();
-                    }
-                });
-                
-                document.addEventListener('keydown', () => {
-                    chatUserInteracted = true;
-                    if (chatAudioContext && chatAudioContext.state === 'suspended') {
-                        chatAudioContext.resume();
-                    }
-                });
-
                 // Инициализация Socket.IO
                 const socket = io();
                 socket.emit('join', {room: chat_key});
@@ -4194,8 +3911,6 @@ def chat(other_user_id):
                         lastMessageCount++;
                         // Автоматически отмечаем сообщение как прочитанное
                         markMessagesAsRead(other_user_id);
-                        // Воспроизводим звук колокольчика при получении сообщения от собеседника
-                        playNotificationSound();
                     }
                 });
 
@@ -4381,181 +4096,6 @@ def get_photo_url(profile):
             os.path.join(app.config['UPLOAD_FOLDER'], profile.photo)):
         return url_for('static', filename='uploads/' + profile.photo)
     return PLACEHOLDER_PHOTO
-
-
-@app.route('/settings')
-@require_profile
-def settings():
-    user_id = request.cookies.get('user_id')
-    settings = get_user_settings(user_id)
-    navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id),
-                           unread_matches=get_unread_matches_count(user_id))
-    return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Настройки</title>
-            <style>
-                {{ get_starry_night_css()|safe }}
-                body { max-width: 500px; margin: 0 auto; padding: 20px; }
-                h1 { 
-                    color: #fff; 
-                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-                    margin-bottom: 25px;
-                    font-size: 1.8em;
-                    text-align: center;
-                }
-                .settings-card {
-                    background: #030202;
-                    border-radius: 15px;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                    padding: 25px;
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                    color: #fff;
-                }
-                .setting-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 15px 0;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                }
-                .setting-item:last-child {
-                    border-bottom: none;
-                }
-                .setting-label {
-                    font-size: 1.1em;
-                    color: #fff;
-                }
-                .toggle-switch {
-                    position: relative;
-                    display: inline-block;
-                    width: 60px;
-                    height: 34px;
-                }
-                .toggle-switch input {
-                    opacity: 0;
-                    width: 0;
-                    height: 0;
-                }
-                .slider {
-                    position: absolute;
-                    cursor: pointer;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: #666;
-                    transition: .4s;
-                    border-radius: 34px;
-                }
-                .slider:before {
-                    position: absolute;
-                    content: "";
-                    height: 26px;
-                    width: 26px;
-                    left: 4px;
-                    bottom: 4px;
-                    background-color: #fff;
-                    transition: .4s;
-                    border-radius: 50%;
-                }
-                input:checked + .slider {
-                    background-color: #fff;
-                }
-                input:checked + .slider:before {
-                    transform: translateX(26px);
-                    background-color: #666;
-                }
-
-                .setting-description {
-                    font-size: 0.9em;
-                    color: #ccc;
-                    margin-top: 5px;
-                }
-            </style>
-        </head>
-        <body>
-            {{ navbar|safe }}
-            <h1>⚙️ Настройки</h1>
-            <div class="settings-card">
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">🔔 Звуковые уведомления</div>
-                        <div class="setting-description">Включить звук при получении сообщений и лайков</div>
-                    </div>
-                    <div style="display: flex; align-items: center;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="sound-toggle" {% if settings.sound_notifications %}checked{% endif %}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            
-            <script>
-                let audioContext = null;
-                let userInteracted = false;
-                
-                // Инициализация аудио
-                function initAudio() {
-                    try {
-                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        console.log('✅ Аудио контекст инициализирован в настройках');
-                    } catch (error) {
-                        console.log('⚠️ Аудио не поддерживается в настройках:', error.message);
-                    }
-                }
-                
-
-                
-                // Обработчик изменения настроек
-                document.getElementById('sound-toggle').addEventListener('change', function() {
-                    const soundEnabled = this.checked;
-                    console.log('🔄 Переключатель изменен на:', soundEnabled ? 'ВКЛ' : 'ВЫКЛ');
-                    
-                    fetch('/api/update_settings', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            sound_notifications: soundEnabled
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            console.log('✅ Настройки обновлены:', soundEnabled ? 'звук включен' : 'звук выключен');
-                            // Проверяем, что настройки действительно сохранились
-                            fetch('/api/get_settings')
-                                .then(response => response.json())
-                                .then(settings => {
-                                    console.log('🔍 Проверка сохраненных настроек:', settings);
-                                });
-                        } else {
-                            console.error('❌ Ошибка обновления настроек:', data.error);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('❌ Ошибка запроса:', error);
-                    });
-                });
-                
-                // Отмечаем взаимодействие пользователя
-                document.addEventListener('click', () => {
-                    userInteracted = true;
-                    if (audioContext && audioContext.state === 'suspended') {
-                        audioContext.resume();
-                    }
-                });
-            </script>
-        </body>
-        </html>
-    ''', navbar=navbar, settings=settings, get_starry_night_css=get_starry_night_css)
 
 
 @app.route('/test-geolocation')

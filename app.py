@@ -251,9 +251,77 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             ✉️
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
+        <a href="#" style="font-size:2em;margin:0 10px;cursor:pointer;{{'font-weight:bold;color:#ff6b6b;' if active=='notifications' else ''}}" title="Уведомления" onclick="playNotificationSound()">
+            🔔
+        </a>
     </nav>
     <div style="height:48px"></div>
     <script>
+    // Переменные для звука
+    let audioContext = null;
+    let userInteracted = false;
+    
+    // Инициализация аудио контекста
+    function initAudio() {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('✅ Аудио контекст инициализирован');
+        } catch (error) {
+            console.log('⚠️ Аудио не поддерживается:', error.message);
+        }
+    }
+    
+    // Функция воспроизведения звука "трынь"
+    function playNotificationSound() {
+        try {
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            // Настройки звука "трынь" - классический уведомительный звук
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.4); // Длительность 0.4 секунды
+            
+            console.log('🔔 Звук "трынь" воспроизведен');
+            
+        } catch (error) {
+            console.error('❌ Ошибка воспроизведения звука:', error);
+        }
+    }
+    
+    // Отмечаем взаимодействие пользователя
+    document.addEventListener('click', () => {
+        userInteracted = true;
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    });
+    
+    document.addEventListener('keydown', () => {
+        userInteracted = true;
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    });
+    
     function markLikesAsRead() {
         // Отмечаем все лайки как прочитанные при клике на иконку
         fetch('/api/mark_likes_read', {

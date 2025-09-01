@@ -2480,20 +2480,43 @@ def view_visitors():
 def toggle_like(profile_id):
     user_id = request.cookies.get('user_id')
     if not user_id or Profile.query.get(profile_id) is None or profile_id == user_id:
-        return jsonify({'liked': False, 'already_liked': False, 'likes_count': 0})
-    # Проверяем, лайкал ли уже
-    already = Like.query.filter(and_(Like.user_id == user_id, Like.liked_id == profile_id)).first()
-    profile = Profile.query.get(profile_id)
-    if already:
-        # Уже лайкал
+        return jsonify({'liked': False, 'already_liked': False, 'likes_count': 0, 'match_created': False})
+    
+    # Проверяем, лайкал ли уже текущий пользователь
+    already_liked = Like.query.filter(and_(Like.user_id == user_id, Like.liked_id == profile_id)).first()
+    
+    if already_liked:
+        # Уже лайкал - убираем лайк
+        db.session.delete(already_liked)
+        db.session.commit()
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
-        return jsonify({'liked': False, 'already_liked': True, 'likes_count': likes_count})
-    # Новый лайк
+        return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': False})
+    
+    # Проверяем, лайкал ли уже целевой пользователь текущего
+    mutual_like = Like.query.filter(and_(Like.user_id == profile_id, Like.liked_id == user_id)).first()
+    
+    if mutual_like:
+        # Взаимный лайк - создаем метч и удаляем лайк
+        db.session.delete(mutual_like)
+        db.session.commit()
+        
+        # Создаем метч
+        user_profile = Profile.query.get(user_id)
+        matched_profile = Profile.query.get(profile_id)
+        if user_profile and matched_profile:
+            add_notification(user_id, f"✨ У вас мэтч с {matched_profile.name}! Теперь вы можете общаться.")
+            add_notification(profile_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
+            new_matches[user_id].add(profile_id)
+            new_matches[profile_id].add(user_id)
+        
+        likes_count = Like.query.filter_by(liked_id=profile_id).count()
+        return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': True})
+    
+    # Обычный лайк
     db.session.add(Like(user_id=user_id, liked_id=profile_id))
     db.session.commit()
-    check_for_matches(user_id)
     likes_count = Like.query.filter_by(liked_id=profile_id).count()
-    return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count})
+    return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count, 'match_created': False})
 
 
 @app.route('/my_profile')

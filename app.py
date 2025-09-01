@@ -271,6 +271,24 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
         <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
     </nav>
     <div style="height:48px"></div>
+    <style>
+        /* Предотвращение масштабирования на мобильных устройствах */
+        html, body {
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Отключаем двойное нажатие для масштабирования */
+        * {
+            touch-action: manipulation;
+        }
+    </style>
     <script>
     // Глобальные переменные для отслеживания предыдущих значений счетчиков
     let previousUnreadMessages = {{ unread_messages }};
@@ -784,7 +802,9 @@ def home():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Знакомства в кафе</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -1183,7 +1203,9 @@ def create_profile():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Создать анкету</title>
             <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
             <style>
@@ -2366,7 +2388,9 @@ def view_visitors():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Посетители кафе</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -2684,7 +2708,9 @@ def my_profile():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Моя анкета</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -2808,7 +2834,9 @@ def edit_profile():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Редактировать анкету</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -3179,7 +3207,9 @@ def my_likes():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Меня лайкнули</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -3364,7 +3394,9 @@ def view_profile(id):
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Анкета</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -3647,7 +3679,9 @@ def my_matches():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Мои мэтчи</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -3781,7 +3815,9 @@ def my_messages():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Мои сообщения</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -3924,7 +3960,9 @@ def chat(other_user_id):
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Чат</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -4944,7 +4982,9 @@ def settings():
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Настройки</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -5211,4 +5251,5 @@ if __name__ == '__main__':
         deleted_count = cleanup_expired_profiles()
         print(f"⏰ Время жизни анкеты: {PROFILE_LIFETIME_HOURS} часов")
 
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5001
+                 , debug=True, allow_unsafe_werkzeug=True)

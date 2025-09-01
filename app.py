@@ -2415,12 +2415,13 @@ def view_visitors():
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
                         .then(r => r.json())
                         .then(data => {
-                            if (data.liked) {
+                            if (data.match_created) {
+                                btn.classList.remove('liked');
+                                showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
+                                setTimeout(() => location.reload(), 2000);
+                            } else if (data.liked) {
                                 btn.classList.add('liked');
                                 showNotification('❤️ Лайк отправлен!', 'success');
-                            } else if (data.already_liked) {
-                                btn.classList.add('liked');
-                                showNotification('💔 Вы уже лайкали эту анкету!', 'warning');
                             } else {
                                 btn.classList.remove('liked');
                             }
@@ -3127,12 +3128,13 @@ def my_likes():
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
                         .then(r => r.json())
                         .then(data => {
-                            if (data.liked) {
+                            if (data.match_created) {
+                                btn.classList.remove('liked');
+                                showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
+                                setTimeout(() => location.reload(), 2000);
+                            } else if (data.liked) {
                                 btn.classList.add('liked');
                                 showNotification('❤️ Лайк отправлен!', 'success');
-                            } else if (data.already_liked) {
-                                btn.classList.add('liked');
-                                showNotification('💔 Вы уже лайкали эту анкету!', 'warning');
                             } else {
                                 btn.classList.remove('liked');
                             }

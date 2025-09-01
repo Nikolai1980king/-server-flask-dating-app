@@ -272,6 +272,55 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     </nav>
     <div style="height:48px"></div>
     <script>
+    // Глобальные переменные для отслеживания предыдущих значений счетчиков
+    let previousUnreadMessages = {{ unread_messages }};
+    let previousUnreadLikes = {{ unread_likes }};
+    let previousUnreadMatches = {{ unread_matches }};
+    
+    // Глобальная функция воспроизведения звука колокольчика
+    function playNotificationSound() {
+        // Проверяем настройки пользователя перед воспроизведением
+        fetch('/api/get_settings')
+            .then(response => response.json())
+            .then(settings => {
+                if (!settings.sound_notifications) {
+                    console.log('🔕 Звук отключен в настройках');
+                    return;
+                }
+                
+                try {
+                    // Создаем простой звук колокольчика
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    // Классический звук колокольчика
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                    
+                    console.log('🔔 Звук колокольчика воспроизведен для уведомления');
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка воспроизведения звука:', error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Ошибка получения настроек:', error);
+            });
+    }
+    
     function markLikesAsRead() {
         // Отмечаем все лайки как прочитанные при клике на иконку
         fetch('/api/mark_likes_read', {
@@ -304,27 +353,47 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                     if (data.unread_messages > 0) {
                         msgBadge.innerText = data.unread_messages;
                         msgBadge.style.display = '';
+                        
+                        // Воспроизводим звук только при появлении новых сообщений
+                        if (data.unread_messages > previousUnreadMessages) {
+                            playNotificationSound();
+                        }
                     } else {
                         msgBadge.style.display = 'none';
                     }
+                    previousUnreadMessages = data.unread_messages;
                 }
+                
                 let likeBadge = document.getElementById('like-badge');
                 if (likeBadge) {
                     if (data.unread_likes > 0) {
                         likeBadge.innerText = data.unread_likes;
                         likeBadge.style.display = '';
+                        
+                        // Воспроизводим звук только при появлении новых лайков
+                        if (data.unread_likes > previousUnreadLikes) {
+                            playNotificationSound();
+                        }
                     } else {
                         likeBadge.style.display = 'none';
                     }
+                    previousUnreadLikes = data.unread_likes;
                 }
+                
                 let matchBadge = document.getElementById('match-badge');
                 if (matchBadge) {
                     if (data.unread_matches > 0) {
                         matchBadge.innerText = data.unread_matches;
                         matchBadge.style.display = '';
+                        
+                        // Воспроизводим звук только при появлении новых матчей
+                        if (data.unread_matches > previousUnreadMatches) {
+                            playNotificationSound();
+                        }
                     } else {
                         matchBadge.style.display = 'none';
                     }
+                    previousUnreadMatches = data.unread_matches;
                 }
             });
     }, 5000);
@@ -2410,6 +2479,37 @@ def view_visitors():
                 }
             </style>
             <script>
+                // Функция воспроизведения звука колокольчика
+                function playNotificationSound() {
+                    try {
+                        // Создаем простой звук колокольчика
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        // Классический звук колокольчика
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                        oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                        
+                        console.log('🔔 Звук колокольчика воспроизведен');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука:', error);
+                    }
+                }
+                
                 function showNotification(message, type = 'info') {
                     // Удаляем существующие уведомления
                     const existingNotifications = document.querySelectorAll('.notification');
@@ -2427,6 +2527,8 @@ def view_visitors():
                     setTimeout(() => {
                         notification.classList.add('show');
                     }, 100);
+                    
+                    // Звук теперь воспроизводится только при обновлении счетчиков в навигации
                     
                     // Скрываем через 3 секунды
                     setTimeout(() => {
@@ -2452,7 +2554,7 @@ def view_visitors():
                                 btn.classList.add('liked');
                                 if (data.already_liked) {
                                     // Уже лайкал - ничего не показываем
-                                } else {
+                            } else {
                                     showNotification('❤️ Лайк отправлен!', 'success');
                                 }
                             } else {
@@ -3202,7 +3304,7 @@ def my_likes():
                                 btn.classList.add('liked');
                                 if (data.already_liked) {
                                     // Уже лайкал - ничего не показываем
-                                } else {
+                            } else {
                                     showNotification('❤️ Лайк отправлен!', 'success');
                                 }
                             } else {
@@ -4006,12 +4108,6 @@ def chat(other_user_id):
 
                 // Функция воспроизведения звука колокольчика
                 function playNotificationSound() {
-                    // Проверяем, находится ли пользователь на странице чата
-                    if (window.location.pathname.includes('/chat/')) {
-                        console.log('🔕 Звук отключен - пользователь в чате');
-                        return;
-                    }
-                    
                     // Проверяем настройки пользователя перед воспроизведением
                     fetch('/api/get_settings')
                         .then(response => response.json())
@@ -4090,10 +4186,7 @@ def chat(other_user_id):
                     document.getElementById('messages').appendChild(div);
                     window.scrollTo(0, document.body.scrollHeight);
 
-                    // Воспроизводим звук только для сообщений от собеседника
-                    if (sender !== user_id) {
-                        playNotificationSound();
-                    }
+                    // Звук теперь воспроизводится только при обновлении счетчиков в навигации
                 }
 
                 // Функция отметки сообщений как прочитанные
@@ -4116,7 +4209,7 @@ def chat(other_user_id):
                     });
                 }
 
-                // Функция обновления счетчиков в навбаре
+                // Функция обновления счетчиков в навбаре (упрощенная версия)
                 function updateNavbarBadges() {
                     fetch('/api/unread')
                         .then(response => response.json())
@@ -4151,8 +4244,7 @@ def chat(other_user_id):
                                     if (msg.sender !== user_id) {
                                         addMessage(msg.text, msg.sender, msg.timestamp);
                                         hasNewMessagesFromOther = true;
-                                        // Воспроизводим звук для новых сообщений от собеседника
-                                        playNotificationSound();
+                                        // Звук теперь воспроизводится только при обновлении счетчиков в навигации
                                     }
                                 });
 
@@ -4180,8 +4272,7 @@ def chat(other_user_id):
                         lastMessageCount++;
                         // Автоматически отмечаем сообщение как прочитанное
                         markMessagesAsRead(other_user_id);
-                        // Воспроизводим звук для новых сообщений от собеседника
-                        playNotificationSound();
+                        // Звук теперь воспроизводится только при обновлении счетчиков в навигации
                     }
                 });
 

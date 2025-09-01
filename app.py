@@ -2452,7 +2452,7 @@ def view_visitors():
                                 btn.classList.add('liked');
                                 if (data.already_liked) {
                                     // Уже лайкал - ничего не показываем
-                            } else {
+                                } else {
                                     showNotification('❤️ Лайк отправлен!', 'success');
                                 }
                             } else {
@@ -3202,7 +3202,7 @@ def my_likes():
                                 btn.classList.add('liked');
                                 if (data.already_liked) {
                                     // Уже лайкал - ничего не показываем
-                            } else {
+                                } else {
                                     showNotification('❤️ Лайк отправлен!', 'success');
                                 }
                             } else {

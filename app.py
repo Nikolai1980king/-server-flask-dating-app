@@ -172,6 +172,16 @@ class Like(db.Model):
     liked_id = db.Column(db.String, nullable=False)
 
 
+class Match(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user1_id = db.Column(db.String, nullable=False)
+    user2_id = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user1_viewed_at = db.Column(db.DateTime, nullable=True)
+    user2_viewed_at = db.Column(db.DateTime, nullable=True)
+    __table_args__ = (db.UniqueConstraint('user1_id', 'user2_id', name='unique_match'),)
+
+
 # Удаляю in-memory структуру сообщений:
 # messages = defaultdict(list)
 notifications = defaultdict(list)
@@ -226,7 +236,14 @@ def get_unread_likes_count(user_id):
 
 
 def get_unread_matches_count(user_id):
-    return len(new_matches[user_id])
+    if not user_id:
+        return 0
+    # Считаем непросмотренные метчи
+    unread_matches = Match.query.filter(
+        ((Match.user1_id == user_id) & (Match.user1_viewed_at.is_(None))) |
+        ((Match.user2_id == user_id) & (Match.user2_viewed_at.is_(None)))
+    ).count()
+    return unread_matches
 
 
 def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unread_matches=0):
@@ -691,7 +708,8 @@ def home():
         user_id,
         active=None,
         unread_messages=get_unread_messages_count(user_id),
-        unread_likes=get_unread_likes_count(user_id)
+        unread_likes=get_unread_likes_count(user_id),
+        unread_matches=get_unread_matches_count(user_id)
     )
     return render_template_string('''
         <!DOCTYPE html>
@@ -2259,8 +2277,19 @@ def view_visitors():
         other_profiles = [p for p in other_profiles if p.venue and venue_query in p.venue.lower()]
     if gender_query:
         other_profiles = [p for p in other_profiles if p.gender == gender_query]
-    # liked_ids теперь из базы
+    # liked_ids включает лайки и метчи
     liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
+    
+    # Добавляем пользователей из метчей
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    for match in matches:
+        if match.user1_id == user_id:
+            liked_ids.add(match.user2_id)
+        else:
+            liked_ids.add(match.user1_id)
     navbar = render_navbar(user_id, active='visitors', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
@@ -2421,9 +2450,13 @@ def view_visitors():
                                 setTimeout(() => location.reload(), 2000);
                             } else if (data.liked) {
                                 btn.classList.add('liked');
-                                showNotification('❤️ Лайк отправлен!', 'success');
-                            } else if (data.already_liked === false) {
-                                // Убираем лайк только если это не взаимный лайк
+                                if (data.already_liked) {
+                                    // Уже лайкал - ничего не показываем
+                            } else {
+                                    showNotification('❤️ Лайк отправлен!', 'success');
+                                }
+                            } else {
+                                // Убираем лайк (отмена лайка) - этого больше не должно происходить
                                 btn.classList.remove('liked');
                             }
                         });
@@ -2488,11 +2521,9 @@ def toggle_like(profile_id):
     already_liked = Like.query.filter(and_(Like.user_id == user_id, Like.liked_id == profile_id)).first()
     
     if already_liked:
-        # Уже лайкал - убираем лайк
-        db.session.delete(already_liked)
-        db.session.commit()
+        # Уже лайкал - ничего не делаем, сердечко остается красным
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
-        return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': False})
+        return jsonify({'liked': True, 'already_liked': True, 'likes_count': likes_count, 'match_created': False})
     
     # Проверяем, лайкал ли уже целевой пользователь текущего
     mutual_like = Like.query.filter(and_(Like.user_id == profile_id, Like.liked_id == user_id)).first()
@@ -2502,14 +2533,25 @@ def toggle_like(profile_id):
         db.session.delete(mutual_like)
         db.session.commit()
         
-        # Создаем метч
+        # Создаем метч в базе данных
         user_profile = Profile.query.get(user_id)
         matched_profile = Profile.query.get(profile_id)
         if user_profile and matched_profile:
+            # Проверяем, что метч еще не существует
+            existing_match = Match.query.filter(
+                ((Match.user1_id == user_id) & (Match.user2_id == profile_id)) |
+                ((Match.user1_id == profile_id) & (Match.user2_id == user_id))
+            ).first()
+            
+            if not existing_match:
+                # Создаем метч (всегда user1_id < user2_id для консистентности)
+                user1_id, user2_id = sorted([user_id, profile_id])
+                match = Match(user1_id=user1_id, user2_id=user2_id)
+                db.session.add(match)
+                db.session.commit()
+            
             add_notification(user_id, f"✨ У вас мэтч с {matched_profile.name}! Теперь вы можете общаться.")
             add_notification(profile_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
-            new_matches[user_id].add(profile_id)
-            new_matches[profile_id].add(user_id)
         
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
         return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': True})
@@ -3006,8 +3048,24 @@ def my_likes():
             liked_me_ids.add(liker_profile.id)
     # Сбросить счетчик лайков - добавляем все текущие лайки в просмотренные
     read_likes[user_id].update(liked_me_ids)
+    
+    # liked_ids включает лайки и метчи
+    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
+    
+    # Добавляем пользователей из метчей
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    for match in matches:
+        if match.user1_id == user_id:
+            liked_ids.add(match.user2_id)
+        else:
+            liked_ids.add(match.user1_id)
+    
     navbar = render_navbar(user_id, active='likes', unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id))
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -3135,9 +3193,13 @@ def my_likes():
                                 setTimeout(() => location.reload(), 2000);
                             } else if (data.liked) {
                                 btn.classList.add('liked');
-                                showNotification('❤️ Лайк отправлен!', 'success');
-                            } else if (data.already_liked === false) {
-                                // Убираем лайк только если это не взаимный лайк
+                                if (data.already_liked) {
+                                    // Уже лайкал - ничего не показываем
+                            } else {
+                                    showNotification('❤️ Лайк отправлен!', 'success');
+                                }
+                            } else {
+                                // Убираем лайк (отмена лайка) - этого больше не должно происходить
                                 btn.classList.remove('liked');
                             }
                         });
@@ -3175,7 +3237,7 @@ def my_likes():
         </body>
         </html>
     ''', liked_me_profiles=liked_me_profiles, navbar=navbar, get_photo_url=get_photo_url,
-                                  liked_ids=set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all()),
+                                  liked_ids=liked_ids,
                                   get_starry_night_css=get_starry_night_css)
 
 
@@ -3448,13 +3510,30 @@ def delete_profile(id):
 @require_profile
 def my_matches():
     user_id = request.cookies.get('user_id')
-    # Получаем метчи из new_matches
-    matches_ids = new_matches.get(user_id, set())
-    matched_profiles = [Profile.query.get(mid) for mid in matches_ids if Profile.query.get(mid)]
-    # Сбросить счетчик новых мэтчей
-    new_matches[user_id].clear()
+    # Получаем метчи из базы данных
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    # Отмечаем метчи как просмотренные
+    current_time = datetime.utcnow()
+    for match in matches:
+        if match.user1_id == user_id and match.user1_viewed_at is None:
+            match.user1_viewed_at = current_time
+        elif match.user2_id == user_id and match.user2_viewed_at is None:
+            match.user2_viewed_at = current_time
+    db.session.commit()
+    
+    matched_ids = set()
+    for match in matches:
+        if match.user1_id == user_id:
+            matched_ids.add(match.user2_id)
+        else:
+            matched_ids.add(match.user1_id)
+    
+    matched_profiles = [Profile.query.get(mid) for mid in matched_ids if Profile.query.get(mid)]
     navbar = render_navbar(user_id, active='matches', unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id), unread_matches=0)
+                           unread_likes=get_unread_likes_count(user_id), unread_matches=get_unread_matches_count(user_id))
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -3567,9 +3646,16 @@ def my_messages():
             if uid != user_id:
                 chat_partners.add(uid)
     
-    # Добавляем всех пользователей из метчей
-    matches_partners = new_matches.get(user_id, set())
-    chat_partners.update(matches_partners)
+    # Добавляем всех пользователей из метчей из базы данных
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    for match in matches:
+        if match.user1_id == user_id:
+            chat_partners.add(match.user2_id)
+        else:
+            chat_partners.add(match.user1_id)
     
     chat_profiles = [p for p in Profile.query.all() if p.id in chat_partners]
     # Считаем непрочитанные сообщения по каждому собеседнику
@@ -3699,10 +3785,13 @@ def my_messages():
 @require_profile
 def chat(other_user_id):
     user_id = request.cookies.get('user_id')
-    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-    matches_ids = liked_ids & liked_me_ids
-    if other_user_id not in matches_ids:
+    # Проверяем метчи в базе данных
+    match_exists = Match.query.filter(
+        ((Match.user1_id == user_id) & (Match.user2_id == other_user_id)) |
+        ((Match.user1_id == other_user_id) & (Match.user2_id == user_id))
+    ).first()
+    
+    if not match_exists:
         return "Чат доступен только для мэтчей", 403
     other_profile = Profile.query.get(other_user_id)
     if not other_profile:
@@ -4250,18 +4339,9 @@ def handle_typing(data):
 
 
 def check_for_matches(user_id):
-    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-    matches_ids = liked_ids & liked_me_ids
-    for matched_user_id in matches_ids:
-        if matched_user_id not in new_matches[user_id]:
-            user_profile = Profile.query.get(user_id)
-            matched_profile = Profile.query.get(matched_user_id)
-            if user_profile and matched_profile:
-                add_notification(user_id, f"✨ У вас мэтч с {matched_profile.name}! Теперь вы можете общаться.")
-                add_notification(matched_user_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
-                new_matches[user_id].add(matched_user_id)
-                new_matches[matched_user_id].add(user_id)
+    # Эта функция больше не используется, так как метчи создаются напрямую в toggle_like
+    # Оставляем для совместимости, но она не выполняет никаких действий
+    pass
 
 
 # Плейсхолдер для фото

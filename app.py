@@ -2416,13 +2416,14 @@ def view_visitors():
                         .then(r => r.json())
                         .then(data => {
                             if (data.match_created) {
-                                btn.classList.remove('liked');
+                                btn.classList.add('liked'); // Оставляем красным при метче
                                 showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
                                 setTimeout(() => location.reload(), 2000);
                             } else if (data.liked) {
                                 btn.classList.add('liked');
                                 showNotification('❤️ Лайк отправлен!', 'success');
-                            } else {
+                            } else if (data.already_liked === false) {
+                                // Убираем лайк только если это не взаимный лайк
                                 btn.classList.remove('liked');
                             }
                         });
@@ -3129,13 +3130,14 @@ def my_likes():
                         .then(r => r.json())
                         .then(data => {
                             if (data.match_created) {
-                                btn.classList.remove('liked');
+                                btn.classList.add('liked'); // Оставляем красным при метче
                                 showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
                                 setTimeout(() => location.reload(), 2000);
                             } else if (data.liked) {
                                 btn.classList.add('liked');
                                 showNotification('❤️ Лайк отправлен!', 'success');
-                            } else {
+                            } else if (data.already_liked === false) {
+                                // Убираем лайк только если это не взаимный лайк
                                 btn.classList.remove('liked');
                             }
                         });
@@ -3446,9 +3448,8 @@ def delete_profile(id):
 @require_profile
 def my_matches():
     user_id = request.cookies.get('user_id')
-    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-    matches_ids = liked_ids & liked_me_ids
+    # Получаем метчи из new_matches
+    matches_ids = new_matches.get(user_id, set())
     matched_profiles = [Profile.query.get(mid) for mid in matches_ids if Profile.query.get(mid)]
     # Сбросить счетчик новых мэтчей
     new_matches[user_id].clear()
@@ -3565,6 +3566,11 @@ def my_messages():
         for uid in ids:
             if uid != user_id:
                 chat_partners.add(uid)
+    
+    # Добавляем всех пользователей из метчей
+    matches_partners = new_matches.get(user_id, set())
+    chat_partners.update(matches_partners)
+    
     chat_profiles = [p for p in Profile.query.all() if p.id in chat_partners]
     # Считаем непрочитанные сообщения по каждому собеседнику
     unread_by_partner = {}

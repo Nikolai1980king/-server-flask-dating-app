@@ -2559,6 +2559,13 @@ def toggle_like(profile_id):
     # Обычный лайк
     db.session.add(Like(user_id=user_id, liked_id=profile_id))
     db.session.commit()
+    
+    # Добавляем уведомление получателю лайка
+    user_profile = Profile.query.get(user_id)
+    liked_profile = Profile.query.get(profile_id)
+    if user_profile and liked_profile:
+        add_notification(profile_id, f"💖 {user_profile.name} лайкнул(а) вас!")
+    
     likes_count = Like.query.filter_by(liked_id=profile_id).count()
     return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count, 'match_created': False})
 

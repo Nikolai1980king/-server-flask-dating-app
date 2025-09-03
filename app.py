@@ -2607,7 +2607,7 @@ def view_visitors():
                 <button type="submit">Фильтровать</button>
             </form>
             <div class="visitor-count">Посетителей: {{ other_profiles|length }}</div>
-            <h1>Посетители кафе</h1>
+            <h1 style="text-align: center;">Посетители кафе</h1>
             {% if other_profiles %}
                 {% for profile in other_profiles %}
                     <div class="visitor-card" onclick="goToProfile('{{ profile.id }}')">
@@ -3350,7 +3350,7 @@ def my_likes():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1>Меня лайкнули</h1>
+            <h1 style="text-align: center;">Меня лайкнули</h1>
             {% if liked_me_profiles %}
                 {% for profile in liked_me_profiles %}
                     <div class="like-card" onclick="goToProfile('{{ profile.id }}')">
@@ -3748,7 +3748,7 @@ def my_matches():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1>Мои мэтчи</h1>
+            <h1 style="text-align: center;">Мои мэтчи</h1>
             {% if matched_profiles %}
                 {% for profile in matched_profiles %}
                     <div class="match-card">
@@ -3902,7 +3902,7 @@ def my_messages():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1>Мои сообщения</h1>
+            <h1 style="text-align: center;">Мои сообщения</h1>
             {% if chat_profiles %}
                 {% for profile in chat_profiles %}
                     <div class="chat-card" onclick="goToChat('{{ profile.id }}')">
@@ -3969,7 +3969,7 @@ def chat(other_user_id):
                 {{ get_starry_night_css()|safe }}
                 body { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .chat-header {
-                    background: rgba(255, 255, 255, 0.95);
+                    background: #030202;
                     border-radius: 15px;
                     padding: 20px;
                     margin-bottom: 20px;
@@ -3990,11 +3990,11 @@ def chat(other_user_id):
                 .chat-info h1 {
                     margin: 0;
                     font-size: 1.4em;
-                    color: #333;
+                    color: #fff;
                 }
                 .chat-info p {
                     margin: 5px 0 0 0;
-                    color: #666;
+                    color: #ccc;
                     font-size: 0.9em;
                 }
                 .message { 
@@ -4011,9 +4011,10 @@ def chat(other_user_id):
                     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
                 }
                 .their-message { 
-                    background: rgba(255, 255, 255, 0.9); 
+                    background: #030202; 
                     margin-right: auto; 
                     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+                    color: #fff;
                 }
                 .modern-btn {
                     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -4048,7 +4049,8 @@ def chat(other_user_id):
                     font-size: 1.1em;
                     border-radius: 15px;
                     border: 1px solid rgba(255, 255, 255, 0.3);
-                    background: rgba(255, 255, 255, 0.9);
+                    background: #030202;
+                    color: #fff;
                     min-height: 48px;
                     margin-bottom: 10px;
                     resize: none;
@@ -4063,12 +4065,12 @@ def chat(other_user_id):
 
 
                 .typing-indicator {
-                    background: rgba(255, 255, 255, 0.9);
+                    background: #030202;
                     border-radius: 15px;
                     padding: 10px 15px;
                     margin: 10px;
                     font-size: 0.9em;
-                    color: #666;
+                    color: #fff;
                     display: none;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);

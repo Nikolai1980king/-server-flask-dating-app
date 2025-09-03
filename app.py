@@ -226,12 +226,12 @@ def get_unread_likes_count(user_id):
     viewed = read_likes.get(user_id, set())
     # Считаем только непросмотренные
     unread_count = len(all_likes - viewed)
-    
+
     # Дополнительная проверка: если счетчик отрицательный, сбрасываем его
     if unread_count < 0:
         read_likes[user_id] = set()
         unread_count = len(all_likes)
-    
+
     return unread_count
 
 
@@ -283,7 +283,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         /* Отключаем двойное нажатие для масштабирования */
         * {
             touch-action: manipulation;
@@ -294,7 +294,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
     let previousUnreadMessages = {{ unread_messages }};
     let previousUnreadLikes = {{ unread_likes }};
     let previousUnreadMatches = {{ unread_matches }};
-    
+
     // Глобальная функция воспроизведения звука колокольчика
     function playNotificationSound() {
         // Проверяем настройки пользователя перед воспроизведением
@@ -305,31 +305,31 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                     console.log('🔕 Звук отключен в настройках');
                     return;
                 }
-                
+
                 try {
                     // Создаем простой звук колокольчика
                     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     const oscillator = audioContext.createOscillator();
                     const gainNode = audioContext.createGain();
-                    
+
                     // Классический звук колокольчика
                     oscillator.type = 'sine';
                     oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
                     oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
                     oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
                     oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
-                    
+
                     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
                     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                    
+
                     oscillator.connect(gainNode);
                     gainNode.connect(audioContext.destination);
-                    
+
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
-                    
+
                     console.log('🔔 Звук колокольчика воспроизведен для уведомления');
-                    
+
                 } catch (error) {
                     console.error('❌ Ошибка воспроизведения звука:', error);
                 }
@@ -338,7 +338,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 console.error('❌ Ошибка получения настроек:', error);
             });
     }
-    
+
     function markLikesAsRead() {
         // Отмечаем все лайки как прочитанные при клике на иконку
         fetch('/api/mark_likes_read', {
@@ -361,7 +361,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             console.error('Ошибка при отметке лайков как прочитанных:', error);
         });
     }
-    
+
     setInterval(function() {
         fetch('/api/unread')
             .then(r => r.json())
@@ -371,7 +371,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                     if (data.unread_messages > 0) {
                         msgBadge.innerText = data.unread_messages;
                         msgBadge.style.display = '';
-                        
+
                         // Воспроизводим звук только при появлении новых сообщений
                         if (data.unread_messages > previousUnreadMessages) {
                             playNotificationSound();
@@ -381,13 +381,13 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                     }
                     previousUnreadMessages = data.unread_messages;
                 }
-                
+
                 let likeBadge = document.getElementById('like-badge');
                 if (likeBadge) {
                     if (data.unread_likes > 0) {
                         likeBadge.innerText = data.unread_likes;
                         likeBadge.style.display = '';
-                        
+
                         // Воспроизводим звук только при появлении новых лайков
                         if (data.unread_likes > previousUnreadLikes) {
                             playNotificationSound();
@@ -397,13 +397,13 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                     }
                     previousUnreadLikes = data.unread_likes;
                 }
-                
+
                 let matchBadge = document.getElementById('match-badge');
                 if (matchBadge) {
                     if (data.unread_matches > 0) {
                         matchBadge.innerText = data.unread_matches;
                         matchBadge.style.display = '';
-                        
+
                         // Воспроизводим звук только при появлении новых матчей
                         if (data.unread_matches > previousUnreadMatches) {
                             playNotificationSound();
@@ -442,7 +442,7 @@ def api_mark_likes_read():
         all_likes = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
         # Добавляем их в просмотренные
         read_likes[user_id].update(all_likes)
-        
+
         return jsonify({
             "success": True,
             "marked_read": len(all_likes),
@@ -1098,25 +1098,25 @@ def create_profile():
         name = request.form.get('name', '').strip()
         hobbies = request.form.get('hobbies', '').strip()
         goal = request.form.get('goal', '').strip()
-        
+
         if len(name) > 12:
             return jsonify({
                 'success': False,
                 'error': 'Имя не должно превышать 12 символов'
             }), 400
-            
+
         if len(hobbies) > 70:
             return jsonify({
                 'success': False,
                 'error': 'Увлечения не должны превышать 70 символов'
             }), 400
-            
+
         if len(goal) > 70:
             return jsonify({
                 'success': False,
                 'error': 'Цель знакомства не должна превышать 70 символов'
             }), 400
-        
+
         photo = request.files['photo']
         venue = request.form.get('venue')
         latitude = request.form.get('latitude')
@@ -1304,9 +1304,9 @@ def create_profile():
                 select option:hover {
                     background: rgba(76, 175, 80, 1);
                 }
-                
 
-                
+
+
                 .field-container {
                     position: relative;
                     width: 100%;
@@ -1528,7 +1528,7 @@ def create_profile():
                     // Функциональность ограничений остается, но без визуальных счетчиков
                     // Пользователь не сможет ввести больше символов благодаря maxlength
                 }
-                
+
                 // Статическое местоположение: карта автоматически определяет местоположение пользователя
                 // и делает его неизменяемым. Пользователь может только выбирать заведения.
                 let myMap, myPlacemark;
@@ -2254,7 +2254,7 @@ def create_profile():
                 // Инициализация карты при загрузке страницы
                 window.onload = function() {
                     console.log('🚀 Страница загружена, начинаем инициализацию...');
-                    
+
                     // Проверяем, есть ли элемент карты
                     const mapElement = document.getElementById('map');
                     if (mapElement) {
@@ -2262,7 +2262,7 @@ def create_profile():
                     } else {
                         console.error('❌ Элемент карты не найден!');
                     }
-                    
+
                     // На странице создания профиля карта должна инициализироваться всегда
                     console.log('🗺️ Инициализируем карту на странице создания профиля...');
                     initMap();
@@ -2291,18 +2291,18 @@ def get_user_settings(user_id):
         import sqlite3
         conn = sqlite3.connect('dating_app.db')
         cursor = conn.cursor()
-        
+
         cursor.execute('SELECT sound_notifications FROM user_settings WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
-        
+
         conn.close()
-        
+
         if result:
             return {'sound_notifications': bool(result[0])}
         else:
             # Создаем настройки по умолчанию
             return {'sound_notifications': True}
-            
+
     except Exception as e:
         print(f"❌ Ошибка получения настроек для {user_id}: {e}")
         return {'sound_notifications': True}
@@ -2314,11 +2314,11 @@ def update_user_settings(user_id, sound_notifications):
         import sqlite3
         conn = sqlite3.connect('dating_app.db')
         cursor = conn.cursor()
-        
+
         # Проверяем, есть ли уже настройки для пользователя
         cursor.execute('SELECT id FROM user_settings WHERE user_id = ?', (user_id,))
         existing = cursor.fetchone()
-        
+
         if existing:
             # Обновляем существующие настройки
             cursor.execute('''
@@ -2332,13 +2332,13 @@ def update_user_settings(user_id, sound_notifications):
                 INSERT INTO user_settings (user_id, sound_notifications, created_at, updated_at) 
                 VALUES (?, ?, ?, ?)
             ''', (user_id, 1 if sound_notifications else 0, datetime.utcnow(), datetime.utcnow()))
-        
+
         conn.commit()
         conn.close()
-        
+
         print(f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}")
         return True
-        
+
     except Exception as e:
         print(f"❌ Ошибка обновления настроек для {user_id}: {e}")
         return False
@@ -2370,12 +2370,12 @@ def view_visitors():
         other_profiles = [p for p in other_profiles if p.gender == gender_query]
     # liked_ids включает лайки и метчи
     liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    
+
     # Добавляем пользователей из метчей
     matches = Match.query.filter(
         (Match.user1_id == user_id) | (Match.user2_id == user_id)
     ).all()
-    
+
     for match in matches:
         if match.user1_id == user_id:
             liked_ids.add(match.user2_id)
@@ -2510,50 +2510,50 @@ def view_visitors():
                         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                         const oscillator = audioContext.createOscillator();
                         const gainNode = audioContext.createGain();
-                        
+
                         // Классический звук колокольчика
                         oscillator.type = 'sine';
                         oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
                         oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
                         oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
                         oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
-                        
+
                         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
                         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                        
+
                         oscillator.connect(gainNode);
                         gainNode.connect(audioContext.destination);
-                        
+
                         oscillator.start(audioContext.currentTime);
                         oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
-                        
+
                         console.log('🔔 Звук колокольчика воспроизведен');
-                        
+
                     } catch (error) {
                         console.error('❌ Ошибка воспроизведения звука:', error);
                     }
                 }
-                
+
                 function showNotification(message, type = 'info') {
                     // Удаляем существующие уведомления
                     const existingNotifications = document.querySelectorAll('.notification');
                     existingNotifications.forEach(notification => notification.remove());
-                    
+
                     // Создаем новое уведомление
                     const notification = document.createElement('div');
                     notification.className = `notification ${type}`;
                     notification.textContent = message;
-                    
+
                     // Добавляем в body
                     document.body.appendChild(notification);
-                    
+
                     // Показываем уведомление
                     setTimeout(() => {
                         notification.classList.add('show');
                     }, 100);
-                    
+
                     // Звук теперь воспроизводится только при обновлении счетчиков в навигации
-                    
+
                     // Скрываем через 3 секунды
                     setTimeout(() => {
                         notification.classList.remove('show');
@@ -2564,7 +2564,7 @@ def view_visitors():
                         }, 300);
                     }, 3000);
                 }
-                
+
                 function toggleLike(profileId, btn) {
                     event.stopPropagation();
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
@@ -2607,7 +2607,7 @@ def view_visitors():
                 <button type="submit">Фильтровать</button>
             </form>
             <div class="visitor-count">Посетителей: {{ other_profiles|length }}</div>
-            <h1 style="text-align: center;">Посетители кафе</h1>
+            <h1>Посетители кафе</h1>
             {% if other_profiles %}
                 {% for profile in other_profiles %}
                     <div class="visitor-card" onclick="goToProfile('{{ profile.id }}')">
@@ -2642,23 +2642,23 @@ def toggle_like(profile_id):
     user_id = request.cookies.get('user_id')
     if not user_id or Profile.query.get(profile_id) is None or profile_id == user_id:
         return jsonify({'liked': False, 'already_liked': False, 'likes_count': 0, 'match_created': False})
-    
+
     # Проверяем, лайкал ли уже текущий пользователь
     already_liked = Like.query.filter(and_(Like.user_id == user_id, Like.liked_id == profile_id)).first()
-    
+
     if already_liked:
         # Уже лайкал - ничего не делаем, сердечко остается красным
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
         return jsonify({'liked': True, 'already_liked': True, 'likes_count': likes_count, 'match_created': False})
-    
+
     # Проверяем, лайкал ли уже целевой пользователь текущего
     mutual_like = Like.query.filter(and_(Like.user_id == profile_id, Like.liked_id == user_id)).first()
-    
+
     if mutual_like:
         # Взаимный лайк - создаем метч и удаляем лайк
         db.session.delete(mutual_like)
         db.session.commit()
-        
+
         # Создаем метч в базе данных
         user_profile = Profile.query.get(user_id)
         matched_profile = Profile.query.get(profile_id)
@@ -2668,30 +2668,30 @@ def toggle_like(profile_id):
                 ((Match.user1_id == user_id) & (Match.user2_id == profile_id)) |
                 ((Match.user1_id == profile_id) & (Match.user2_id == user_id))
             ).first()
-            
+
             if not existing_match:
                 # Создаем метч (всегда user1_id < user2_id для консистентности)
                 user1_id, user2_id = sorted([user_id, profile_id])
                 match = Match(user1_id=user1_id, user2_id=user2_id)
                 db.session.add(match)
                 db.session.commit()
-            
+
             add_notification(user_id, f"✨ У вас мэтч с {matched_profile.name}! Теперь вы можете общаться.")
             add_notification(profile_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
-        
+
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
         return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': True})
-    
+
     # Обычный лайк
     db.session.add(Like(user_id=user_id, liked_id=profile_id))
     db.session.commit()
-    
+
     # Добавляем уведомление получателю лайка
     user_profile = Profile.query.get(user_id)
     liked_profile = Profile.query.get(profile_id)
     if user_profile and liked_profile:
         add_notification(profile_id, f"💖 {user_profile.name} лайкнул(а) вас!")
-    
+
     likes_count = Like.query.filter_by(liked_id=profile_id).count()
     return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count, 'match_created': False})
 
@@ -3185,21 +3185,21 @@ def my_likes():
             liked_me_ids.add(liker_profile.id)
     # Сбросить счетчик лайков - добавляем все текущие лайки в просмотренные
     read_likes[user_id].update(liked_me_ids)
-    
+
     # liked_ids включает лайки и метчи
     liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    
+
     # Добавляем пользователей из метчей
     matches = Match.query.filter(
         (Match.user1_id == user_id) | (Match.user2_id == user_id)
     ).all()
-    
+
     for match in matches:
         if match.user1_id == user_id:
             liked_ids.add(match.user2_id)
         else:
             liked_ids.add(match.user1_id)
-    
+
     navbar = render_navbar(user_id, active='likes', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
@@ -3254,7 +3254,7 @@ def my_likes():
                 .like-heart.liked { color: #ff6b6b; }
                 .back-btn { background: linear-gradient(90deg, #6c757d 0%, #495057 100%); color: white; border: none; padding: 12px 24px; border-radius: 25px; box-shadow: 0 4px 14px rgba(108,117,125,0.2); font-size: 1.1em; cursor: pointer; transition: box-shadow 0.2s, transform 0.2s; text-decoration: none; display: inline-block; margin-top: 20px; }
                 .back-btn:hover { box-shadow: 0 8px 24px rgba(108,117,125,0.3); transform: translateY(-2px) scale(1.03); }
-                
+
                 /* Стили для уведомлений */
                 .notification {
                     position: fixed;
@@ -3270,23 +3270,23 @@ def my_likes():
                     max-width: 300px;
                     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
                 }
-                
+
                 .notification.show {
                     transform: translateX(0);
                 }
-                
+
                 .notification.success {
                     background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
                 }
-                
+
                 .notification.error {
                     background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
                 }
-                
+
                 .notification.info {
                     background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
                 }
-                
+
                 .notification.warning {
                     background: linear-gradient(90deg, #ff9800 0%, #ffb74d 100%);
                 }
@@ -3296,20 +3296,20 @@ def my_likes():
                     // Удаляем существующие уведомления
                     const existingNotifications = document.querySelectorAll('.notification');
                     existingNotifications.forEach(notification => notification.remove());
-                    
+
                     // Создаем новое уведомление
                     const notification = document.createElement('div');
                     notification.className = `notification ${type}`;
                     notification.textContent = message;
-                    
+
                     // Добавляем в body
                     document.body.appendChild(notification);
-                    
+
                     // Показываем уведомление
                     setTimeout(() => {
                         notification.classList.add('show');
                     }, 100);
-                    
+
                     // Скрываем через 3 секунды
                     setTimeout(() => {
                         notification.classList.remove('show');
@@ -3320,7 +3320,7 @@ def my_likes():
                         }, 300);
                     }, 3000);
                 }
-                
+
                 function toggleLike(profileId, btn) {
                     event.stopPropagation();
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
@@ -3350,7 +3350,7 @@ def my_likes():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1 style="text-align: center;">Меня лайкнули</h1>
+            <h1>Меня лайкнули</h1>
             {% if liked_me_profiles %}
                 {% for profile in liked_me_profiles %}
                     <div class="like-card" onclick="goToProfile('{{ profile.id }}')">
@@ -3448,7 +3448,7 @@ def view_profile(id):
                     box-shadow: 0 8px 24px rgba(108,117,125,0.3);
                     transform: translateY(-2px) scale(1.03);
                 }
-                
+
                 /* Стили для уведомлений */
                 .notification {
                     position: fixed;
@@ -3464,23 +3464,23 @@ def view_profile(id):
                     max-width: 300px;
                     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
                 }
-                
+
                 .notification.show {
                     transform: translateX(0);
                 }
-                
+
                 .notification.success {
                     background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
                 }
-                
+
                 .notification.error {
                     background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
                 }
-                
+
                 .notification.info {
                     background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
                 }
-                
+
                 .notification.warning {
                     background: linear-gradient(90deg, #ff9800 0%, #ffb74d 100%);
                 }
@@ -3490,20 +3490,20 @@ def view_profile(id):
                     // Удаляем существующие уведомления
                     const existingNotifications = document.querySelectorAll('.notification');
                     existingNotifications.forEach(notification => notification.remove());
-                    
+
                     // Создаем новое уведомление
                     const notification = document.createElement('div');
                     notification.className = `notification ${type}`;
                     notification.textContent = message;
-                    
+
                     // Добавляем в body
                     document.body.appendChild(notification);
-                    
+
                     // Показываем уведомление
                     setTimeout(() => {
                         notification.classList.add('show');
                     }, 100);
-                    
+
                     // Скрываем через 3 секунды
                     setTimeout(() => {
                         notification.classList.remove('show');
@@ -3514,14 +3514,14 @@ def view_profile(id):
                         }, 300);
                     }, 3000);
                 }
-                
+
                 function likeProfile(profileId) {
                     // Показываем индикатор загрузки
                     const button = event.target;
                     const originalText = button.textContent;
                     button.textContent = '⏳ Отправляем...';
                     button.disabled = true;
-                    
+
                     fetch('/like/' + profileId, {
                         method: 'POST',
                         headers: {
@@ -3616,7 +3616,7 @@ def like_profile(id):
         return jsonify({'error': 'Нельзя лайкнуть свою анкету'}), 400
     if Like.query.filter_by(user_id=user_id, liked_id=id).first():
         return jsonify({'error': 'Вы уже лайкнули этого пользователя'}), 400
-    
+
     try:
         db.session.add(Like(user_id=user_id, liked_id=id))
         db.session.commit()
@@ -3655,7 +3655,7 @@ def my_matches():
     matches = Match.query.filter(
         (Match.user1_id == user_id) | (Match.user2_id == user_id)
     ).all()
-    
+
     # Отмечаем метчи как просмотренные
     current_time = datetime.utcnow()
     for match in matches:
@@ -3664,17 +3664,18 @@ def my_matches():
         elif match.user2_id == user_id and match.user2_viewed_at is None:
             match.user2_viewed_at = current_time
     db.session.commit()
-    
+
     matched_ids = set()
     for match in matches:
         if match.user1_id == user_id:
             matched_ids.add(match.user2_id)
         else:
             matched_ids.add(match.user1_id)
-    
+
     matched_profiles = [Profile.query.get(mid) for mid in matched_ids if Profile.query.get(mid)]
     navbar = render_navbar(user_id, active='matches', unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id), unread_matches=get_unread_matches_count(user_id))
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -3747,7 +3748,7 @@ def my_matches():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1 style="text-align: center;">Мои мэтчи</h1>
+            <h1>Мои мэтчи</h1>
             {% if matched_profiles %}
                 {% for profile in matched_profiles %}
                     <div class="match-card">
@@ -3788,18 +3789,18 @@ def my_messages():
         for uid in ids:
             if uid != user_id:
                 chat_partners.add(uid)
-    
+
     # Добавляем всех пользователей из метчей из базы данных
     matches = Match.query.filter(
         (Match.user1_id == user_id) | (Match.user2_id == user_id)
     ).all()
-    
+
     for match in matches:
         if match.user1_id == user_id:
             chat_partners.add(match.user2_id)
         else:
             chat_partners.add(match.user1_id)
-    
+
     chat_profiles = [p for p in Profile.query.all() if p.id in chat_partners]
     # Считаем непрочитанные сообщения по каждому собеседнику
     unread_by_partner = {}
@@ -3901,7 +3902,7 @@ def my_messages():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1 style="text-align: center;">Мои сообщения</h1>
+            <h1>Мои сообщения</h1>
             {% if chat_profiles %}
                 {% for profile in chat_profiles %}
                     <div class="chat-card" onclick="goToChat('{{ profile.id }}')">
@@ -3935,7 +3936,7 @@ def chat(other_user_id):
         ((Match.user1_id == user_id) & (Match.user2_id == other_user_id)) |
         ((Match.user1_id == other_user_id) & (Match.user2_id == user_id))
     ).first()
-    
+
     if not match_exists:
         return "Чат доступен только для мэтчей", 403
     other_profile = Profile.query.get(other_user_id)
@@ -3968,7 +3969,7 @@ def chat(other_user_id):
                 {{ get_starry_night_css()|safe }}
                 body { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .chat-header {
-                    background: #030202;
+                    background: rgba(255, 255, 255, 0.95);
                     border-radius: 15px;
                     padding: 20px;
                     margin-bottom: 20px;
@@ -3989,11 +3990,11 @@ def chat(other_user_id):
                 .chat-info h1 {
                     margin: 0;
                     font-size: 1.4em;
-                    color: #fff;
+                    color: #333;
                 }
                 .chat-info p {
                     margin: 5px 0 0 0;
-                    color: #ccc;
+                    color: #666;
                     font-size: 0.9em;
                 }
                 .message { 
@@ -4010,10 +4011,9 @@ def chat(other_user_id):
                     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
                 }
                 .their-message { 
-                    background: #030202; 
+                    background: rgba(255, 255, 255, 0.9); 
                     margin-right: auto; 
                     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-                    color: #fff;
                 }
                 .modern-btn {
                     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -4048,8 +4048,7 @@ def chat(other_user_id):
                     font-size: 1.1em;
                     border-radius: 15px;
                     border: 1px solid rgba(255, 255, 255, 0.3);
-                    background: #030202;
-                    color: #fff;
+                    background: rgba(255, 255, 255, 0.9);
                     min-height: 48px;
                     margin-bottom: 10px;
                     resize: none;
@@ -4064,12 +4063,12 @@ def chat(other_user_id):
 
 
                 .typing-indicator {
-                    background: #030202;
+                    background: rgba(255, 255, 255, 0.9);
                     border-radius: 15px;
                     padding: 10px 15px;
                     margin: 10px;
                     font-size: 0.9em;
-                    color: #fff;
+                    color: #666;
                     display: none;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -4156,41 +4155,41 @@ def chat(other_user_id):
                                 console.log('🔕 Звук отключен в настройках');
                                 return;
                             }
-                            
+
                             if (!chatUserInteracted) {
                                 chatUserInteracted = true;
                             }
-                            
+
                             try {
                                 if (!chatAudioContext) {
                                     initChatAudio();
                                 }
-                                
+
                                 if (chatAudioContext && chatAudioContext.state === 'suspended') {
                                     chatAudioContext.resume();
                                 }
-                                
+
                                 const oscillator = chatAudioContext.createOscillator();
                                 const gainNode = chatAudioContext.createGain();
-                                
+
                                 // Классический звук колокольчика
                                 oscillator.type = 'sine';
                                 oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
                                 oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
                                 oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
                                 oscillator.frequency.setValueAtTime(400, chatAudioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
-                                
+
                                 gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
                                 gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.5);
-                                
+
                                 oscillator.connect(gainNode);
                                 gainNode.connect(chatAudioContext.destination);
-                                
+
                                 oscillator.start(chatAudioContext.currentTime);
                                 oscillator.stop(chatAudioContext.currentTime + 0.5); // Длительность 0.5 секунды
-                                
+
                                 console.log('🔔 Звук колокольчика воспроизведен при новом сообщении');
-                                
+
                             } catch (error) {
                                 console.error('❌ Ошибка воспроизведения звука:', error);
                             }
@@ -4323,11 +4322,11 @@ def chat(other_user_id):
                 socket.on('disconnect', function() {
                     console.log('❌ Socket.IO отключен, переключаемся на AJAX');
                 });
-                
+
                 socket.on('connect_error', function(error) {
                     console.error('❌ Ошибка подключения Socket.IO:', error);
                 });
-                
+
                 socket.on('error', function(error) {
                     console.error('❌ Ошибка Socket.IO:', error);
                 });
@@ -4339,16 +4338,16 @@ def chat(other_user_id):
                     const msg = input.value;
                     if (msg.trim()) {
                         console.log('📤 Отправка сообщения через Socket.IO...');
-                        
+
                         // Отправляем через Socket.IO
                         socket.emit('send_message', {room: chat_key, text: msg, sender: user_id});
-                        
+
                         // Добавляем сообщение локально для мгновенного отображения
                         addMessage(msg, user_id);
-                        
+
                         // Очищаем поле ввода
                         input.value = '';
-                        
+
                         console.log('✅ Сообщение отправлено');
                     }
                 };
@@ -4444,23 +4443,23 @@ def handle_send_message(data):
         room = data['room']
         text = data['text']
         sender = data['sender']
-        
+
         # Проверяем, что данные корректны
         if not room or not text or not sender:
             print(f"❌ Некорректные данные сообщения: {data}")
             return
-            
+
         # Сохраняем сообщение в базу данных
         new_message = Message(chat_key=room, sender=sender, text=text)
         db.session.add(new_message)
         db.session.commit()
-        
+
         print(f"✅ Сообщение сохранено: {sender} -> {room}: {text[:50]}...")
-        
+
         # Отправляем сообщение всем в комнате
         emit('message', {'text': text, 'sender': sender}, room=room)
         print(f"📤 Сообщение отправлено в комнату {room}")
-        
+
     except Exception as e:
         print(f"❌ Ошибка при обработке сообщения: {e}")
         db.session.rollback()
@@ -4472,7 +4471,7 @@ def handle_typing(data):
         room = data.get('room')
         user = data.get('user')
         is_typing = data.get('isTyping')
-        
+
         if room and user is not None:
             emit('user_typing', {'user': user, 'isTyping': is_typing}, room=room, include_self=False)
             print(f"⌨️ Индикатор печати: {user} {'печатает' if is_typing else 'остановился'} в комнате {room}")
@@ -4951,13 +4950,13 @@ def api_update_settings():
     """API для обновления настроек пользователя"""
     user_id = request.cookies.get('user_id')
     data = request.get_json()
-    
+
     if not data or 'sound_notifications' not in data:
         return jsonify({"error": "Неверные данные"}), 400
-    
+
     sound_enabled = data['sound_notifications']
     success = update_user_settings(user_id, sound_enabled)
-    
+
     if success:
         return jsonify({"success": True, "sound_notifications": sound_enabled})
     else:
@@ -5057,17 +5056,17 @@ def settings():
                     <button id="sound-toggle" class="bell-button" onclick="toggleSound()">🔔</button>
                 </div>
             </div>
-            
+
             <script>
                 let audioContext = null;
                 let userInteracted = false;
                 let soundEnabled = true;
-                
+
                 // Загружаем настройки при загрузке страницы
                 window.addEventListener('load', function() {
                     loadSettings();
                 });
-                
+
                 // Загрузка настроек
                 function loadSettings() {
                     fetch('/api/get_settings')
@@ -5081,7 +5080,7 @@ def settings():
                             console.error('❌ Ошибка загрузки настроек:', error);
                         });
                 }
-                
+
                 // Обновление внешнего вида колокольчика
                 function updateBellAppearance() {
                     const bellButton = document.getElementById('sound-toggle');
@@ -5095,14 +5094,14 @@ def settings():
                         bellButton.style.background = '#666';
                     }
                 }
-                
+
                 // Переключение звука
                 function toggleSound() {
                     soundEnabled = !soundEnabled;
-                    
+
                     // Обновляем внешний вид
                     updateBellAppearance();
-                    
+
                     // Сохраняем настройки
                     fetch('/api/update_settings', {
                         method: 'POST',
@@ -5129,7 +5128,7 @@ def settings():
                         console.error('❌ Ошибка сохранения настроек:', error);
                     });
                 }
-                
+
                 // Инициализация аудио
                 function initAudio() {
                     try {
@@ -5139,48 +5138,48 @@ def settings():
                         console.log('⚠️ Аудио не поддерживается в настройках:', error.message);
                     }
                 }
-                
+
                 // Функция воспроизведения классического звука колокольчика
                 function playBellSound() {
                     if (!userInteracted) {
                         userInteracted = true;
                     }
-                    
+
                     try {
                         if (!audioContext) {
                             initAudio();
                         }
-                        
+
                         if (audioContext && audioContext.state === 'suspended') {
                             audioContext.resume();
                         }
-                        
+
                         const oscillator = audioContext.createOscillator();
                         const gainNode = audioContext.createGain();
-                        
+
                         // Классический звук колокольчика
                         oscillator.type = 'sine';
                         oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
                         oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
                         oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
                         oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
-                        
+
                         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
                         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                        
+
                         oscillator.connect(gainNode);
                         gainNode.connect(audioContext.destination);
-                        
+
                         oscillator.start(audioContext.currentTime);
                         oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
-                        
+
                         console.log('🔔 Классический звук колокольчика воспроизведен');
-                        
+
                     } catch (error) {
                         console.error('❌ Ошибка воспроизведения звука:', error);
                     }
                 }
-                
+
                 // Отмечаем взаимодействие пользователя
                 document.addEventListener('click', () => {
                     userInteracted = true;
@@ -5253,5 +5252,5 @@ if __name__ == '__main__':
         deleted_count = cleanup_expired_profiles()
         print(f"⏰ Время жизни анкеты: {PROFILE_LIFETIME_HOURS} часов")
 
-    socketio.run(app, host='0.0.0.0', port=5001
-                 , debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5000
+                 , debug=True, allow_unsafe_werkzeug=True, ssl_context='adhoc')

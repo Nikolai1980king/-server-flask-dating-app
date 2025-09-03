@@ -1199,7 +1199,7 @@ def create_profile():
             }), 500
     navbar = render_navbar(user_id, active=None, unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id))
-    return render_template_string('''
+    return render_template_string(r'''
         <!DOCTYPE html>
         <html>
         <head>
@@ -5201,7 +5201,8 @@ def cleanup_expired_profiles():
     """
     try:
         from datetime import timedelta
-        cutoff_time = datetime.utcnow() - timedelta(hours=PROFILE_LIFETIME_HOURS)
+        from datetime import datetime, timezone, timedelta
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PROFILE_LIFETIME_HOURS)
 
         # Находим просроченные анкеты
         expired_profiles = Profile.query.filter(Profile.created_at < cutoff_time).all()

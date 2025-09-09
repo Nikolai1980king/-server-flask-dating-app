@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест геолокации</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Диагностика геолокации</h1>
+    
+    <div class="test-section info">
+        <h3>📋 Проверка поддержки геолокации</h3>
+        <button onclick="checkGeolocationSupport()">Проверить поддержку</button>
+        <div id="support-result"></div>
+    </div>
+    
+    <div class="test-section info">
+        <h3>📍 Тест получения местоположения</h3>
+        <button onclick="getCurrentLocation()">Получить местоположение</button>
+        <div id="location-result"></div>
+    </div>
+    
+    <div class="test-section info">
+        <h3>🌐 Проверка HTTPS</h3>
+        <button onclick="checkHTTPS()">Проверить протокол</button>
+        <div id="https-result"></div>
+    </div>
+    
+    <div class="test-section info">
+        <h3>🔧 Настройки браузера</h3>
+        <div id="browser-settings">
+            <p><strong>Проверьте настройки:</strong></p>
+            <ul>
+                <li>Разрешен ли доступ к местоположению для этого сайта</li>
+                <li>Не заблокирована ли геолокация в настройках браузера</li>
+                <li>Нет ли расширений, блокирующих геолокацию</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            results.appendChild(div);
+        }
+        
+        function checkGeolocationSupport() {
+            const resultDiv = document.getElementById('support-result');
+            
+            if (navigator.geolocation) {
+                resultDiv.innerHTML = '<div class="success">✅ Геолокация поддерживается браузером</div>';
+                log('Геолокация поддерживается браузером', 'success');
+            } else {
+                resultDiv.innerHTML = '<div class="error">❌ Геолокация не поддерживается браузером</div>';
+                log('Геолокация не поддерживается браузером', 'error');
+            }
+        }
+        
+        function getCurrentLocation() {
+            const resultDiv = document.getElementById('location-result');
+            resultDiv.innerHTML = '<div class="info">⏳ Получаем местоположение...</div>';
+            
+            if (!navigator.geolocation) {
+                resultDiv.innerHTML = '<div class="error">❌ Геолокация не поддерживается</div>';
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const coords = position.coords;
+                    const accuracy = coords.accuracy;
+                    const timestamp = new Date(position.timestamp);
+                    
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Местоположение получено успешно!<br>
+                            <strong>Координаты:</strong> ${coords.latitude}, ${coords.longitude}<br>
+                            <strong>Точность:</strong> ±${accuracy} метров<br>
+                            <strong>Время:</strong> ${timestamp.toLocaleString()}
+                        </div>
+                    `;
+                    
+                    log(`Местоположение получено: ${coords.latitude}, ${coords.longitude}`, 'success');
+                },
+                function(error) {
+                    let errorMessage = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = '❌ Доступ к местоположению запрещен пользователем';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = '❌ Информация о местоположении недоступна';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = '❌ Превышено время ожидания получения местоположения';
+                            break;
+                        case error.UNKNOWN_ERROR:
+                            errorMessage = '❌ Произошла неизвестная ошибка';
+                            break;
+                    }
+                    
+                    resultDiv.innerHTML = `<div class="error">${errorMessage}</div>`;
+                    log(`Ошибка геолокации: ${errorMessage}`, 'error');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 60000
+                }
+            );
+        }
+        
+        function checkHTTPS() {
+            const resultDiv = document.getElementById('https-result');
+            const isHTTPS = window.location.protocol === 'https:';
+            const isLocalhost = window.location.hostname === 'localhost' || 
+                               window.location.hostname === '127.0.0.1';
+            
+            if (isHTTPS || isLocalhost) {
+                resultDiv.innerHTML = '<div class="success">✅ Протокол подходит для геолокации</div>';
+                log('Протокол подходит для геолокации', 'success');
+            } else {
+                resultDiv.innerHTML = '<div class="error">❌ Для геолокации требуется HTTPS</div>';
+                log('Для геолокации требуется HTTPS', 'error');
+            }
+        }
+        
+        // Автоматические проверки при загрузке
+        window.onload = function() {
+            log('Страница загружена, начинаем диагностику...', 'info');
+            checkGeolocationSupport();
+            checkHTTPS();
+        };
+    </script>
+</body>
+</html> 

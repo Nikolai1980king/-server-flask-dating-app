@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест времени жизни анкет</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .test-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .feature-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .feature-box h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .test-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .demo-box {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .demo-box h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+        }
+
+        .warning-box {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .warning-box h3 {
+            color: #F44336;
+            margin-bottom: 15px;
+        }
+
+        .instruction-list {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .instruction-list h3 {
+            color: #FFC107;
+            margin-bottom: 15px;
+        }
+
+        .instruction-list ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instruction-list li {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .instruction-list li:before {
+            content: "⏰";
+            position: absolute;
+            left: 0;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .status-display {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>⏰ Тест времени жизни анкет</h2>
+        
+        <div class="feature-box">
+            <h3>🎯 Новая функциональность</h3>
+            <p>Добавлено автоматическое удаление анкет по истечении времени жизни. Анкеты удаляются через 24 часа после создания.</p>
+        </div>
+
+        <div class="demo-box">
+            <h3>🔧 Настройка времени жизни</h3>
+            <p><strong>Переменная:</strong> <code>PROFILE_LIFETIME_HOURS</code></p>
+            <p><strong>Расположение:</strong> Строка 27 в файле <code>app.py</code></p>
+            <p><strong>Текущее значение:</strong> 24 часа</p>
+            
+            <div class="code-block">
+# Время жизни анкеты в часах - СТРОКА 27
+PROFILE_LIFETIME_HOURS = 24  # 24 часа = 1 день
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <h3>⚠️ Что удаляется автоматически</h3>
+            <ul>
+                <li><strong>Анкета пользователя</strong> - полностью удаляется из базы данных</li>
+                <li><strong>Фотография</strong> - файл удаляется с сервера</li>
+                <li><strong>Лайки</strong> - все лайки пользователя и лайки на него</li>
+                <li><strong>Сообщения</strong> - все чаты с участием пользователя</li>
+            </ul>
+        </div>
+
+        <div class="instruction-list">
+            <h3>🧪 Как протестировать:</h3>
+            <ul>
+                <li>Создайте тестовую анкету</li>
+                <li>Измените время жизни на 1 час для быстрого тестирования</li>
+                <li>Подождите истечения времени или запустите очистку вручную</li>
+                <li>Проверьте, что анкета удалилась</li>
+                <li>Верните время жизни обратно на 24 часа</li>
+            </ul>
+        </div>
+
+        <div class="feature-box">
+            <h3>⚡ Функциональность</h3>
+            <ul>
+                <li><strong>Автоматическая очистка:</strong> При запуске сервера</li>
+                <li><strong>Ручная очистка:</strong> API endpoint для принудительной очистки</li>
+                <li><strong>Полное удаление:</strong> Анкета + фото + лайки + сообщения</li>
+                <li><strong>Настраиваемое время:</strong> Легко изменить в коде</li>
+                <li><strong>Безопасность:</strong> Обработка ошибок и логирование</li>
+            </ul>
+        </div>
+
+        <div class="demo-box">
+            <h3>🔧 Технические детали</h3>
+            <ul>
+                <li><strong>Новое поле:</strong> <code>created_at</code> в модели Profile</li>
+                <li><strong>Функция очистки:</strong> <code>cleanup_expired_profiles()</code></li>
+                <li><strong>API endpoint:</strong> <code>POST /api/cleanup-profiles</code></li>
+                <li><strong>Автозапуск:</strong> При старте приложения</li>
+                <li><strong>Логирование:</strong> Консольные сообщения о процессе</li>
+                <li><strong>Папка фотографий:</strong> <code>static/uploads/</code></li>
+                <li><strong>Удаление фото:</strong> Автоматически при удалении анкеты</li>
+                <li><strong>Сиротские файлы:</strong> API для проверки и очистки</li>
+            </ul>
+        </div>
+
+        <div class="status-display">
+            <h3>🧹 Ручная очистка</h3>
+            <button class="test-btn" onclick="runCleanup()">🗑️ Запустить очистку сейчас</button>
+            <div id="cleanup-result" style="margin-top: 15px;"></div>
+        </div>
+
+        <div class="status-display">
+            <h3>📸 Управление фотографиями</h3>
+            <button class="test-btn" onclick="checkOrphanedPhotos()">🔍 Проверить сиротские фото</button>
+            <button class="test-btn" onclick="cleanupOrphanedPhotos()">🗑️ Удалить сиротские фото</button>
+            <div id="photos-result" style="margin-top: 15px;"></div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" class="test-btn">🚀 Создать тестовую анкету</a>
+            <a href="/" class="test-btn">🏠 На главную</a>
+        </div>
+    </div>
+
+    <script>
+        console.log('⏰ Страница тестирования времени жизни анкет загружена');
+        
+        function runCleanup() {
+            const resultDiv = document.getElementById('cleanup-result');
+            resultDiv.innerHTML = '<p>🔄 Выполняется очистка...</p>';
+            
+            fetch('/api/cleanup-profiles', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `<p style="color: #4CAF50;">✅ ${data.message}</p>`;
+                    console.log('✅ Очистка выполнена успешно:', data);
+                } else {
+                    resultDiv.innerHTML = `<p style="color: #F44336;">❌ Ошибка: ${data.error}</p>`;
+                    console.error('❌ Ошибка очистки:', data.error);
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p style="color: #F44336;">❌ Ошибка сети: ${error}</p>`;
+                console.error('❌ Ошибка сети:', error);
+            });
+        }
+
+        function checkOrphanedPhotos() {
+            const resultDiv = document.getElementById('photos-result');
+            resultDiv.innerHTML = '<p>🔍 Проверяем сиротские фотографии...</p>';
+            
+            fetch('/api/check-orphaned-photos', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.orphaned_count > 0) {
+                        let filesList = '<ul style="text-align: left; max-height: 200px; overflow-y: auto;">';
+                        data.orphaned_photos.forEach(photo => {
+                            const sizeKB = Math.round(photo.size / 1024);
+                            filesList += `<li>${photo.filename} (${sizeKB} KB)</li>`;
+                        });
+                        filesList += '</ul>';
+                        
+                        resultDiv.innerHTML = `
+                            <p style="color: #FF9800;">⚠️ Найдено ${data.orphaned_count} сиротских файлов:</p>
+                            ${filesList}
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `<p style="color: #4CAF50;">✅ Сиротских файлов не найдено</p>`;
+                    }
+                    console.log('✅ Проверка сиротских фото выполнена:', data);
+                } else {
+                    resultDiv.innerHTML = `<p style="color: #F44336;">❌ Ошибка: ${data.error}</p>`;
+                    console.error('❌ Ошибка проверки:', data.error);
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p style="color: #F44336;">❌ Ошибка сети: ${error}</p>`;
+                console.error('❌ Ошибка сети:', error);
+            });
+        }
+
+        function cleanupOrphanedPhotos() {
+            const resultDiv = document.getElementById('photos-result');
+            resultDiv.innerHTML = '<p>🗑️ Удаляем сиротские фотографии...</p>';
+            
+            fetch('/api/cleanup-orphaned-photos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.deleted_count > 0) {
+                        const sizeMB = Math.round(data.deleted_size / 1024 / 1024 * 100) / 100;
+                        resultDiv.innerHTML = `
+                            <p style="color: #4CAF50;">✅ ${data.message}</p>
+                            <p>Освобождено места: ${sizeMB} MB</p>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `<p style="color: #4CAF50;">✅ Сиротских файлов не найдено</p>`;
+                    }
+                    console.log('✅ Очистка сиротских фото выполнена:', data);
+                } else {
+                    resultDiv.innerHTML = `<p style="color: #F44336;">❌ Ошибка: ${data.error}</p>`;
+                    console.error('❌ Ошибка очистки:', data.error);
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p style="color: #F44336;">❌ Ошибка сети: ${error}</p>`;
+                console.error('❌ Ошибка сети:', error);
+            });
+        }
+    </script>
+</body>
+</html> 

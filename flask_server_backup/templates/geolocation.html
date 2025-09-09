@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }}</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 500px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: twinkle 4s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .form-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        input, textarea, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #333;
+            font-size: 1em;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+        }
+
+        label {
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+
+        .modern-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .modern-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+        .back-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            box-shadow: 0 4px 14px rgba(108,117,125,0.2);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .back-btn:hover {
+            box-shadow: 0 8px 24px rgba(108,117,125,0.3);
+            transform: translateY(-2px) scale(1.03);
+        }
+        
+        .location-info {
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .location-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        
+        .location-btn:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+    <script>
+    function onCityChange(sel) {
+        var otherInput = document.getElementById('city-other-input');
+        if (sel.value === 'other') {
+            otherInput.style.display = 'block';
+        } else {
+            otherInput.style.display = 'none';
+        }
+    }
+    
+    function getCurrentLocation() {
+        const statusDiv = document.getElementById('location-status');
+        const locationBtn = document.getElementById('get-location-btn');
+        
+        if (navigator.geolocation) {
+            statusDiv.textContent = 'Определяем ваше местоположение...';
+            locationBtn.style.display = 'none';
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    // Обновляем скрытые поля
+                    document.getElementById('latitude-input').value = lat;
+                    document.getElementById('longitude-input').value = lng;
+                    
+                    statusDiv.textContent = `Местоположение определено! Координаты: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                    locationBtn.style.display = 'inline-block';
+                    locationBtn.textContent = '📍 Обновить местоположение';
+                    
+                    // Показываем информацию о местоположении
+                    document.getElementById('location-info').style.display = 'block';
+                },
+                function() {
+                    statusDiv.textContent = 'Не удалось определить местоположение';
+                    locationBtn.style.display = 'inline-block';
+                    locationBtn.textContent = '📍 Попробовать снова';
+                }
+            );
+        } else {
+            statusDiv.textContent = 'Геолокация не поддерживается';
+            locationBtn.style.display = 'inline-block';
+        }
+        
+        locationBtn.onclick = getCurrentLocation;
+    }
+    
+    // Инициализация при загрузке страницы
+    window.onload = function() {
+        getCurrentLocation();
+    };
+    </script>
+</head>
+<body>
+    <div class="form-container">
+        <h2>{{ title }}</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="text" name="name" placeholder="Ваше имя" value="{{ profile.name if profile else '' }}" required>
+            <input type="number" name="age" placeholder="Ваш возраст" value="{{ profile.age if profile else '' }}" required>
+            <select name="gender" required>
+                <option value="">Выберите пол</option>
+                <option value="male" {% if profile and profile.gender == 'male' %}selected{% endif %}>Мужской</option>
+                <option value="female" {% if profile and profile.gender == 'female' %}selected{% endif %}>Женский</option>
+                <option value="other" {% if profile and profile.gender == 'other' %}selected{% endif %}>Другое</option>
+            </select>
+            <textarea name="hobbies" placeholder="Ваши увлечения" required>{{ profile.hobbies if profile else '' }}</textarea>
+            <textarea name="goal" placeholder="Цель знакомства" required>{{ profile.goal if profile else '' }}</textarea>
+            <label for="city">Город:</label>
+            <select name="city" id="city-select" onchange="onCityChange(this)" required>
+                <option value="">Выберите город</option>
+                <option value="Москва" {% if profile and profile.city == 'Москва' %}selected{% endif %}>Москва</option>
+                <option value="Санкт-Петербург" {% if profile and profile.city == 'Санкт-Петербург' %}selected{% endif %}>Санкт-Петербург</option>
+                <option value="Новосибирск" {% if profile and profile.city == 'Новосибирск' %}selected{% endif %}>Новосибирск</option>
+                <option value="Екатеринбург" {% if profile and profile.city == 'Екатеринбург' %}selected{% endif %}>Екатеринбург</option>
+                <option value="Казань" {% if profile and profile.city == 'Казань' %}selected{% endif %}>Казань</option>
+                <option value="Нижний Новгород" {% if profile and profile.city == 'Нижний Новгород' %}selected{% endif %}>Нижний Новгород</option>
+                <option value="Челябинск" {% if profile and profile.city == 'Челябинск' %}selected{% endif %}>Челябинск</option>
+                <option value="Самара" {% if profile and profile.city == 'Самара' %}selected{% endif %}>Самара</option>
+                <option value="Омск" {% if profile and profile.city == 'Омск' %}selected{% endif %}>Омск</option>
+                <option value="Ростов-на-Дону" {% if profile and profile.city == 'Ростов-на-Дону' %}selected{% endif %}>Ростов-на-Дону</option>
+                <option value="Уфа" {% if profile and profile.city == 'Уфа' %}selected{% endif %}>Уфа</option>
+                <option value="Красноярск" {% if profile and profile.city == 'Красноярск' %}selected{% endif %}>Красноярск</option>
+                <option value="Воронеж" {% if profile and profile.city == 'Воронеж' %}selected{% endif %}>Воронеж</option>
+                <option value="Пермь" {% if profile and profile.city == 'Пермь' %}selected{% endif %}>Пермь</option>
+                <option value="Волгоград" {% if profile and profile.city == 'Волгоград' %}selected{% endif %}>Волгоград</option>
+                <option value="other" {% if profile and profile.city and profile.city not in [
+                    'Москва','Санкт-Петербург','Новосибирск','Екатеринбург','Казань','Нижний Новгород','Челябинск','Самара','Омск','Ростов-на-Дону','Уфа','Красноярск','Воронеж','Пермь','Волгоград'] %}selected{% endif %}>Другое</option>
+            </select>
+            <input type="text" name="city_other" id="city-other-input" placeholder="Введите город" style="display:{% if profile and profile.city and profile.city not in [
+                'Москва','Санкт-Петербург','Новосибирск','Екатеринбург','Казань','Нижний Новгород','Челябинск','Самара','Омск','Ростов-на-Дону','Уфа','Красноярск','Воронеж','Пермь','Волгоград'] %}block{% else %}none{% endif %};" value="{% if profile and profile.city and profile.city not in [
+                'Москва','Санкт-Петербург','Новосибирск','Екатеринбург','Казань','Нижний Новгород','Челябинск','Самара','Омск','Ростов-на-Дону','Уфа','Красноярск','Воронеж','Пермь','Волгоград'] %}{{ profile.city }}{% endif %}">
+            
+            <label for="venue">Местоположение и кафе:</label>
+            <div class="location-info" style="display: none;" id="location-info">
+                <div id="location-status">Определяем ваше местоположение...</div>
+                <button type="button" id="get-location-btn" class="location-btn">📍 Определить местоположение</button>
+            </div>
+            <input type="text" name="venue" id="venue-input" placeholder="Название заведения" value="{{ profile.venue if profile else '' }}" required>
+            <input type="hidden" name="latitude" id="latitude-input" value="{{ profile.latitude if profile else '' }}">
+            <input type="hidden" name="longitude" id="longitude-input" value="{{ profile.longitude if profile else '' }}">
+            <input type="file" name="photo" accept="image/*" {% if not profile %}required{% endif %}>
+            <button type="submit" class="modern-btn">{{ submit_text }}</button>
+        </form>
+        <a href="{{ back_url }}" class="back-btn">← {{ back_text }}</a>
+    </div>
+</body>
+</html> 

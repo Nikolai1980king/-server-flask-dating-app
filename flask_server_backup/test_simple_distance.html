@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Простой тест geopy API</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #results { margin-top: 20px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🧭 Простой тест geopy API</h1>
+    
+    <div class="test-section">
+        <h3>📏 Тест расчета расстояния</h3>
+        <button onclick="testDistance()">Рассчитать расстояние Москва-СПб</button>
+        <button onclick="testDistanceClose()">Рассчитать близкие точки</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            console.log(message);
+        }
+
+        async function testDistance() {
+            log('🧪 Тестируем расчет расстояния Москва-СПб...');
+            
+            try {
+                const response = await fetch('/api/calculate-distance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        lat1: 55.7558,
+                        lon1: 37.6176,
+                        lat2: 59.9311,
+                        lon2: 30.3609
+                    })
+                });
+
+                log(`📡 Статус: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                log(`✅ Ответ: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data.success) {
+                    log(`📏 Расстояние: ${data.distance_meters} м (${data.distance_km} км)`);
+                } else {
+                    log(`❌ Ошибка: ${data.error}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Ошибка: ${error.message}`);
+            }
+        }
+
+        async function testDistanceClose() {
+            log('🧪 Тестируем расчет близких точек...');
+            
+            try {
+                const response = await fetch('/api/calculate-distance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        lat1: 55.7558,
+                        lon1: 37.6176,
+                        lat2: 55.7517,
+                        lon2: 37.6178
+                    })
+                });
+
+                log(`📡 Статус: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                log(`✅ Ответ: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data.success) {
+                    log(`📏 Расстояние: ${data.distance_meters} м (${data.distance_km} км)`);
+                } else {
+                    log(`❌ Ошибка: ${data.error}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Ошибка: ${error.message}`);
+            }
+        }
+
+        // Автоматический тест при загрузке
+        window.onload = function() {
+            log('🚀 Страница загружена, готов к тестированию');
+        };
+    </script>
+</body>
+</html> 

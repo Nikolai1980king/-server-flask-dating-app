@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отладка перенаправления</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            background: #f9f9f9;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+            white-space: pre-wrap;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        .info {
+            border-left-color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Отладка системы "Одно устройство = одна анкета"</h1>
+    
+    <div class="debug-section">
+        <h2>📊 Текущее состояние</h2>
+        <button onclick="checkCurrentState()">Проверить текущее состояние</button>
+        <div id="current-state" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🧪 Тест создания анкеты</h2>
+        <button onclick="testCreateProfile()">Попробовать создать анкету</button>
+        <div id="create-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🗄️ База данных</h2>
+        <button onclick="checkDatabase()">Проверить базу данных</button>
+        <div id="database-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🧹 Очистка</h2>
+        <button onclick="clearAll()">Очистить все записи</button>
+        <div id="clear-result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        async function checkCurrentState() {
+            showResult('current-state', '⏳ Проверяем текущее состояние...', 'info');
+            
+            try {
+                const response = await fetch('/check_ip');
+                const data = await response.json();
+                
+                let message = `🌐 IP-адрес: ${data.ip}\n`;
+                message += `🔍 Отпечаток устройства: ${data.device_fingerprint}\n`;
+                message += `📱 Тип устройства: ${data.device_info.is_mobile ? 'Мобильное' : 'Десктопное'}\n`;
+                message += `📱 User-Agent: ${data.device_info.user_agent}\n\n`;
+                
+                if (data.restrictions) {
+                    message += `🔒 Ограничения:\n`;
+                    message += `• IP-ограничение: ${data.restrictions.ip_restriction.has_existing ? 'ЕСТЬ (БЛОКИРУЕТ)' : 'НЕТ'}\n`;
+                    if (data.restrictions.ip_restriction.has_existing) {
+                        message += `  Profile ID: ${data.restrictions.ip_restriction.profile_id}\n`;
+                        message += `  → При попытке создать анкету будет перенаправление на эту анкету\n`;
+                    }
+                    message += `• Device-ограничение: ${data.restrictions.device_restriction.has_existing ? 'ЕСТЬ (информация)' : 'НЕТ'}\n`;
+                    if (data.restrictions.device_restriction.has_existing) {
+                        message += `  Profile ID: ${data.restrictions.device_restriction.profile_id}\n`;
+                    }
+                }
+                
+                showResult('current-state', message, 'info');
+            } catch (error) {
+                showResult('current-state', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateProfile() {
+            showResult('create-result', '⏳ Пытаемся создать анкету...', 'info');
+            
+            try {
+                const response = await fetch('/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        name: 'Тестовый пользователь',
+                        age: '25',
+                        gender: 'Мужской',
+                        hobbies: 'Тестирование системы',
+                        goal: 'Проверка блокировки',
+                        venue: 'Тестовое кафе',
+                        latitude: '55.7558',
+                        longitude: '37.6176',
+                        venue_lat: '55.7558',
+                        venue_lng: '37.6176'
+                    })
+                });
+
+                const data = await response.json();
+                
+                let message = `📊 Результат создания анкеты:\n`;
+                message += `Success: ${data.success}\n`;
+                
+                if (data.success) {
+                    message += `✅ Анкета создана успешно!\n`;
+                    message += `User ID: ${data.user_id}\n`;
+                    message += `Redirect: ${data.redirect}\n`;
+                } else {
+                    message += `❌ Ошибка: ${data.error}\n`;
+                    if (data.redirect_url) {
+                        message += `🔄 Перенаправление: ${data.redirect_url}\n`;
+                    }
+                    if (data.debug_info) {
+                        message += `\n🔍 Отладочная информация:\n`;
+                        message += `IP: ${data.debug_info.ip}\n`;
+                        message += `Device: ${data.debug_info.device_fingerprint}\n`;
+                        message += `Blocked by: ${data.debug_info.blocked_by}\n`;
+                        message += `IP restriction: ${data.debug_info.ip_restriction}\n`;
+                        message += `Device restriction: ${data.debug_info.device_restriction}\n`;
+                    }
+                }
+                
+                showResult('create-result', message, data.success ? 'info' : 'error');
+            } catch (error) {
+                showResult('create-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkDatabase() {
+            showResult('database-result', '⏳ Проверяем базу данных...', 'info');
+            
+            try {
+                const response = await fetch('/check_ip_control');
+                const data = await response.json();
+                
+                let message = `📊 База данных:\n\n`;
+                
+                message += `IP Control (${data.ip_control.count} записей):\n`;
+                if (data.ip_control.records.length > 0) {
+                    data.ip_control.records.forEach(record => {
+                        message += `• ${record.ip_address} → ${record.profile_id}\n`;
+                    });
+                } else {
+                    message += `  (пусто)\n`;
+                }
+                
+                message += `\nDevice Control (${data.device_control.count} записей):\n`;
+                if (data.device_control.records.length > 0) {
+                    data.device_control.records.forEach(record => {
+                        message += `• ${record.device_fingerprint.substring(0, 8)}... → ${record.profile_id} (${record.is_mobile ? 'Mobile' : 'Desktop'})\n`;
+                        message += `  IP: ${record.ip_address}\n`;
+                    });
+                } else {
+                    message += `  (пусто)\n`;
+                }
+                
+                showResult('database-result', message, 'info');
+            } catch (error) {
+                showResult('database-result', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearAll() {
+            showResult('clear-result', '⏳ Очищаем все записи...', 'info');
+            
+            try {
+                const response = await fetch('/clear_ip_control', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('clear-result', '✅ Все записи очищены успешно', 'info');
+                } else {
+                    showResult('clear-result', `❌ Ошибка: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('clear-result', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

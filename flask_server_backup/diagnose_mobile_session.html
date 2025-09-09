@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Диагностика мобильной сессии</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f0f0f0; 
+            margin: 0;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .info { background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .success { background: #d4edda; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #28a745; }
+        .error { background: #f8d7da; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #dc3545; }
+        .warning { background: #fff3cd; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #ffc107; }
+        button { 
+            padding: 12px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        .profile-list { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; border: 1px solid #dee2e6; }
+        .profile-item { 
+            padding: 8px; 
+            margin: 5px 0; 
+            background: white; 
+            border-radius: 3px; 
+            border: 1px solid #e9ecef;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .mobile-indicator {
+            background: #ff6b6b;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .storage-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .storage-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .storage-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        .storage-value {
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .restore-button {
+            background: #28a745;
+            font-size: 16px;
+            padding: 15px 30px;
+            margin: 20px 0;
+        }
+        .restore-button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Диагностика мобильной сессии</h1>
+        
+        <div id="mobile-indicator" class="mobile-indicator">
+            📱 Мобильное устройство: <span id="mobile-status">Проверяется...</span>
+        </div>
+        
+        <div id="status" class="info">
+            <strong>Статус:</strong> <span id="status-text">Начинаем диагностику...</span>
+        </div>
+        
+        <div class="storage-info">
+            <div class="storage-item">
+                <div class="storage-label">🍪 Cookie (user_id):</div>
+                <div id="cookie-value" class="storage-value">Проверяется...</div>
+            </div>
+            <div class="storage-item">
+                <div class="storage-label">💾 localStorage:</div>
+                <div id="localstorage-value" class="storage-value">Проверяется...</div>
+            </div>
+            <div class="storage-item">
+                <div class="storage-label">📋 sessionStorage:</div>
+                <div id="sessionstorage-value" class="storage-value">Проверяется...</div>
+            </div>
+            <div class="storage-item">
+                <div class="storage-label">🗄️ IndexedDB:</div>
+                <div id="indexeddb-value" class="storage-value">Проверяется...</div>
+            </div>
+        </div>
+        
+        <button onclick="checkAllSources()">🔄 Проверить все источники</button>
+        <button onclick="checkProfileIds()">📋 Проверить профили в базе</button>
+        <button onclick="restoreSession()">🔧 Восстановить сессию</button>
+        <button onclick="forceRestore()" class="restore-button">🚀 Принудительное восстановление</button>
+        <button onclick="clearAll()">🗑️ Очистить все данные</button>
+        <button onclick="goToMain()">🏠 Перейти на главную</button>
+        
+        <div id="results"></div>
+        
+        <div id="profile-list" class="profile-list" style="display: none;">
+            <h3>📋 Профили в базе данных:</h3>
+            <div id="profiles"></div>
+        </div>
+    </div>
+
+    <script>
+        // Определяем мобильное устройство
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        function getUserIdFromStorage() {
+            return localStorage.getItem('dating_app_user_id') || sessionStorage.getItem('dating_app_user_id');
+        }
+
+        function saveUserId(userId) {
+            if (userId) {
+                localStorage.setItem('dating_app_user_id', userId);
+                sessionStorage.setItem('dating_app_user_id', userId);
+            }
+        }
+
+        function addResult(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `${new Date().toLocaleTimeString()}: ${msg}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function updateStatus(text, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const statusText = document.getElementById('status-text');
+            statusDiv.className = type;
+            statusText.textContent = text;
+        }
+
+        function updateStorageDisplay() {
+            const cookie = getCookie('user_id');
+            const localStorage = window.localStorage.getItem('dating_app_user_id');
+            const sessionStorage = window.sessionStorage.getItem('dating_app_user_id');
+            
+            document.getElementById('cookie-value').textContent = cookie || 'не найден';
+            document.getElementById('localstorage-value').textContent = localStorage || 'не найден';
+            document.getElementById('sessionstorage-value').textContent = sessionStorage || 'не найден';
+            document.getElementById('indexeddb-value').textContent = 'проверяется...';
+            
+            // Проверяем IndexedDB
+            if ('indexedDB' in window) {
+                const request = indexedDB.open('DatingAppDB', 1);
+                request.onsuccess = function() {
+                    const db = request.result;
+                    const transaction = db.transaction(['userData'], 'readonly');
+                    const store = transaction.objectStore('userData');
+                    const getRequest = store.get('user_id');
+                    getRequest.onsuccess = function() {
+                        const value = getRequest.result ? getRequest.result.value : null;
+                        document.getElementById('indexeddb-value').textContent = value || 'не найден';
+                    };
+                    getRequest.onerror = function() {
+                        document.getElementById('indexeddb-value').textContent = 'ошибка чтения';
+                    };
+                };
+                request.onerror = function() {
+                    document.getElementById('indexeddb-value').textContent = 'недоступен';
+                };
+            } else {
+                document.getElementById('indexeddb-value').textContent = 'не поддерживается';
+            }
+        }
+
+        async function checkAllSources() {
+            addResult('🔍 Проверяем все источники данных...');
+            updateStatus('Проверяем все источники данных...', 'info');
+            
+            const cookie = getCookie('user_id');
+            const storage = getUserIdFromStorage();
+            
+            addResult(`🍪 Cookie: ${cookie || 'не найден'}`, cookie ? 'success' : 'error');
+            addResult(`💾 Storage: ${storage || 'не найден'}`, storage ? 'success' : 'error');
+            
+            if (cookie || storage) {
+                try {
+                    const response = await fetch(`/api/check-profile/${cookie || storage}`);
+                    const data = await response.json();
+                    addResult(`✅ Профиль существует: ${data.exists}`, data.exists ? 'success' : 'error');
+                    
+                    if (data.exists) {
+                        updateStatus('Профиль найден!', 'success');
+                    } else {
+                        updateStatus('Профиль не найден в базе', 'error');
+                    }
+                } catch (e) {
+                    addResult(`❌ Ошибка API: ${e}`, 'error');
+                    updateStatus('Ошибка при проверке профиля', 'error');
+                }
+            } else {
+                updateStatus('User ID не найден ни в одном источнике', 'warning');
+            }
+            
+            updateStorageDisplay();
+        }
+
+        async function checkProfileIds() {
+            addResult('📋 Проверяем профили в базе данных...');
+            updateStatus('Проверяем профили в базе...', 'info');
+            
+            try {
+                const response = await fetch('/api/profile-ids');
+                const data = await response.json();
+                
+                if (data.success && data.profile_ids) {
+                    addResult(`✅ Найдено ${data.profile_ids.length} профилей в базе`, 'success');
+                    
+                    // Показываем список профилей
+                    const profileList = document.getElementById('profile-list');
+                    const profilesDiv = document.getElementById('profiles');
+                    profilesDiv.innerHTML = '';
+                    
+                    data.profile_ids.forEach(id => {
+                        const div = document.createElement('div');
+                        div.className = 'profile-item';
+                        div.textContent = id;
+                        profilesDiv.appendChild(div);
+                    });
+                    
+                    profileList.style.display = 'block';
+                    
+                    // Проверяем, есть ли наш user_id в списке
+                    const cookie = getCookie('user_id');
+                    const storage = getUserIdFromStorage();
+                    const userId = cookie || storage;
+                    
+                    if (userId) {
+                        if (data.profile_ids.includes(userId)) {
+                            addResult(`✅ User ID ${userId} найден в базе!`, 'success');
+                            updateStatus('Ваш профиль найден в базе!', 'success');
+                        } else {
+                            addResult(`❌ User ID ${userId} НЕ найден в базе`, 'error');
+                            updateStatus('Ваш профиль не найден в базе', 'error');
+                        }
+                    } else {
+                        addResult('⚠️ User ID не найден в хранилище', 'warning');
+                        updateStatus('User ID не найден в хранилище', 'warning');
+                    }
+                }
+            } catch (e) {
+                addResult(`❌ Ошибка: ${e}`, 'error');
+                updateStatus('Ошибка при получении профилей', 'error');
+            }
+        }
+
+        async function restoreSession() {
+            addResult('🔧 Восстанавливаем сессию...');
+            updateStatus('Восстанавливаем сессию...', 'info');
+            
+            let userId = getCookie('user_id') || getUserIdFromStorage();
+            
+            if (userId) {
+                // Устанавливаем cookie
+                document.cookie = `user_id=${userId}; path=/; max-age=${365*24*60*60}`;
+                saveUserId(userId);
+                addResult(`✅ Восстановлен: ${userId}`, 'success');
+                
+                try {
+                    const response = await fetch(`/api/check-profile/${userId}`);
+                    const data = await response.json();
+                    if (data.exists) {
+                        addResult('✅ Профиль найден, перезагружаем...', 'success');
+                        updateStatus('Сессия восстановлена!', 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        addResult('❌ Профиль не найден', 'error');
+                        updateStatus('Профиль не найден', 'error');
+                    }
+                } catch (e) {
+                    addResult(`❌ Ошибка: ${e}`, 'error');
+                    updateStatus('Ошибка при проверке профиля', 'error');
+                }
+            } else {
+                addResult('❌ User ID не найден', 'error');
+                updateStatus('User ID не найден', 'error');
+            }
+        }
+
+        async function forceRestore() {
+            addResult('🚀 Принудительное восстановление...');
+            updateStatus('Принудительное восстановление...', 'info');
+            
+            // Сначала проверяем все профили
+            try {
+                const response = await fetch('/api/profile-ids');
+                const data = await response.json();
+                
+                if (data.success && data.profile_ids) {
+                    // Проверяем все возможные источники
+                    let userId = getCookie('user_id') || getUserIdFromStorage();
+                    
+                    if (userId && data.profile_ids.includes(userId)) {
+                        addResult(`✅ Найден валидный user ID: ${userId}`, 'success');
+                        
+                        // Устанавливаем cookie и сохраняем в storage
+                        document.cookie = `user_id=${userId}; path=/; max-age=${365*24*60*60}`;
+                        saveUserId(userId);
+                        
+                        addResult('✅ Сессия восстановлена, переходим на главную...', 'success');
+                        updateStatus('Сессия восстановлена!', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1000);
+                    } else {
+                        addResult('❌ Валидный user ID не найден в хранилище', 'error');
+                        updateStatus('Валидный user ID не найден', 'error');
+                    }
+                }
+            } catch (e) {
+                addResult(`❌ Ошибка: ${e}`, 'error');
+                updateStatus('Ошибка при восстановлении', 'error');
+            }
+        }
+
+        function clearAll() {
+            addResult('🗑️ Очищаем все данные...');
+            updateStatus('Очищаем данные...', 'warning');
+            document.cookie = 'user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            localStorage.removeItem('dating_app_user_id');
+            sessionStorage.removeItem('dating_app_user_id');
+            addResult('✅ Все данные очищены', 'success');
+            updateStatus('Все данные очищены', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        }
+
+        function goToMain() {
+            window.location.href = '/';
+        }
+
+        // Автоматическая диагностика при загрузке
+        window.onload = function() {
+            // Показываем статус мобильного устройства
+            const mobileStatus = document.getElementById('mobile-status');
+            if (isMobile()) {
+                mobileStatus.textContent = 'ДА';
+                document.getElementById('mobile-indicator').style.background = '#ff6b6b';
+            } else {
+                mobileStatus.textContent = 'НЕТ';
+                document.getElementById('mobile-indicator').style.background = '#6c757d';
+            }
+            
+            updateStatus('Диагностика завершена', 'info');
+            updateStorageDisplay();
+            checkAllSources();
+            checkProfileIds();
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Клик по объектам на карте</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: twinkle 4s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        .form-group label {
+            display: block;
+            color: #fff;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .map-container {
+            margin: 20px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+        }
+
+        .location-info {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .selected-venue {
+            background: rgba(40, 167, 69, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .debug-info {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Клик по объектам на карте</h1>
+        
+        <div class="instructions">
+            <strong>Как использовать:</strong><br>
+            1. Определите ваше местоположение<br>
+            2. Кликайте на любые объекты на карте (кафе, рестораны, здания)<br>
+            3. Название объекта автоматически заполнится в поле
+        </div>
+
+        <div class="form-group">
+            <label for="venue-input">Название заведения:</label>
+            <input type="text" id="venue-input" placeholder="Кликните на объект на карте">
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="location-info" id="location-info">
+                <strong>Ваше местоположение:</strong><br>
+                <span id="location-address">Не выбрано</span><br>
+                <small>Координаты: <span id="location-coords">-</span></small>
+            </div>
+        </div>
+
+        <div class="selected-venue" id="selected-venue">
+            <strong>Выбранное заведение:</strong> <span id="venue-name"></span>
+        </div>
+
+        <div class="debug-info" id="debug-info">
+            <strong>Отладочная информация:</strong><br>
+            <div id="debug-content"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="getCurrentLocation()">📍 Определить мое местоположение</button>
+            <button class="btn" onclick="clearLocation()">🗑️ Очистить</button>
+            <button class="btn" onclick="toggleDebug()">🐛 Показать/скрыть отладку</button>
+        </div>
+    </div>
+
+    <script>
+        let myMap, myPlacemark;
+        let currentLocation = null;
+        let debugVisible = false;
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва по умолчанию
+                    zoom: 16,
+                    controls: ['zoomControl', 'fullscreenControl', 'searchControl']
+                });
+
+                // Обработчик клика по карте
+                myMap.events.add('click', function (e) {
+                    var coords = e.get('coords');
+                    logDebug('Клик по координатам: ' + coords[0] + ', ' + coords[1]);
+                    
+                    if (!currentLocation) {
+                        setLocation(coords[0], coords[1]);
+                    } else {
+                        getObjectInfo(coords[0], coords[1]);
+                    }
+                });
+            });
+        }
+
+        function setLocation(lat, lng) {
+            currentLocation = {lat: lat, lng: lng};
+
+            // Удаляем предыдущую метку
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+            }
+
+            // Добавляем новую метку
+            myPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Ваше местоположение'
+            }, {
+                preset: 'islands#redDotIcon'
+            });
+
+            myMap.geoObjects.add(myPlacemark);
+            myMap.setCenter([lat, lng], 16);
+
+            // Показываем местоположение в интерфейсе
+            document.getElementById('location-address').textContent = 'Местоположение определено';
+            document.getElementById('location-coords').textContent = 'Координаты: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+            document.getElementById('location-info').style.display = 'block';
+            
+            logDebug('Местоположение установлено: ' + lat + ', ' + lng);
+        }
+
+        function getObjectInfo(lat, lng) {
+            logDebug('Получение информации об объекте...');
+            
+            // Сначала попробуем получить информацию через геокодер
+            ymaps.geocode([lat, lng], {
+                results: 1
+            }).then(function (res) {
+                logDebug('Геокодер вернул ' + res.geoObjects.getLength() + ' результатов');
+                
+                if (res.geoObjects.getLength() > 0) {
+                    var firstGeoObject = res.geoObjects.get(0);
+                    var objectName = firstGeoObject.properties.get('name');
+                    var objectAddress = firstGeoObject.getAddressLine();
+                    
+                    logDebug('Название объекта: ' + (objectName || 'не найдено'));
+                    logDebug('Адрес объекта: ' + objectAddress);
+                    
+                    // Попробуем получить метаданные
+                    var metaDataProperty = firstGeoObject.properties.get('metaDataProperty');
+                    if (metaDataProperty && metaDataProperty.GeocoderMetaData) {
+                        var geocoderMetaData = metaDataProperty.GeocoderMetaData;
+                        logDebug('Тип объекта: ' + (geocoderMetaData.kind || 'неизвестно'));
+                        logDebug('Текст объекта: ' + (geocoderMetaData.text || 'неизвестно'));
+                        
+                        if (geocoderMetaData.text) {
+                            objectName = geocoderMetaData.text;
+                        }
+                    }
+                    
+                    if (objectName && objectName.trim() !== '') {
+                        // Заполняем поле названием объекта
+                        document.getElementById('venue-input').value = objectName;
+                        
+                        // Показываем информацию о выбранном объекте
+                        document.getElementById('venue-name').textContent = objectName + ' (' + objectAddress + ')';
+                        document.getElementById('selected-venue').style.display = 'block';
+                        
+                        // Добавляем метку выбранного объекта
+                        addSelectedObjectMarker(lat, lng, objectName, objectAddress);
+                        
+                        logDebug('✅ Успешно выбрано заведение: ' + objectName);
+                    } else {
+                        // Если название не найдено, попробуем поиск организаций
+                        logDebug('Название не найдено, ищем организации...');
+                        searchOrganizations(lat, lng);
+                    }
+                } else {
+                    logDebug('Геокодер не нашел объект, ищем организации...');
+                    searchOrganizations(lat, lng);
+                }
+            }).catch(function (error) {
+                logDebug('❌ Ошибка геокодера: ' + error.message);
+                searchOrganizations(lat, lng);
+            });
+        }
+
+        function searchOrganizations(lat, lng) {
+            logDebug('Поиск организаций в радиусе 100м...');
+            
+            // Поиск организаций через поиск по карте
+            ymaps.search('организация', {
+                boundedBy: myMap.getBounds(),
+                strictBounds: true,
+                results: 10
+            }).then(function (searchResults) {
+                logDebug('Найдено организаций: ' + searchResults.length);
+                
+                if (searchResults.length > 0) {
+                    // Ищем ближайшую организацию к точке клика
+                    var nearestOrg = null;
+                    var minDistance = Infinity;
+                    
+                    for (var i = 0; i < searchResults.length; i++) {
+                        var org = searchResults[i];
+                        var orgCoords = org.geometry.getCoordinates();
+                        var distance = calculateDistance(lat, lng, orgCoords[1], orgCoords[0]);
+                        
+                        logDebug('Организация ' + i + ': ' + (org.name || 'без названия') + ' на расстоянии ' + distance + 'м');
+                        
+                        if (distance < minDistance && distance <= 200) { // в радиусе 200м
+                            minDistance = distance;
+                            nearestOrg = org;
+                        }
+                    }
+                    
+                    if (nearestOrg) {
+                        var orgName = nearestOrg.name || nearestOrg.description;
+                        var orgAddress = nearestOrg.description || nearestOrg.getAddressLine();
+                        
+                        logDebug('✅ Найдена ближайшая организация: ' + orgName + ' на расстоянии ' + minDistance + 'м');
+                        
+                        document.getElementById('venue-input').value = orgName;
+                        document.getElementById('venue-name').textContent = orgName + ' (' + orgAddress + ')';
+                        document.getElementById('selected-venue').style.display = 'block';
+                        
+                        addSelectedObjectMarker(lat, lng, orgName, orgAddress);
+                    } else {
+                        logDebug('❌ Подходящие организации не найдены в радиусе 200м');
+                        useAddressAsFallback(lat, lng);
+                    }
+                } else {
+                    logDebug('❌ Организации не найдены');
+                    useAddressAsFallback(lat, lng);
+                }
+            }).catch(function (error) {
+                logDebug('❌ Ошибка поиска организаций: ' + error.message);
+                useAddressAsFallback(lat, lng);
+            });
+        }
+
+        function useAddressAsFallback(lat, lng) {
+            logDebug('Используем адрес как fallback...');
+            
+            ymaps.geocode([lat, lng]).then(function (res) {
+                if (res.geoObjects.getLength() > 0) {
+                    var address = res.geoObjects.get(0).getAddressLine();
+                    logDebug('✅ Используем адрес: ' + address);
+                    
+                    document.getElementById('venue-input').value = address;
+                    document.getElementById('venue-name').textContent = address;
+                    document.getElementById('selected-venue').style.display = 'block';
+                    
+                    addSelectedObjectMarker(lat, lng, 'Объект', address);
+                } else {
+                    logDebug('❌ Адрес не найден');
+                    alert('Не удалось получить информацию об объекте. Попробуйте кликнуть на другой объект.');
+                }
+            });
+        }
+
+        function addSelectedObjectMarker(lat, lng, name, address) {
+            // Удаляем предыдущую метку выбранного объекта
+            myMap.geoObjects.each(function(geoObject) {
+                if (geoObject.properties.get('isSelectedObject')) {
+                    myMap.geoObjects.remove(geoObject);
+                }
+            });
+
+            // Добавляем новую метку выбранного объекта
+            var selectedMarker = new ymaps.Placemark([lat, lng], {
+                balloonContent: '<strong>' + name + '</strong><br>' + address
+            }, {
+                preset: 'islands#blueDotIcon'
+            });
+            
+            selectedMarker.properties.set('isSelectedObject', true);
+            myMap.geoObjects.add(selectedMarker);
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            var R = 6371e3; // радиус Земли в метрах
+            var φ1 = lat1 * Math.PI / 180;
+            var φ2 = lat2 * Math.PI / 180;
+            var Δφ = (lat2 - lat1) * Math.PI / 180;
+            var Δλ = (lng2 - lng1) * Math.PI / 180;
+
+            var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return Math.round(R * c);
+        }
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        setLocation(lat, lng);
+                    },
+                    function(error) {
+                        alert('Не удалось получить местоположение. Попробуйте еще раз.');
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 5000,
+                        maximumAge: 300000
+                    }
+                );
+            } else {
+                alert('Геолокация не поддерживается вашим браузером.');
+            }
+        }
+
+        function clearLocation() {
+            currentLocation = null;
+            document.getElementById('location-info').style.display = 'none';
+            document.getElementById('selected-venue').style.display = 'none';
+            document.getElementById('venue-input').value = '';
+
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+                myPlacemark = null;
+            }
+
+            // Удаляем метку выбранного объекта
+            myMap.geoObjects.each(function(geoObject) {
+                if (geoObject.properties.get('isSelectedObject')) {
+                    myMap.geoObjects.remove(geoObject);
+                }
+            });
+
+            logDebug('Очищено местоположение и выбранные объекты');
+        }
+
+        function toggleDebug() {
+            debugVisible = !debugVisible;
+            document.getElementById('debug-info').style.display = debugVisible ? 'block' : 'none';
+        }
+
+        function logDebug(message) {
+            var debugContent = document.getElementById('debug-content');
+            var timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += '[' + timestamp + '] ' + message + '<br>';
+            debugContent.scrollTop = debugContent.scrollHeight;
+            console.log('[' + timestamp + '] ' + message);
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+            logDebug('Карта инициализирована');
+        };
+    </script>
+</body>
+</html> 

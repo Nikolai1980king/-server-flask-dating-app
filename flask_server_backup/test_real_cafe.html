@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест реального местоположения и кафе</title>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #map {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 2px solid #ddd;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .test-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-btn:hover {
+            background: #0056b3;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Тест реального местоположения и кафе</h1>
+        
+        <div>
+            <button class="test-btn" onclick="getLocation()">📍 Получить местоположение</button>
+            <button class="test-btn" onclick="addTestCafes()">🏪 Добавить тестовые кафе</button>
+            <button class="test-btn" onclick="searchRealCafes()">🔍 Поиск реальных кафе</button>
+            <button class="test-btn" onclick="clearLog()">🧹 Очистить лог</button>
+        </div>
+        
+        <div id="status" class="status info">Ожидание действий...</div>
+        
+        <div id="map"></div>
+        
+        <div class="form-group">
+            <label for="venue-input">🏪 Название заведения:</label>
+            <input type="text" id="venue-input" placeholder="Должно заполниться при выборе кафе">
+        </div>
+        
+        <div class="form-group">
+            <label for="latitude-input">📍 Широта:</label>
+            <input type="text" id="latitude-input" readonly>
+        </div>
+        
+        <div class="form-group">
+            <label for="longitude-input">📍 Долгота:</label>
+            <input type="text" id="longitude-input" readonly>
+        </div>
+        
+        <div class="form-group">
+            <label>Лог событий:</label>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        var myMap;
+        var currentLocation = null;
+        var cafeMarkers = [];
+        
+        // Функция логирования
+        function log(message) {
+            var logDiv = document.getElementById('log');
+            var timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += '[' + timestamp + '] ' + message + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        // Функция обновления статуса
+        function updateStatus(message, type) {
+            var statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+        }
+        
+        // Функция очистки лога
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Инициализация карты
+        ymaps.ready(function () {
+            log('✅ Yandex Maps API загружен');
+            
+            myMap = new ymaps.Map('map', {
+                center: [55.76, 37.64], // Москва
+                zoom: 12,
+                controls: ['zoomControl', 'fullscreenControl']
+            });
+            
+            log('✅ Карта инициализирована');
+            updateStatus('Карта загружена. Нажмите "Получить местоположение"', 'info');
+            
+            // Обработчик клика по карте
+            myMap.events.add('click', function(e) {
+                var coords = e.get('coords');
+                log('🖱️ Клик по карте: ' + coords[0] + ', ' + coords[1]);
+                searchCafesAtLocation(coords);
+            });
+        });
+        
+        // Функция получения местоположения
+        function getLocation() {
+            log('📍 Запрос местоположения...');
+            updateStatus('Определение местоположения...', 'info');
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        log('✅ Местоположение получено: ' + currentLocation.lat + ', ' + currentLocation.lng);
+                        updateStatus('Местоположение определено!', 'success');
+                        
+                        // Обновляем поля координат
+                        document.getElementById('latitude-input').value = currentLocation.lat;
+                        document.getElementById('longitude-input').value = currentLocation.lng;
+                        
+                                            // Добавляем метку пользователя на карту
+                    var userPlacemark = new ymaps.Placemark([currentLocation.lat, currentLocation.lng], {
+                        balloonContent: 'Ваше местоположение'
+                    }, {
+                        preset: 'islands#blueDotIcon'
+                    });
+                        
+                        myMap.geoObjects.add(userPlacemark);
+                        myMap.setCenter([currentLocation.lat, currentLocation.lng], 15);
+                        
+                        log('✅ Метка пользователя добавлена на карту');
+                        
+                        // Автоматически ищем кафе рядом
+                        searchCafesAtLocation([currentLocation.lat, currentLocation.lng]);
+                    },
+                    function(error) {
+                        log('❌ Ошибка получения местоположения: ' + error.message);
+                        updateStatus('Ошибка определения местоположения', 'error');
+                    }
+                );
+            } else {
+                log('❌ Геолокация не поддерживается');
+                updateStatus('Геолокация не поддерживается', 'error');
+            }
+        }
+        
+        // Функция добавления тестовых кафе
+        function addTestCafes() {
+            log('🏪 Добавление тестовых кафе...');
+            
+            if (!currentLocation) {
+                log('❌ Сначала получите местоположение');
+                updateStatus('Сначала получите местоположение', 'error');
+                return;
+            }
+            
+            // Очищаем предыдущие маркеры
+            clearCafeMarkers();
+            
+            // Создаем тестовые кафе вокруг текущего местоположения
+            var testCafes = [
+                {
+                    name: 'Кафе "Уютное"',
+                    coords: [currentLocation.lat + 0.001, currentLocation.lng + 0.001]
+                },
+                {
+                    name: 'Ресторан "Вкусно"',
+                    coords: [currentLocation.lat - 0.001, currentLocation.lng + 0.001]
+                },
+                {
+                    name: 'Кофейня "Аромат"',
+                    coords: [currentLocation.lat + 0.001, currentLocation.lng - 0.001]
+                }
+            ];
+            
+            testCafes.forEach(function(cafe, index) {
+                log('📍 Добавляем тестовое кафе: ' + cafe.name);
+                
+                var cafePlacemark = new ymaps.Placemark(cafe.coords, {
+                    balloonContent: '<strong>' + cafe.name + '</strong><br>Кликните для выбора'
+                }, {
+                    preset: 'islands#blueDotIcon',
+                    iconColor: '#ff6b6b'
+                });
+                
+                // Добавляем обработчик клика на метку кафе
+                cafePlacemark.events.add('click', function() {
+                    log('🖱️ Клик по кафе: ' + cafe.name);
+                    selectCafe(cafe.name, cafe.coords[0], cafe.coords[1]);
+                });
+                
+                myMap.geoObjects.add(cafePlacemark);
+                cafeMarkers.push(cafePlacemark);
+                
+                log('✅ Тестовое кафе ' + (index + 1) + ' добавлено');
+            });
+            
+            updateStatus('Тестовые кафе добавлены. Кликните на красные метки', 'success');
+        }
+        
+        // Функция поиска реальных кафе через Yandex API
+        function searchRealCafes() {
+            log('🔍 Поиск реальных кафе через Yandex API...');
+            
+            if (!currentLocation) {
+                log('❌ Сначала получите местоположение');
+                updateStatus('Сначала получите местоположение', 'error');
+                return;
+            }
+            
+            searchCafesAtLocation([currentLocation.lat, currentLocation.lng]);
+        }
+        
+        // Функция поиска кафе в указанной точке
+        function searchCafesAtLocation(coords) {
+            log('🔍 Поиск кафе в точке: ' + coords[0] + ', ' + coords[1]);
+            updateStatus('Поиск кафе...', 'info');
+            
+            // Очищаем предыдущие маркеры
+            clearCafeMarkers();
+            
+            // Используем Yandex Maps API для поиска организаций
+            ymaps.geocode(coords, {
+                results: 10,
+                kind: 'biz'
+            }).then(function(res) {
+                log('✅ Geocoder ответ получен');
+                
+                var cafes = [];
+                
+                res.geoObjects.each(function(geoObject) {
+                    var properties = geoObject.properties.get('metaDataProperty');
+                    if (properties && properties.GeocoderMetaData) {
+                        var name = properties.GeocoderMetaData.text;
+                        var kind = properties.GeocoderMetaData.kind;
+                        
+                        log('📍 Найдена организация: ' + name + ' (тип: ' + kind + ')');
+                        
+                        // Фильтруем только кафе, рестораны и места питания
+                        if (kind === 'biz' && (
+                            name.toLowerCase().includes('кафе') ||
+                            name.toLowerCase().includes('ресторан') ||
+                            name.toLowerCase().includes('кофейня') ||
+                            name.toLowerCase().includes('бар') ||
+                            name.toLowerCase().includes('пиццерия') ||
+                            name.toLowerCase().includes('столовая')
+                        )) {
+                            cafes.push({
+                                name: name,
+                                coords: geoObject.geometry.getCoordinates()
+                            });
+                            log('✅ Кафе добавлено в список: ' + name);
+                        }
+                    }
+                });
+                
+                log('🏪 Найдено реальных кафе: ' + cafes.length);
+                
+                if (cafes.length === 0) {
+                    log('⚠️ Реальные кафе не найдены, добавляем тестовые');
+                    addTestCafes();
+                    return;
+                }
+                
+                // Добавляем маркеры реальных кафе
+                cafes.forEach(function(cafe, index) {
+                    log('📍 Добавляем реальное кафе: ' + cafe.name);
+                    
+                    var cafePlacemark = new ymaps.Placemark(cafe.coords, {
+                        balloonContent: '<strong>' + cafe.name + '</strong><br>Кликните для выбора'
+                    }, {
+                        preset: 'islands#blueDotIcon',
+                        iconColor: '#ff6b6b'
+                    });
+                    
+                    // Добавляем обработчик клика на метку кафе
+                    cafePlacemark.events.add('click', function() {
+                        log('🖱️ Клик по кафе: ' + cafe.name);
+                        selectCafe(cafe.name, cafe.coords[0], cafe.coords[1]);
+                    });
+                    
+                    myMap.geoObjects.add(cafePlacemark);
+                    cafeMarkers.push(cafePlacemark);
+                    
+                    log('✅ Реальное кафе ' + (index + 1) + ' добавлено на карту');
+                });
+                
+                updateStatus('Найдено ' + cafes.length + ' реальных кафе. Кликните на красные метки', 'success');
+                
+            }).catch(function(error) {
+                log('❌ Ошибка поиска кафе: ' + error.message);
+                updateStatus('Ошибка поиска кафе, добавляем тестовые', 'error');
+                addTestCafes();
+            });
+        }
+        
+        // Функция очистки маркеров кафе
+        function clearCafeMarkers() {
+            log('🧹 Очистка маркеров кафе');
+            cafeMarkers.forEach(function(marker) {
+                myMap.geoObjects.remove(marker);
+            });
+            cafeMarkers = [];
+        }
+        
+        // Функция выбора кафе
+        function selectCafe(name, lat, lng) {
+            log('🏪 Выбор кафе: ' + name + ' (' + lat + ', ' + lng + ')');
+            
+            // Заполняем поле названия заведения
+            var venueInput = document.getElementById('venue-input');
+            if (venueInput) {
+                venueInput.value = name;
+                log('✅ Поле "Название заведения" заполнено: ' + name);
+                
+                // Визуальная обратная связь
+                venueInput.style.border = '2px solid #28a745';
+                venueInput.style.backgroundColor = '#d4edda';
+                setTimeout(() => {
+                    venueInput.style.border = '2px solid #ddd';
+                    venueInput.style.backgroundColor = 'white';
+                }, 2000);
+            } else {
+                log('❌ ОШИБКА: Поле venue-input не найдено!');
+            }
+            
+            // Заполняем поля координат
+            var latInput = document.getElementById('latitude-input');
+            var lngInput = document.getElementById('longitude-input');
+            
+            if (latInput && lngInput) {
+                latInput.value = lat;
+                lngInput.value = lng;
+                log('✅ Координаты сохранены: ' + lat + ', ' + lng);
+            } else {
+                log('❌ ОШИБКА: Поля координат не найдены!');
+            }
+            
+            // Показываем уведомление
+            alert('🏪 Выбрано кафе: ' + name + '\nКоординаты: ' + lat + ', ' + lng);
+            log('🎉 Уведомление показано');
+            updateStatus('Кафе выбрано: ' + name, 'success');
+        }
+        
+        // Проверяем наличие элементов при загрузке
+        window.onload = function() {
+            log('📄 Страница загружена');
+            
+            var venueInput = document.getElementById('venue-input');
+            var latInput = document.getElementById('latitude-input');
+            var lngInput = document.getElementById('longitude-input');
+            
+            if (venueInput) {
+                log('✅ Поле venue-input найдено');
+            } else {
+                log('❌ ОШИБКА: Поле venue-input НЕ найдено!');
+            }
+            
+            if (latInput) {
+                log('✅ Поле latitude-input найдено');
+            } else {
+                log('❌ ОШИБКА: Поле latitude-input НЕ найдено!');
+            }
+            
+            if (lngInput) {
+                log('✅ Поле longitude-input найдено');
+            } else {
+                log('❌ ОШИБКА: Поле longitude-input НЕ найдено!');
+            }
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Очистка Cookie</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #45a049;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Очистка Cookie</h1>
+        
+        <div id="status" class="status info">
+            Проверяем текущие cookie...
+        </div>
+        
+        <div id="cookie-info"></div>
+        
+        <button class="btn" onclick="clearUserCookie()">🗑️ Очистить user_id cookie</button>
+        <button class="btn" onclick="goToMain()">🏠 Перейти на главную</button>
+        <button class="btn" onclick="goToCreate()">📝 Перейти к созданию профиля</button>
+    </div>
+
+    <script>
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+        
+        function clearCookie(name) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+        
+        function showCookieInfo() {
+            const userId = getCookie('user_id');
+            const cookieInfo = document.getElementById('cookie-info');
+            const status = document.getElementById('status');
+            
+            if (userId) {
+                cookieInfo.innerHTML = `
+                    <h3>📋 Текущие cookie:</h3>
+                    <p><strong>user_id:</strong> ${userId}</p>
+                    <p>⚠️ Этот cookie указывает на несуществующий профиль</p>
+                `;
+                status.textContent = '❌ Найден user_id cookie с несуществующим профилем';
+                status.className = 'status info';
+            } else {
+                cookieInfo.innerHTML = `
+                    <h3>📋 Текущие cookie:</h3>
+                    <p>✅ user_id cookie не найден</p>
+                `;
+                status.textContent = '✅ user_id cookie не найден';
+                status.className = 'status success';
+            }
+        }
+        
+        function clearUserCookie() {
+            clearCookie('user_id');
+            clearCookie('dating_app_user_id'); // на всякий случай
+            localStorage.removeItem('dating_app_user_id'); // и из localStorage
+            
+            const status = document.getElementById('status');
+            status.textContent = '✅ user_id cookie очищен!';
+            status.className = 'status success';
+            
+            showCookieInfo();
+        }
+        
+        function goToMain() {
+            window.location.href = '/';
+        }
+        
+        function goToCreate() {
+            window.location.href = '/create';
+        }
+        
+        // Показываем информацию при загрузке
+        showCookieInfo();
+    </script>
+</body>
+</html> 

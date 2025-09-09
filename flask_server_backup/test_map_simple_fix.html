@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Простой тест карты</title>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #map {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            background: #e0e0e0;
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Простой тест карты</h1>
+        <p><strong>Без API ключа</strong> - базовая функциональность</p>
+        
+        <div id="status" class="status info">
+            <strong>Статус:</strong> <span id="status-text">Ожидание загрузки...</span>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div style="margin: 20px 0;">
+            <button onclick="testMap()" class="btn btn-primary">🧪 Тестировать карту</button>
+            <button onclick="getLocation()" class="btn btn-success">📍 Определить местоположение</button>
+        </div>
+        
+        <div id="console-output" style="background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; max-height: 300px; overflow-y: auto;">
+            <strong>Консоль:</strong><br>
+            <span id="console-text">Ожидание логов...</span>
+        </div>
+    </div>
+
+    <script>
+        var myMap = null;
+        var myPlacemark = null;
+        var consoleOutput = document.getElementById('console-text');
+        var statusElement = document.getElementById('status');
+        var statusText = document.getElementById('status-text');
+        
+        function log(message) {
+            var timestamp = new Date().toLocaleTimeString();
+            consoleOutput.innerHTML += '[' + timestamp + '] ' + message + '<br>';
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus(message, type) {
+            statusText.textContent = message;
+            statusElement.className = 'status ' + type;
+        }
+        
+        function testMap() {
+            log('🧪 Начинаем тест карты...');
+            
+            if (typeof ymaps === 'undefined') {
+                log('❌ Yandex Maps API не загружен!');
+                updateStatus('Yandex Maps API не загружен', 'error');
+                return;
+            }
+            
+            log('✅ Yandex Maps API загружен');
+            
+            try {
+                ymaps.ready(function () {
+                    log('✅ ymaps.ready() выполнен');
+                    
+                    try {
+                        myMap = new ymaps.Map('map', {
+                            center: [55.76, 37.64], // Москва
+                            zoom: 10,
+                            controls: ['zoomControl', 'fullscreenControl']
+                        });
+                        
+                        log('✅ Карта создана успешно');
+                        updateStatus('Карта загружена успешно!', 'success');
+                        
+                        // Добавляем обработчик клика
+                        myMap.events.add('click', function (e) {
+                            var coords = e.get('coords');
+                            log('📍 Клик по карте: ' + coords[0] + ', ' + coords[1]);
+                            setLocation(coords[0], coords[1]);
+                        });
+                        
+                        log('✅ Обработчик клика добавлен');
+                        
+                    } catch (error) {
+                        log('❌ Ошибка при создании карты: ' + error.message);
+                        updateStatus('Ошибка при создании карты: ' + error.message, 'error');
+                    }
+                });
+                
+            } catch (error) {
+                log('❌ Ошибка в ymaps.ready(): ' + error.message);
+                updateStatus('Ошибка в ymaps.ready(): ' + error.message, 'error');
+            }
+        }
+        
+        function setLocation(lat, lng) {
+            log('📍 Установка местоположения: ' + lat + ', ' + lng);
+            
+            // Удаляем предыдущую метку
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+            }
+            
+            // Добавляем новую метку
+            myPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Выбранное местоположение'
+            }, {
+                preset: 'islands#blueDotIcon'
+            });
+            
+            myMap.geoObjects.add(myPlacemark);
+            myMap.setCenter([lat, lng], 15);
+            
+            log('✅ Местоположение установлено');
+            updateStatus('Местоположение установлено: ' + lat + ', ' + lng, 'success');
+        }
+        
+        function getLocation() {
+            if (navigator.geolocation) {
+                log('📍 Запрос геолокации...');
+                updateStatus('Запрос геолокации...', 'info');
+                
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        log('✅ Геолокация получена: ' + lat + ', ' + lng);
+                        setLocation(lat, lng);
+                    },
+                    function(error) {
+                        log('❌ Ошибка геолокации: ' + error.message);
+                        updateStatus('Ошибка геолокации: ' + error.message, 'error');
+                    }
+                );
+            } else {
+                log('❌ Геолокация не поддерживается');
+                updateStatus('Геолокация не поддерживается', 'error');
+            }
+        }
+        
+        // Автоматический тест при загрузке страницы
+        window.onload = function() {
+            log('🚀 Страница загружена, начинаем автоматический тест...');
+            setTimeout(testMap, 1000); // Задержка 1 секунда для загрузки API
+        };
+    </script>
+</body>
+</html> 

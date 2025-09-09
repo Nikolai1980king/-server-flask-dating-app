@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Детальная диагностика мобильной сессии</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f0f0f0; 
+            margin: 0;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .info { background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .success { background: #d4edda; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #28a745; }
+        .error { background: #f8d7da; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #dc3545; }
+        .warning { background: #fff3cd; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #ffc107; }
+        button { 
+            padding: 12px 20px; 
+            margin: 8px 5px; 
+            cursor: pointer; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        .debug-info { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            border: 1px solid #dee2e6;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .step { 
+            background: #e9ecef; 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-radius: 3px; 
+            border-left: 3px solid #6c757d;
+        }
+        .mobile-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-indicator" id="mobileIndicator">📱 МОБИЛЬНОЕ УСТРОЙСТВО</div>
+    
+    <div class="container">
+        <h1>🔍 Детальная диагностика мобильной сессии</h1>
+        
+        <div class="info">
+            <strong>Цель:</strong> Найти причину, почему сессия не восстанавливается на мобильных устройствах
+        </div>
+
+        <div id="autoDiagnosis" class="debug-info">
+            🔄 Автоматическая диагностика запущена...
+        </div>
+
+        <h2>📋 Ручная диагностика</h2>
+        
+        <button onclick="checkAllSources()">🔍 Проверить все источники данных</button>
+        <button onclick="checkProfileIds()">📋 Проверить профили в базе</button>
+        <button onclick="forceRestoreSession()">🚀 Принудительное восстановление</button>
+        <button onclick="clearAllData()">🗑️ Очистить все данные</button>
+        <button onclick="goToMainPage()">🏠 Перейти на главную</button>
+        
+        <div id="results"></div>
+        
+        <h2>📝 Инструкции для тестирования</h2>
+        
+        <div class="step">
+            <strong>Шаг 1:</strong> Нажмите "🔍 Проверить все источники данных" - покажет, есть ли user_id в cookie и storage
+        </div>
+        
+        <div class="step">
+            <strong>Шаг 2:</strong> Нажмите "📋 Проверить профили в базе" - покажет все профили и сравнит с вашим user_id
+        </div>
+        
+        <div class="step">
+            <strong>Шаг 3:</strong> Если user_id найден, нажмите "🚀 Принудительное восстановление"
+        </div>
+        
+        <div class="step">
+            <strong>Шаг 4:</strong> Нажмите "🏠 Перейти на главную" - должна показать ваш профиль
+        </div>
+        
+        <div class="step">
+            <strong>Если не работает:</strong> Нажмите "🗑️ Очистить все данные" и создайте анкету заново
+        </div>
+    </div>
+
+    <script>
+        // Автоматическая диагностика при загрузке
+        window.onload = function() {
+            autoDiagnosis();
+        };
+
+        // Проверка мобильного устройства
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // Показать индикатор мобильного устройства
+        if (isMobile()) {
+            document.getElementById('mobileIndicator').style.display = 'block';
+        } else {
+            document.getElementById('mobileIndicator').style.display = 'none';
+        }
+
+        // Автоматическая диагностика
+        async function autoDiagnosis() {
+            let log = '🔄 Автоматическая диагностика:\n\n';
+            
+            // Проверка мобильного устройства
+            log += `📱 Мобильное устройство: ${isMobile() ? 'ДА' : 'НЕТ'}\n`;
+            
+            // Проверка cookie
+            const cookieUserId = getCookie('user_id');
+            log += `🍪 User ID в cookie: ${cookieUserId || 'НЕТ'}\n`;
+            
+            // Проверка localStorage
+            const localUserId = localStorage.getItem('dating_app_user_id');
+            log += `💾 User ID в localStorage: ${localUserId || 'НЕТ'}\n`;
+            
+            // Проверка sessionStorage
+            const sessionUserId = sessionStorage.getItem('dating_app_user_id');
+            log += `📦 User ID в sessionStorage: ${sessionUserId || 'НЕТ'}\n`;
+            
+            // Проверка IndexedDB
+            try {
+                const indexedUserId = await getUserIdFromIndexedDB();
+                log += `🗄️ User ID в IndexedDB: ${indexedUserId || 'НЕТ'}\n`;
+            } catch (e) {
+                log += `🗄️ User ID в IndexedDB: ОШИБКА - ${e.message}\n`;
+            }
+            
+            // Проверка профилей в базе
+            try {
+                const response = await fetch('/api/profile-ids');
+                const data = await response.json();
+                if (data.success) {
+                    log += `📋 Профилей в базе: ${data.profile_ids.length}\n`;
+                    log += `📋 ID профилей: ${data.profile_ids.join(', ')}\n`;
+                } else {
+                    log += `📋 Ошибка получения профилей\n`;
+                }
+            } catch (e) {
+                log += `📋 Ошибка API: ${e.message}\n`;
+            }
+            
+            document.getElementById('autoDiagnosis').textContent = log;
+        }
+
+        // Получение cookie
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Получение user_id из IndexedDB
+        function getUserIdFromIndexedDB() {
+            return new Promise((resolve) => {
+                if (!('indexedDB' in window)) {
+                    resolve(null);
+                    return;
+                }
+                
+                const request = indexedDB.open('DatingAppDB', 1);
+                request.onerror = function() {
+                    resolve(null);
+                };
+                request.onsuccess = function() {
+                    const db = request.result;
+                    const transaction = db.transaction(['userData'], 'readonly');
+                    const store = transaction.objectStore('userData');
+                    const getRequest = store.get('user_id');
+                    getRequest.onsuccess = function() {
+                        if (getRequest.result) {
+                            resolve(getRequest.result.value);
+                        } else {
+                            resolve(null);
+                        }
+                    };
+                    getRequest.onerror = function() {
+                        resolve(null);
+                    };
+                };
+            });
+        }
+
+        // Проверка всех источников данных
+        async function checkAllSources() {
+            let result = '🔍 Проверка всех источников данных:\n\n';
+            
+            const cookieUserId = getCookie('user_id');
+            const localUserId = localStorage.getItem('dating_app_user_id');
+            const sessionUserId = sessionStorage.getItem('dating_app_user_id');
+            const indexedUserId = await getUserIdFromIndexedDB();
+            
+            result += `🍪 Cookie: ${cookieUserId || 'НЕТ'}\n`;
+            result += `💾 localStorage: ${localUserId || 'НЕТ'}\n`;
+            result += `📦 sessionStorage: ${sessionUserId || 'НЕТ'}\n`;
+            result += `🗄️ IndexedDB: ${indexedUserId || 'НЕТ'}\n\n`;
+            
+            // Проверка существования профиля
+            const userId = cookieUserId || localUserId || sessionUserId || indexedUserId;
+            if (userId) {
+                try {
+                    const response = await fetch(`/api/check-profile/${userId}`);
+                    const data = await response.json();
+                    if (data.success && data.exists) {
+                        result += `✅ Профиль найден в базе данных!\n`;
+                    } else {
+                        result += `❌ Профиль НЕ найден в базе данных\n`;
+                    }
+                } catch (e) {
+                    result += `❌ Ошибка проверки профиля: ${e.message}\n`;
+                }
+            } else {
+                result += `❌ User ID не найден ни в одном источнике\n`;
+            }
+            
+            document.getElementById('results').innerHTML = `<div class="debug-info">${result}</div>`;
+        }
+
+        // Проверка профилей в базе
+        async function checkProfileIds() {
+            let result = '📋 Проверка профилей в базе данных:\n\n';
+            
+            try {
+                const response = await fetch('/api/profile-ids');
+                const data = await response.json();
+                
+                if (data.success) {
+                    result += `📊 Всего профилей: ${data.profile_ids.length}\n\n`;
+                    
+                    const cookieUserId = getCookie('user_id');
+                    const localUserId = localStorage.getItem('dating_app_user_id');
+                    const sessionUserId = sessionStorage.getItem('dating_app_user_id');
+                    const indexedUserId = await getUserIdFromIndexedDB();
+                    
+                    const allUserIds = [cookieUserId, localUserId, sessionUserId, indexedUserId].filter(id => id);
+                    
+                    result += `🔍 Ваши user_id:\n`;
+                    allUserIds.forEach((id, index) => {
+                        const source = ['cookie', 'localStorage', 'sessionStorage', 'IndexedDB'][index];
+                        const found = data.profile_ids.includes(id);
+                        result += `  ${source}: ${id} ${found ? '✅' : '❌'}\n`;
+                    });
+                    
+                    result += `\n📋 Все профили в базе:\n`;
+                    data.profile_ids.forEach((id, index) => {
+                        result += `  ${index + 1}. ${id}\n`;
+                    });
+                } else {
+                    result += `❌ Ошибка получения профилей\n`;
+                }
+            } catch (e) {
+                result += `❌ Ошибка API: ${e.message}\n`;
+            }
+            
+            document.getElementById('results').innerHTML = `<div class="debug-info">${result}</div>`;
+        }
+
+        // Принудительное восстановление сессии
+        async function forceRestoreSession() {
+            let result = '🚀 Принудительное восстановление сессии:\n\n';
+            
+            // Получаем user_id из всех источников
+            const cookieUserId = getCookie('user_id');
+            const localUserId = localStorage.getItem('dating_app_user_id');
+            const sessionUserId = sessionStorage.getItem('dating_app_user_id');
+            const indexedUserId = await getUserIdFromIndexedDB();
+            
+            const userId = cookieUserId || localUserId || sessionUserId || indexedUserId;
+            
+            if (userId) {
+                result += `🔍 Найден user_id: ${userId}\n`;
+                
+                // Проверяем профиль
+                try {
+                    const response = await fetch(`/api/check-profile/${userId}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.exists) {
+                        result += `✅ Профиль существует в базе\n`;
+                        
+                        // Устанавливаем cookie
+                        document.cookie = `user_id=${userId}; path=/; max-age=${365*24*60*60}; samesite=Lax`;
+                        result += `🍪 Cookie установлен\n`;
+                        
+                        // Сохраняем в localStorage
+                        localStorage.setItem('dating_app_user_id', userId);
+                        result += `💾 localStorage обновлен\n`;
+                        
+                        // Сохраняем в sessionStorage
+                        sessionStorage.setItem('dating_app_user_id', userId);
+                        result += `📦 sessionStorage обновлен\n`;
+                        
+                        result += `\n✅ Сессия восстановлена! Теперь перейдите на главную страницу.\n`;
+                    } else {
+                        result += `❌ Профиль не найден в базе данных\n`;
+                    }
+                } catch (e) {
+                    result += `❌ Ошибка проверки профиля: ${e.message}\n`;
+                }
+            } else {
+                result += `❌ User ID не найден ни в одном источнике\n`;
+            }
+            
+            document.getElementById('results').innerHTML = `<div class="debug-info">${result}</div>`;
+        }
+
+        // Очистка всех данных
+        function clearAllData() {
+            let result = '🗑️ Очистка всех данных сессии:\n\n';
+            
+            // Очищаем cookie
+            document.cookie = 'user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            document.cookie = 'user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+            result += `🍪 Cookie очищен\n`;
+            
+            // Очищаем localStorage
+            localStorage.removeItem('dating_app_user_id');
+            result += `💾 localStorage очищен\n`;
+            
+            // Очищаем sessionStorage
+            sessionStorage.removeItem('dating_app_user_id');
+            result += `📦 sessionStorage очищен\n`;
+            
+            // Очищаем IndexedDB
+            if ('indexedDB' in window) {
+                const request = indexedDB.open('DatingAppDB', 1);
+                request.onsuccess = function() {
+                    const db = request.result;
+                    const transaction = db.transaction(['userData'], 'readwrite');
+                    const store = transaction.objectStore('userData');
+                    store.delete('user_id');
+                    result += `🗄️ IndexedDB очищен\n`;
+                    document.getElementById('results').innerHTML = `<div class="debug-info">${result}</div>`;
+                };
+                request.onerror = function() {
+                    result += `❌ Ошибка очистки IndexedDB\n`;
+                    document.getElementById('results').innerHTML = `<div class="debug-info">${result}</div>`;
+                };
+            } else {
+                result += `🗄️ IndexedDB недоступен\n`;
+                document.getElementById('results').innerHTML = `<div class="debug-info">${result}</div>`;
+            }
+        }
+
+        // Переход на главную страницу
+        function goToMainPage() {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html> 

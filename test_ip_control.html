@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест системы IP-контроля</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        .info {
+            border-left-color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест системы контроля устройств</h1>
+    
+    <div class="test-section">
+        <h2>📋 Информация о системе</h2>
+        <p><strong>Принцип работы:</strong> Одно устройство = одна анкета</p>
+        <p><strong>Цель:</strong> Предотвратить создание множественных анкет с одного устройства</p>
+        <p><strong>Метод:</strong> Гибридная система: IP-адрес + отпечаток устройства</p>
+        <p><strong>Отпечаток устройства:</strong> User-Agent + Accept-Language + Accept-Encoding + IP</p>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Тест 1: Создание первой анкеты</h2>
+        <p>Попробуйте создать анкету. Это должно работать нормально.</p>
+        <button onclick="testCreateProfile()">Создать анкету</button>
+        <div id="test1-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Тест 2: Повторное создание анкеты</h2>
+        <p>Попробуйте создать анкету снова с того же устройства. Должно произойти перенаправление на существующий профиль.</p>
+        <button onclick="testCreateProfileAgain()">Создать анкету снова</button>
+        <div id="test2-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🌐 Тест 3: Проверка IP-адреса и отпечатка устройства</h2>
+        <p>Проверим, какой IP-адрес и отпечаток устройства видит сервер.</p>
+        <button onclick="checkIP()">Проверить IP и отпечаток</button>
+        <div id="test3-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Тест 4: Проверка базы данных</h2>
+        <p>Проверим записи в таблицах ip_control и device_control.</p>
+        <button onclick="checkDatabase()">Проверить базу данных</button>
+        <div id="test4-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧹 Очистка</h2>
+        <p>Очистить все записи контроля устройств (для повторного тестирования).</p>
+        <button onclick="clearIPControl()">Очистить контроль устройств</button>
+        <div id="clear-result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.innerHTML = message;
+        }
+
+        async function testCreateProfile() {
+            showResult('test1-result', '⏳ Создаем анкету...', 'info');
+            
+            try {
+                const response = await fetch('/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        name: 'Тестовый пользователь',
+                        age: '25',
+                        gender: 'Мужской',
+                        hobbies: 'Тестирование системы',
+                        goal: 'Проверка IP-контроля',
+                        venue: 'Тестовое кафе',
+                        latitude: '55.7558',
+                        longitude: '37.6176',
+                        venue_lat: '55.7558',
+                        venue_lng: '37.6176'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('test1-result', `✅ Анкета создана успешно!<br>User ID: ${data.user_id}<br>Перенаправление: ${data.redirect}`, 'info');
+                } else {
+                    showResult('test1-result', `❌ Ошибка: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('test1-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateProfileAgain() {
+            showResult('test2-result', '⏳ Пытаемся создать анкету снова...', 'info');
+            
+            try {
+                const response = await fetch('/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        name: 'Второй пользователь',
+                        age: '30',
+                        gender: 'Женский',
+                        hobbies: 'Повторное тестирование',
+                        goal: 'Проверка блокировки',
+                        venue: 'Другое кафе',
+                        latitude: '55.7558',
+                        longitude: '37.6176',
+                        venue_lat: '55.7558',
+                        venue_lng: '37.6176'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('test2-result', `✅ Анкета создана!<br>User ID: ${data.user_id}`, 'info');
+                } else {
+                    if (data.redirect_url) {
+                        showResult('test2-result', `🔄 IP-контроль сработал!<br>Ошибка: ${data.error}<br>Перенаправление: ${data.redirect_url}`, 'info');
+                    } else {
+                        showResult('test2-result', `❌ Ошибка: ${data.error}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showResult('test2-result', `❌ Ошибка запроса: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkIP() {
+            showResult('test3-result', '⏳ Проверяем IP-адрес и отпечаток устройства...', 'info');
+            
+            try {
+                const response = await fetch('/check_ip');
+                const data = await response.json();
+                
+                let html = `🌐 IP-адрес: ${data.ip}<br>`;
+                html += `🔍 Отпечаток устройства: ${data.device_fingerprint}<br>`;
+                html += `📱 Тип устройства: ${data.device_info.is_mobile ? 'Мобильное' : 'Десктопное'}<br>`;
+                html += `📱 User-Agent: ${data.device_info.user_agent}<br>`;
+                
+                // Показываем информацию об ограничениях
+                if (data.restrictions) {
+                    html += `<br><strong>🔒 Ограничения:</strong><br>`;
+                    html += `• IP-ограничение: ${data.restrictions.ip_restriction.has_existing ? 'ЕСТЬ' : 'НЕТ'}`;
+                    if (data.restrictions.ip_restriction.has_existing) {
+                        html += ` (Profile: ${data.restrictions.ip_restriction.profile_id})`;
+                    }
+                    html += `<br>`;
+                    html += `• Device-ограничение: ${data.restrictions.device_restriction.has_existing ? 'ЕСТЬ' : 'НЕТ'}`;
+                    if (data.restrictions.device_restriction.has_existing) {
+                        html += ` (Profile: ${data.restrictions.device_restriction.profile_id})`;
+                    }
+                    html += `<br>`;
+                }
+                
+                html += `<details><summary>Все заголовки</summary><pre>${JSON.stringify(data.headers, null, 2)}</pre></details>`;
+                
+                showResult('test3-result', html, 'info');
+            } catch (error) {
+                showResult('test3-result', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkDatabase() {
+            showResult('test4-result', '⏳ Проверяем базу данных...', 'info');
+            
+            try {
+                const response = await fetch('/check_ip_control');
+                const data = await response.json();
+                
+                let html = '';
+                
+                // IP Control
+                if (data.ip_control && data.ip_control.records && data.ip_control.records.length > 0) {
+                    html += '📊 Записи в таблице ip_control:<br>';
+                    data.ip_control.records.forEach(record => {
+                        html += `• IP: ${record.ip_address} → Profile: ${record.profile_id}<br>`;
+                    });
+                    html += '<br>';
+                } else {
+                    html += '📊 Таблица ip_control пуста<br><br>';
+                }
+                
+                // Device Control
+                if (data.device_control && data.device_control.records && data.device_control.records.length > 0) {
+                    html += '🔍 Записи в таблице device_control:<br>';
+                    data.device_control.records.forEach(record => {
+                        html += `• Device: ${record.device_fingerprint.substring(0, 8)}... → Profile: ${record.profile_id}<br>`;
+                        html += `  IP: ${record.ip_address}<br>`;
+                        html += `  Тип: ${record.is_mobile ? 'Мобильное' : 'Десктопное'}<br>`;
+                        html += `  User-Agent: ${record.user_agent ? record.user_agent.substring(0, 50) + '...' : 'N/A'}<br><br>`;
+                    });
+                } else {
+                    html += '🔍 Таблица device_control пуста<br>';
+                }
+                
+                showResult('test4-result', html, 'info');
+            } catch (error) {
+                showResult('test4-result', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearIPControl() {
+            showResult('clear-result', '⏳ Очищаем контроль устройств...', 'info');
+            
+            try {
+                const response = await fetch('/clear_ip_control', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('clear-result', '✅ Контроль устройств очищен успешно', 'info');
+                } else {
+                    showResult('clear-result', `❌ Ошибка: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('clear-result', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест подключения</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>🔗 Тест подключения</h1>
+    <p>Если вы видите эту страницу, значит подключение работает!</p>
+    
+    <button onclick="testGeolocation()">📍 Тест геолокации</button>
+    <div id="result"></div>
+    
+    <script>
+        function testGeolocation() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Проверяем геолокацию...</p>';
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        resultDiv.innerHTML = `
+                            <p class="success">✅ Геолокация работает!</p>
+                            <p>Координаты: ${position.coords.latitude}, ${position.coords.longitude}</p>
+                            <p>Точность: ±${position.coords.accuracy} метров</p>
+                        `;
+                    },
+                    function(error) {
+                        let errorMessage = '';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = '❌ Доступ к местоположению запрещен';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = '❌ Информация о местоположении недоступна';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = '❌ Превышено время ожидания';
+                                break;
+                            default:
+                                errorMessage = '❌ Ошибка: ' + error.message;
+                        }
+                        resultDiv.innerHTML = `<p class="error">${errorMessage}</p>`;
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            } else {
+                resultDiv.innerHTML = '<p class="error">❌ Геолокация не поддерживается</p>';
+            }
+        }
+    </script>
+</body>
+</html> 

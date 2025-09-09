@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест восстановления профиля на мобильных устройствах</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            margin: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .success { color: #2ecc71; }
+        .error { color: #e74c3c; }
+        .info { color: #3498db; }
+        .warning { color: #f39c12; }
+        #log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .status {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .mobile-optimized {
+            background: rgba(52, 152, 219, 0.2);
+            border: 1px solid #3498db;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Тест восстановления профиля на мобильных устройствах</h1>
+        
+        <div class="status">
+            <h3>✅ Решение проблемы с цикличной регистрацией</h3>
+            <ul>
+                <li>🔒 Двойное сохранение: cookie + localStorage</li>
+                <li>🔄 Автоматическое восстановление сессии при входе</li>
+                <li>📱 Оптимизация для мобильных браузеров</li>
+                <li>🗑️ Предотвращение накопления анкет в базе данных</li>
+            </ul>
+        </div>
+
+        <div class="mobile-optimized">
+            <h3>📱 Мобильная оптимизация</h3>
+            <ul>
+                <li>💾 localStorage для надежного хранения user_id</li>
+                <li>🍪 Cookie с длительным сроком действия (1 год)</li>
+                <li>🔄 Автоматическая проверка существующего профиля</li>
+                <li>⚡ Быстрое восстановление сессии</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Проверка текущего состояния</h2>
+            <button class="button" onclick="checkCurrentState()">Проверить состояние</button>
+            <button class="button" onclick="checkDeviceType()">Тип устройства</button>
+            <button class="button" onclick="checkProfileExistence()">Проверить профиль</button>
+            <div id="current-state"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>💾 Управление данными сессии</h2>
+            <button class="button" onclick="saveTestUserId()">Сохранить тестовый User ID</button>
+            <button class="button" onclick="restoreSession()">Восстановить сессию</button>
+            <button class="button" onclick="clearAllData()">Очистить все данные</button>
+            <button class="button" onclick="testAutoRestore()">Тест авто-восстановления</button>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Тестирование API</h2>
+            <button class="button" onclick="testCheckProfile()">Тест проверки профиля</button>
+            <button class="button" onclick="testRestoreSession()">Тест восстановления сессии</button>
+            <button class="button" onclick="getProfilesCount()">Количество анкет</button>
+            <button class="button" onclick="cleanupProfiles()">Очистить просроченные</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Лог операций</h2>
+            <button class="button" onclick="clearLog()">Очистить лог</button>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'success' ? '#2ecc71' : 
+                         type === 'error' ? '#e74c3c' : 
+                         type === 'warning' ? '#f39c12' : '#3498db';
+            
+            logDiv.innerHTML += `<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        function setCookie(name, value, days = 365) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
+        }
+
+        function saveUserId(userId) {
+            if (userId) {
+                localStorage.setItem('dating_app_user_id', userId);
+                sessionStorage.setItem('dating_app_user_id', userId);
+            }
+        }
+
+        function getUserIdFromStorage() {
+            return localStorage.getItem('dating_app_user_id') || sessionStorage.getItem('dating_app_user_id');
+        }
+
+        function checkCurrentState() {
+            const cookie = getCookie('user_id');
+            const storage = getUserIdFromStorage();
+            
+            log(`🍪 Cookie user_id: ${cookie || 'не найден'}`, cookie ? 'success' : 'warning');
+            log(`💾 localStorage user_id: ${storage || 'не найден'}`, storage ? 'success' : 'warning');
+            
+            const stateDiv = document.getElementById('current-state');
+            stateDiv.innerHTML = `
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;">
+                    <strong>Текущее состояние:</strong><br>
+                    Cookie: ${cookie || 'не найден'}<br>
+                    localStorage: ${storage || 'не найден'}<br>
+                    Совпадение: ${cookie === storage ? '✅' : '❌'}
+                </div>
+            `;
+        }
+
+        function checkDeviceType() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const userAgent = navigator.userAgent;
+            
+            log(`📱 Тип устройства: ${isMobile ? 'Мобильное' : 'Десктопное'}`, 'info');
+            log(`🔍 User Agent: ${userAgent.substring(0, 100)}...`, 'info');
+        }
+
+        async function checkProfileExistence() {
+            const userId = getCookie('user_id') || getUserIdFromStorage();
+            
+            if (!userId) {
+                log('❌ Нет User ID для проверки профиля', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/check-profile/${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.exists) {
+                        log(`✅ Профиль найден для ID: ${userId}`, 'success');
+                        log(`👤 Имя: ${data.profile_data.name}, Возраст: ${data.profile_data.age}`, 'info');
+                    } else {
+                        log(`⚠️ Профиль не найден для ID: ${userId}`, 'warning');
+                    }
+                } else {
+                    log(`❌ Ошибка проверки профиля: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error.message}`, 'error');
+            }
+        }
+
+        function saveTestUserId() {
+            const testId = 'test_mobile_' + Date.now();
+            setCookie('user_id', testId);
+            saveUserId(testId);
+            
+            log(`✅ Сохранен тестовый User ID: ${testId}`, 'success');
+            checkCurrentState();
+        }
+
+        function restoreSession() {
+            const cookie = getCookie('user_id');
+            const storage = getUserIdFromStorage();
+            
+            if (!cookie && storage) {
+                setCookie('user_id', storage);
+                log(`🔄 Восстановлена сессия из localStorage: ${storage}`, 'success');
+            } else if (cookie && !storage) {
+                saveUserId(cookie);
+                log(`🔄 Восстановлена сессия из cookie: ${cookie}`, 'success');
+            } else if (cookie && storage && cookie !== storage) {
+                // Синхронизируем данные
+                setCookie('user_id', storage);
+                log(`🔄 Синхронизированы cookie и localStorage: ${storage}`, 'success');
+            } else if (cookie) {
+                log(`✅ Сессия уже активна: ${cookie}`, 'info');
+            } else {
+                log('❌ Нет данных для восстановления сессии', 'warning');
+            }
+            
+            checkCurrentState();
+        }
+
+        function clearAllData() {
+            // Очищаем cookie
+            document.cookie = 'user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            // Очищаем localStorage
+            localStorage.removeItem('dating_app_user_id');
+            sessionStorage.removeItem('dating_app_user_id');
+            
+            log('🗑️ Все данные сессии очищены', 'success');
+            checkCurrentState();
+        }
+
+        async function testAutoRestore() {
+            log('🔄 Тестируем автоматическое восстановление сессии...', 'info');
+            
+            const cookie = getCookie('user_id');
+            const storage = getUserIdFromStorage();
+            const userId = cookie || storage;
+            
+            if (!userId) {
+                log('❌ Нет User ID для авто-восстановления', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/check-profile/${userId}`);
+                const data = await response.json();
+                
+                if (data.success && data.exists) {
+                    // Восстанавливаем сессию
+                    setCookie('user_id', userId);
+                    saveUserId(userId);
+                    
+                    log('✅ Авто-восстановление успешно!', 'success');
+                    log('🔄 Переходим к профилю...', 'info');
+                    
+                    // Имитируем переход к профилю
+                    setTimeout(() => {
+                        log('📍 Перенаправление на /my_profile', 'info');
+                    }, 1000);
+                    
+                } else {
+                    log('❌ Профиль не найден для авто-восстановления', 'warning');
+                }
+            } catch (error) {
+                log(`❌ Ошибка авто-восстановления: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCheckProfile() {
+            const userId = getCookie('user_id') || getUserIdFromStorage();
+            
+            if (!userId) {
+                log('❌ Нет User ID для проверки', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/check-profile/${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ API проверки профиля работает`, 'success');
+                    log(`📊 Профиль ${data.exists ? 'существует' : 'не найден'} для ID: ${userId}`, data.exists ? 'success' : 'warning');
+                } else {
+                    log(`❌ Ошибка проверки профиля: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRestoreSession() {
+            const userId = getCookie('user_id') || getUserIdFromStorage();
+            
+            if (!userId) {
+                log('❌ Нет User ID для восстановления', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/restore-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    log('✅ API восстановления сессии работает', 'success');
+                    log(`🔄 Сессия восстановлена для ID: ${userId}`, 'success');
+                } else {
+                    log(`❌ Ошибка восстановления сессии: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error.message}`, 'error');
+            }
+        }
+
+        async function getProfilesCount() {
+            try {
+                const response = await fetch('/api/profiles');
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`📊 Количество анкет в базе данных: ${data.count}`, 'info');
+                } else {
+                    log(`❌ Ошибка получения количества анкет: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error.message}`, 'error');
+            }
+        }
+
+        async function cleanupProfiles() {
+            try {
+                const response = await fetch('/api/cleanup-profiles', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`🗑️ Очищено просроченных анкет: ${data.deleted_count}`, 'success');
+                    log(`⏰ Время жизни анкет: ${data.lifetime_hours} часов`, 'info');
+                } else {
+                    log(`❌ Ошибка очистки анкет: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error.message}`, 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('📝 Лог очищен', 'info');
+        }
+
+        // Автоматическая проверка при загрузке страницы
+        window.onload = function() {
+            log('🚀 Страница загружена, начинаем тестирование...', 'info');
+            checkCurrentState();
+            checkDeviceType();
+        };
+    </script>
+</body>
+</html> 

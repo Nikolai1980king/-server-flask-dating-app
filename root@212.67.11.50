@@ -1,10 +1,10 @@
 # нужно вводить https://192.168.255.137
+# Тестовое изменение для демонстрации коммита
 
 from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify
-
+from flask_socketio import SocketIO, emit, join_room
 import os
 import uuid
-import time
 from datetime import datetime, timedelta
 from collections import defaultdict
 from flask_sqlalchemy import SQLAlchemy
@@ -14,6 +14,7 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = 'super-secret-key'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -26,7 +27,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 db = SQLAlchemy(app)
 
 # Максимальное расстояние для регистрации (в метрах) - СТРОКА 29
-MAX_REGISTRATION_DISTANCE = 1000  # 1000 метров
+MAX_REGISTRATION_DISTANCE = 3000  # 3 км = 3000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
 PROFILE_LIFETIME_HOURS = 24  # Измените это значение для настройки времени жизни анкет
@@ -171,6 +172,16 @@ class Like(db.Model):
     liked_id = db.Column(db.String, nullable=False)
 
 
+class Match(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user1_id = db.Column(db.String, nullable=False)
+    user2_id = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user1_viewed_at = db.Column(db.DateTime, nullable=True)
+    user2_viewed_at = db.Column(db.DateTime, nullable=True)
+    __table_args__ = (db.UniqueConstraint('user1_id', 'user2_id', name='unique_match'),)
+
+
 # Удаляю in-memory структуру сообщений:
 # messages = defaultdict(list)
 notifications = defaultdict(list)
@@ -214,11 +225,25 @@ def get_unread_likes_count(user_id):
     # Получаем id просмотренных
     viewed = read_likes.get(user_id, set())
     # Считаем только непросмотренные
-    return len(all_likes - viewed)
+    unread_count = len(all_likes - viewed)
+    
+    # Дополнительная проверка: если счетчик отрицательный, сбрасываем его
+    if unread_count < 0:
+        read_likes[user_id] = set()
+        unread_count = len(all_likes)
+    
+    return unread_count
 
 
 def get_unread_matches_count(user_id):
-    return len(new_matches[user_id])
+    if not user_id:
+        return 0
+    # Считаем непросмотренные метчи
+    unread_matches = Match.query.filter(
+        ((Match.user1_id == user_id) & (Match.user1_viewed_at.is_(None))) |
+        ((Match.user2_id == user_id) & (Match.user2_viewed_at.is_(None)))
+    ).count()
+    return unread_matches
 
 
 def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unread_matches=0):
@@ -229,10 +254,10 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
         avatar_html += f'<img src="{photo_url}" alt="Аватар" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #6c757d;vertical-align:middle;">'
         avatar_html += '</a>'
     return render_template_string('''
-    <nav id="navbar" style="position:fixed;top:0;left:0;width:100%;background:#080707;box-shadow:0 2px 8px rgba(0,0,0,0.07);z-index:100;display:flex;justify-content:center;align-items:center;padding:8px 0;">
+    <nav id="navbar" style="position:fixed;top:0;left:0;width:100%;background:#0a0909;box-shadow:0 2px 8px rgba(0,0,0,0.07);z-index:100;display:flex;justify-content:center;align-items:center;padding:8px 0;">
         {{ avatar_html|safe }}
         <a href="/visitors" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='visitors' else ''}}" title="Посетители">👥</a>
-        <a href="/my_likes" style="font-size:2em;margin:0 10px;position:relative;{{'font-weight:bold;color:#ff6b6b;' if active=='likes' else ''}}" title="Меня лайкнули">
+        <a href="/my_likes" style="font-size:2em;margin:0 10px;position:relative;{{'font-weight:bold;color:#ff6b6b;' if active=='likes' else ''}}" title="Меня лайкнули" onclick="markLikesAsRead()">
             ❤️
             <span id="like-badge" style="display:{% if unread_likes > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_likes if unread_likes > 0 else '' }}</span>
         </a>
@@ -243,9 +268,100 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             ✉️
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
+        <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
     </nav>
     <div style="height:48px"></div>
+    <style>
+        /* Предотвращение масштабирования на мобильных устройствах */
+        html, body {
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Отключаем двойное нажатие для масштабирования */
+        * {
+            touch-action: manipulation;
+        }
+    </style>
     <script>
+    // Глобальные переменные для отслеживания предыдущих значений счетчиков
+    let previousUnreadMessages = {{ unread_messages }};
+    let previousUnreadLikes = {{ unread_likes }};
+    let previousUnreadMatches = {{ unread_matches }};
+    
+    // Глобальная функция воспроизведения звука колокольчика
+    function playNotificationSound() {
+        // Проверяем настройки пользователя перед воспроизведением
+        fetch('/api/get_settings')
+            .then(response => response.json())
+            .then(settings => {
+                if (!settings.sound_notifications) {
+                    console.log('🔕 Звук отключен в настройках');
+                    return;
+                }
+                
+                try {
+                    // Создаем простой звук колокольчика
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    // Классический звук колокольчика
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                    
+                    console.log('🔔 Звук колокольчика воспроизведен для уведомления');
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка воспроизведения звука:', error);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Ошибка получения настроек:', error);
+            });
+    }
+    
+    function markLikesAsRead() {
+        // Отмечаем все лайки как прочитанные при клике на иконку
+        fetch('/api/mark_likes_read', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Скрываем счетчик лайков
+                let likeBadge = document.getElementById('like-badge');
+                if (likeBadge) {
+                    likeBadge.style.display = 'none';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при отметке лайков как прочитанных:', error);
+        });
+    }
+    
     setInterval(function() {
         fetch('/api/unread')
             .then(r => r.json())
@@ -255,27 +371,47 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                     if (data.unread_messages > 0) {
                         msgBadge.innerText = data.unread_messages;
                         msgBadge.style.display = '';
+                        
+                        // Воспроизводим звук только при появлении новых сообщений
+                        if (data.unread_messages > previousUnreadMessages) {
+                            playNotificationSound();
+                        }
                     } else {
                         msgBadge.style.display = 'none';
                     }
+                    previousUnreadMessages = data.unread_messages;
                 }
+                
                 let likeBadge = document.getElementById('like-badge');
                 if (likeBadge) {
                     if (data.unread_likes > 0) {
                         likeBadge.innerText = data.unread_likes;
                         likeBadge.style.display = '';
+                        
+                        // Воспроизводим звук только при появлении новых лайков
+                        if (data.unread_likes > previousUnreadLikes) {
+                            playNotificationSound();
+                        }
                     } else {
                         likeBadge.style.display = 'none';
                     }
+                    previousUnreadLikes = data.unread_likes;
                 }
+                
                 let matchBadge = document.getElementById('match-badge');
                 if (matchBadge) {
                     if (data.unread_matches > 0) {
                         matchBadge.innerText = data.unread_matches;
                         matchBadge.style.display = '';
+                        
+                        // Воспроизводим звук только при появлении новых матчей
+                        if (data.unread_matches > previousUnreadMatches) {
+                            playNotificationSound();
+                        }
                     } else {
                         matchBadge.style.display = 'none';
                     }
+                    previousUnreadMatches = data.unread_matches;
                 }
             });
     }, 5000);
@@ -302,14 +438,19 @@ def api_mark_likes_read():
         return jsonify({"error": "Пользователь не авторизован"}), 401
 
     try:
-        # Получаем всех, кто лайкнул пользователя
-        liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-        # Отмечаем всех как прочитанных
-        read_likes[user_id] = liked_me_ids
+        # Получаем все лайки, которые получил пользователь
+        all_likes = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
+        # Добавляем их в просмотренные
+        read_likes[user_id].update(all_likes)
+        
+        return jsonify({
+            "success": True,
+            "marked_read": len(all_likes),
+            "unread_likes": get_unread_likes_count(user_id)
+        })
 
-        return jsonify({"success": True, "marked_count": len(liked_me_ids)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Ошибка при отметке лайков: {str(e)}"}), 500
 
 
 @app.route('/api/mark_messages_read/<string:other_user_id>', methods=['POST'])
@@ -429,6 +570,60 @@ def api_calculate_distance():
 def test_balloon_integration():
     """Тестовая страница для проверки интеграции парсинга балунов"""
     return render_template_string(open('test_balloon_integration.html').read())
+
+
+@app.route('/test-mobile-profile-restore')
+def test_mobile_profile_restore():
+    """Тестовая страница для проверки восстановления профиля на мобильных устройствах"""
+    return render_template_string(open('test_mobile_profile_restore.html').read())
+
+
+@app.route('/test-mobile-debug')
+def test_mobile_debug():
+    """Простая страница для диагностики проблем с мобильными устройствами"""
+    return render_template_string(open('test_mobile_debug.html').read())
+
+
+@app.route('/test-profile-redirect')
+def test_profile_redirect():
+    """Тестовая страница для проверки перенаправления профиля"""
+    return render_template_string(open('test_profile_redirect.html').read())
+
+
+@app.route('/test-map-load')
+def test_map_load():
+    """Тестовая страница для проверки загрузки карты"""
+    return render_template_string(open('test_map_load.html').read())
+
+
+@app.route('/test-simple-map')
+def test_simple_map():
+    """Простая тестовая страница для проверки карты"""
+    return render_template_string(open('test_simple_map.html').read())
+
+
+@app.route('/clear-cookie')
+def clear_cookie():
+    """Страница для очистки cookie"""
+    return render_template_string(open('clear_cookie.html').read())
+
+
+@app.route('/test-field-limits')
+def test_field_limits():
+    """Тестовая страница для демонстрации ограничений полей"""
+    return render_template_string(open('test_field_limits.html').read())
+
+
+@app.route('/test-alignment')
+def test_alignment():
+    """Тестовая страница для демонстрации выравнивания полей"""
+    return render_template_string(open('test_alignment.html').read())
+
+
+@app.route('/test-chat-debug')
+def test_chat_debug():
+    """Тестовая страница для отладки отправки сообщений"""
+    return render_template_string(open('test_chat_debug.html').read())
 
 
 @app.route('/debug-geolocation')
@@ -600,27 +795,20 @@ def home():
         user_id,
         active=None,
         unread_messages=get_unread_messages_count(user_id),
-        unread_likes=get_unread_likes_count(user_id)
+        unread_likes=get_unread_likes_count(user_id),
+        unread_matches=get_unread_matches_count(user_id)
     )
     return render_template_string('''
         <!DOCTYPE html>
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Знакомства в кафе</title>
             <style>
                 {{ get_starry_night_css()|safe }}
                 body { text-align: center; padding: 20px; }
-                /* Блокировка масштабирования на мобильных устройствах */
-                html, body {
-                    touch-action: manipulation;
-                    -webkit-touch-callout: none;
-                    -webkit-user-select: none;
-                    -khtml-user-select: none;
-                    -moz-user-select: none;
-                    -ms-user-select: none;
-                    user-select: none;
-                }
                 h1 { color: #ff6b6b; margin-top: 20px; }
                 .welcome-message {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -690,6 +878,18 @@ def home():
                     font-size: 1.5em;
                     margin-right: 10px;
                 }
+                .session-restore-notification {
+                    position: fixed;
+                    top: 60px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #2196F3;
+                    color: white;
+                    padding: 15px 25px;
+                    border-radius: 30px;
+                    z-index: 1000;
+                    animation: fadeInOut 4s forwards;
+                }
             </style>
         </head>
         <body>
@@ -704,11 +904,166 @@ def home():
             </div>
             <h1>Добро пожаловать в наше кафе! 🎉</h1>
             <p style="color: white;">Здесь вы можете найти интересных людей для общения.</p>
-            {% if not has_profile %}
+            <div id="create-profile-section" style="display: {% if not has_profile %}block{% else %}none{% endif %};">
                 <a href="/create" class="big-create-btn">
                     <span class="icon">📝</span> Создать анкету
                 </a>
-            {% endif %}
+            </div>
+
+            <script>
+                // Функции для работы с cookie и localStorage
+                function getCookie(name) {
+                    const value = `; ${document.cookie}`;
+                    const parts = value.split(`; ${name}=`);
+                    if (parts.length === 2) return parts.pop().split(';').shift();
+                    return null;
+                }
+
+                function setCookie(name, value, days = 365) {
+                    const expires = new Date();
+                    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+                    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
+                }
+
+                function saveUserId(userId) {
+                    if (userId) {
+                        localStorage.setItem('dating_app_user_id', userId);
+                        sessionStorage.setItem('dating_app_user_id', userId);
+                    }
+                }
+
+                function getUserIdFromStorage() {
+                    return localStorage.getItem('dating_app_user_id') || sessionStorage.getItem('dating_app_user_id');
+                }
+
+                function showNotification(message, type = 'info') {
+                    const notification = document.createElement('div');
+                    notification.className = 'session-restore-notification';
+                    notification.textContent = message;
+                    document.body.appendChild(notification);
+
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 4000);
+                }
+
+                // Автоматическое восстановление сессии
+                async function autoRestoreSession() {
+                    console.log('🔄 Начинаем автоматическое восстановление сессии...');
+
+                    const cookie = getCookie('user_id');
+                    const storage = getUserIdFromStorage();
+
+                    console.log('🍪 Cookie user_id:', cookie);
+                    console.log('💾 Storage user_id:', storage);
+
+                    const userId = cookie || storage;
+
+                    if (userId) {
+                        console.log('✅ Найден user_id:', userId);
+
+                        try {
+                            console.log('🌐 Проверяем профиль через API...');
+                            const response = await fetch(`/api/check-profile/${userId}`);
+                            const data = await response.json();
+
+                            console.log('📊 Ответ API:', data);
+
+                            if (data.success && data.exists) {
+                                console.log('✅ Профиль найден! Восстанавливаем сессию...');
+
+                                // Восстанавливаем сессию
+                                setCookie('user_id', userId);
+                                saveUserId(userId);
+
+                                // Скрываем кнопку создания анкеты
+                                const createSection = document.getElementById('create-profile-section');
+                                if (createSection) {
+                                    createSection.style.display = 'none';
+                                    console.log('✅ Кнопка создания анкеты скрыта');
+                                }
+
+                                console.log('✅ Сессия восстановлена, возвращаем true для перенаправления');
+                                return true;
+                            } else {
+                                console.log('❌ Профиль не найден или ошибка API');
+
+                                // Показываем кнопку создания анкеты, если профиль не найден
+                                const createSection = document.getElementById('create-profile-section');
+                                if (createSection) {
+                                    createSection.style.display = 'block';
+                                    console.log('✅ Кнопка создания анкеты показана');
+                                }
+                            }
+                        } catch (error) {
+                            console.error('❌ Ошибка при восстановлении сессии:', error);
+                        }
+                    } else {
+                        console.log('❌ User ID не найден');
+                    }
+
+                    return false;
+                }
+
+                // Функция для обновления состояния кнопки создания анкеты
+                async function updateCreateButtonState() {
+                    const userId = getCookie('user_id') || getUserIdFromStorage();
+                    const createSection = document.getElementById('create-profile-section');
+
+                    if (userId && createSection) {
+                        try {
+                            const response = await fetch(`/api/check-profile/${userId}`);
+                            const data = await response.json();
+
+                            if (data.success && data.exists) {
+                                // Профиль существует - скрываем кнопку
+                                createSection.style.display = 'none';
+                                console.log('✅ Профиль существует, кнопка создания скрыта');
+                            } else {
+                                // Профиль не существует - показываем кнопку
+                                createSection.style.display = 'block';
+                                console.log('❌ Профиль не существует, кнопка создания показана');
+                            }
+                        } catch (error) {
+                            console.error('❌ Ошибка при проверке состояния профиля:', error);
+                            // В случае ошибки показываем кнопку
+                            createSection.style.display = 'block';
+                        }
+                    } else if (createSection) {
+                        // Нет user_id - показываем кнопку
+                        createSection.style.display = 'block';
+                        console.log('❌ Нет user_id, кнопка создания показана');
+                    }
+                }
+
+                // Запускаем восстановление сессии при загрузке страницы
+                window.onload = function() {
+                    console.log('🚀 Страница загружена, начинаем восстановление сессии...');
+
+                    // Проверяем тип устройства
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    console.log('📱 Тип устройства:', isMobile ? 'Мобильное' : 'Десктопное');
+
+                    // На мобильных устройствах увеличиваем задержку
+                    const delay = isMobile ? 1000 : 500;
+
+                    setTimeout(async () => {
+                        console.log('⏰ Запускаем восстановление сессии с задержкой:', delay + 'ms');
+                        const restored = await autoRestoreSession();
+                        if (!restored) {
+                            console.log('❌ Сессия не восстановлена, пользователь может создать новую анкету');
+                            // Обновляем состояние кнопки
+                            await updateCreateButtonState();
+                        } else {
+                            // Если сессия восстановлена, сразу перенаправляем на профиль
+                            console.log('✅ Сессия восстановлена, перенаправляем на профиль');
+                            window.location.href = '/my_profile';
+                        }
+                    }, delay);
+                };
+            </script>
         </body>
         </html>
     ''', unread_notifications=unread_notifications, navbar=navbar, has_profile=has_profile,
@@ -717,10 +1072,51 @@ def home():
 
 @app.route('/create', methods=['GET', 'POST'])
 def create_profile():
-    # Всегда генерируем новый ID для каждой анкеты
-    # Это позволяет создавать несколько анкет
-    user_id = str(uuid.uuid4())
+    # Получаем user_id из cookie или генерируем новый
+    user_id = request.cookies.get('user_id')
+
+    # Проверяем, есть ли уже анкета у пользователя (для GET и POST запросов)
+    if user_id:
+        existing_profile = Profile.query.get(user_id)
+        if existing_profile:
+            if request.method == 'POST':
+                return jsonify({
+                    'success': False,
+                    'error': 'У вас уже есть анкета. Вы можете создать только одну анкету.',
+                    'has_active_profile': True
+                }), 400
+            else:
+                # Для GET запроса перенаправляем на профиль
+                return redirect(url_for('view_profile', id=user_id))
+
     if request.method == 'POST':
+        # Если нет user_id, генерируем новый
+        if not user_id:
+            user_id = str(uuid.uuid4())
+    if request.method == 'POST':
+        # Валидация длины полей
+        name = request.form.get('name', '').strip()
+        hobbies = request.form.get('hobbies', '').strip()
+        goal = request.form.get('goal', '').strip()
+        
+        if len(name) > 12:
+            return jsonify({
+                'success': False,
+                'error': 'Имя не должно превышать 12 символов'
+            }), 400
+            
+        if len(hobbies) > 70:
+            return jsonify({
+                'success': False,
+                'error': 'Увлечения не должны превышать 70 символов'
+            }), 400
+            
+        if len(goal) > 70:
+            return jsonify({
+                'success': False,
+                'error': 'Цель знакомства не должна превышать 70 символов'
+            }), 400
+        
         photo = request.files['photo']
         venue = request.form.get('venue')
         latitude = request.form.get('latitude')
@@ -767,11 +1163,11 @@ def create_profile():
                 photo.save(photo_path)
                 profile = Profile(
                     id=user_id,
-                    name=request.form['name'],
+                    name=name,
                     age=int(request.form['age']),
                     gender=request.form['gender'],
-                    hobbies=request.form['hobbies'],
-                    goal=request.form['goal'],
+                    hobbies=hobbies,
+                    goal=goal,
                     city=location_name,
                     venue=venue,
                     photo=filename,
@@ -808,6 +1204,8 @@ def create_profile():
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Создать анкету</title>
             <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
             <style>
@@ -873,9 +1271,9 @@ def create_profile():
                 }
 
                 input, textarea, select { 
-                    width: calc(100% - 24px); 
+                    width: 100%; 
                     padding: 12px; 
-                    margin: 10px 12px; 
+                    margin: 0; 
                     background: rgba(76, 175, 80, 0.1);
                     border: 1px solid rgba(76, 175, 80, 0.3);
                     border-radius: 10px;
@@ -906,6 +1304,14 @@ def create_profile():
                 select option:hover {
                     background: rgba(76, 175, 80, 1);
                 }
+                
+
+                
+                .field-container {
+                    position: relative;
+                    width: 100%;
+                    margin-bottom: 10px;
+                }
 
                 input[type="file"] {
                     background: rgba(76, 175, 80, 0.1);
@@ -914,9 +1320,6 @@ def create_profile():
                     padding: 12px;
                     border-radius: 10px;
                     cursor: pointer;
-                    width: calc(100% - 24px);
-                    margin: 10px 12px;
-                    box-sizing: border-box;
                 }
 
                 input[type="file"]:focus {
@@ -1051,21 +1454,31 @@ def create_profile():
         <body>
             {{ navbar|safe }}
             <div class="form-container">
-                <h2 style="text-align: center; margin-top: 5px;">Создать анкету</h2>
+                <h2 style="text-align: center; margin-top: 10px;">Создать анкету</h2>
                 <p style="color: #fff; opacity: 0.8; margin-bottom: 20px; text-align: center;">
                     📍 Ваше местоположение будет определено автоматически
                 </p>
                 <form method="post" enctype="multipart/form-data">
-                <input type="text" name="name" placeholder="Ваше имя" maxlength="15" required>
-                <input type="number" name="age" placeholder="Ваш возраст" min="1" max="999" required>
-                <select name="gender" required>
-                    <option value="">Выберите пол</option>
-                    <option value="male">Мужской</option>
-                    <option value="female">Женский</option>
-                    <option value="other">Другое</option>
-                </select>
-                <textarea name="hobbies" placeholder="Ваши увлечения" maxlength="100" required></textarea>
-                <textarea name="goal" placeholder="Цель знакомства" maxlength="100" required></textarea>
+                <div class="field-container">
+                    <input type="text" name="name" placeholder="Ваше имя" required maxlength="12" oninput="checkFieldLength(this, 12)">
+                </div>
+                <div class="field-container">
+                    <input type="number" name="age" placeholder="Ваш возраст" required>
+                </div>
+                <div class="field-container">
+                    <select name="gender" required>
+                        <option value="">Выберите пол</option>
+                        <option value="male">Мужской</option>
+                        <option value="female">Женский</option>
+                        <option value="other">Другое</option>
+                    </select>
+                </div>
+                <div class="field-container">
+                    <textarea name="hobbies" placeholder="Ваши увлечения" required maxlength="70" oninput="checkFieldLength(this, 70)"></textarea>
+                </div>
+                <div class="field-container">
+                    <textarea name="goal" placeholder="Цель знакомства" required maxlength="70" oninput="checkFieldLength(this, 70)"></textarea>
+                </div>
 
                     <div class="map-container">
                         <div id="map"></div>
@@ -1074,15 +1487,11 @@ def create_profile():
                         </button>
                     </div>
 
-                <!-- Предупреждение о выборе заведения -->
-                <div style="margin: 15px 0; padding: 12px; background: linear-gradient(135deg, #ff6b6b, #ff8e8e); border-radius: 8px; border: 2px solid #ff4757; box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);">
-                    <div style="display: flex; align-items: center; gap: 10px; color: white; font-weight: 600; font-size: 14px;">
-                        <span style="font-size: 18px;">⚠️</span>
-                        <span>Кликните в карте на заведение, чтобы автоматически заполнить поле ниже</span>
-                    </div>
-                </div>
 
-                <input type="text" name="venue" id="venue-input" placeholder="Название заведения (кафе, ресторан и т.д.)" required onchange="updateVenueCoordinates()">
+
+                <div class="field-container">
+                    <input type="text" name="venue" id="venue-input" placeholder="Название заведения (кафе, ресторан и т.д.)" required onchange="updateVenueCoordinates()">
+                </div>
                 <input type="hidden" name="latitude" id="latitude-input">
                 <input type="hidden" name="longitude" id="longitude-input">
                 <input type="hidden" name="venue_lat" id="venue-lat-input">
@@ -1093,7 +1502,9 @@ def create_profile():
                 <input type="hidden" id="venue-coordinates-display">
                 <input type="hidden" id="distance-display">
 
-                <input type="file" name="photo" accept="image/*" required>
+                <div class="field-container">
+                    <input type="file" name="photo" accept="image/*" required>
+                </div>
 
                 <div class="terms-checkbox-container" style="margin: 20px 0; padding: 15px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; border: 1px solid rgba(76, 175, 80, 0.3);">
                     <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: #fff; font-size: 1em;">
@@ -1112,6 +1523,12 @@ def create_profile():
             </div>
 
             <script>
+                // Функция для проверки длины полей (функциональность ограничений сохранена)
+                function checkFieldLength(field, maxLength) {
+                    // Функциональность ограничений остается, но без визуальных счетчиков
+                    // Пользователь не сможет ввести больше символов благодаря maxlength
+                }
+                
                 // Статическое местоположение: карта автоматически определяет местоположение пользователя
                 // и делает его неизменяемым. Пользователь может только выбирать заведения.
                 let myMap, myPlacemark;
@@ -1737,8 +2154,6 @@ def create_profile():
                     const formData = new FormData(this);
 
                     console.log('📤 Отправляем данные на сервер...');
-                    console.log('📍 Координаты пользователя:', formData.get('latitude'), formData.get('longitude'));
-                    console.log('🏪 Координаты кафе:', formData.get('venue_lat'), formData.get('venue_lng'));
 
                     fetch('/create', {
                         method: 'POST',
@@ -1753,20 +2168,6 @@ def create_profile():
                             if (response.status === 413) {
                                 throw new Error('Файл слишком большой. Пожалуйста, выберите фото меньшего размера (максимум 16MB)');
                             }
-                            // Для ошибок 400 (включая ошибку расстояния) обрабатываем JSON
-                            if (response.status === 400) {
-                                const contentType = response.headers.get('content-type');
-                                if (contentType && contentType.includes('application/json')) {
-                                    return response.json().then(data => {
-                                        console.log('❌ Ошибка 400:', data);
-                                        if (data.error) {
-                                            alert('ОШИБКА: ' + data.error);
-                                        } else {
-                                            alert('Ошибка при создании анкеты');
-                                        }
-                                    });
-                                }
-                            }
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
 
@@ -1779,12 +2180,26 @@ def create_profile():
                                 if (data.success === false) {
                                     // Показываем ошибку
                                     console.log('❌ Ошибка:', data.error);
-                                    console.log('❌ Полные данные ответа:', data);
-                                    alert('ОШИБКА: ' + data.error);
+                                    alert(data.error);
                                 } else {
-                                    // Успешная регистрация - устанавливаем cookie и перенаправляем
+                                    // Успешная регистрация - устанавливаем cookie, localStorage и перенаправляем
                                     console.log('✅ Успешная регистрация, перенаправляем на:', data.redirect);
-                                    document.cookie = 'user_id=' + data.user_id + '; path=/';
+
+                                    // Сохраняем в cookie с дополнительными параметрами для мобильных устройств
+                                    const cookieValue = 'user_id=' + data.user_id + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
+                                    document.cookie = cookieValue;
+
+                                    // Сохраняем в localStorage для мобильных устройств
+                                    try {
+                                        localStorage.setItem('dating_app_user_id', data.user_id);
+                                        sessionStorage.setItem('dating_app_user_id', data.user_id);
+                                        console.log('✅ User ID сохранен в localStorage и sessionStorage');
+                                    } catch (e) {
+                                        console.warn('⚠️ Не удалось сохранить в localStorage:', e);
+                                    }
+
+                                    console.log('✅ User ID сохранен в cookie:', data.user_id);
+
                                     window.location.href = data.redirect || '/';
                                 }
                             });
@@ -1815,77 +2230,118 @@ def create_profile():
                     }
                 });
 
+                // Функция для проверки существующего профиля
+                async function checkExistingProfile() {
+                    const userId = getCookie('user_id') || localStorage.getItem('dating_app_user_id');
+
+                    if (userId) {
+                        try {
+                            const response = await fetch(`/api/check-profile/${userId}`);
+                            const data = await response.json();
+
+                            if (data.success && data.exists) {
+                                console.log('✅ Профиль уже существует, перенаправляем на профиль');
+                                window.location.href = '/my_profile';
+                                return true;
+                            }
+                        } catch (error) {
+                            console.error('❌ Ошибка при проверке профиля:', error);
+                        }
+                    }
+                    return false;
+                }
+
                 // Инициализация карты при загрузке страницы
                 window.onload = function() {
+                    console.log('🚀 Страница загружена, начинаем инициализацию...');
+                    
+                    // Проверяем, есть ли элемент карты
+                    const mapElement = document.getElementById('map');
+                    if (mapElement) {
+                        console.log('✅ Элемент карты найден');
+                    } else {
+                        console.error('❌ Элемент карты не найден!');
+                    }
+                    
+                    // На странице создания профиля карта должна инициализироваться всегда
+                    console.log('🗺️ Инициализируем карту на странице создания профиля...');
                     initMap();
 
                     // Инициализируем состояние кнопки
                     const createBtn = document.getElementById('create-btn');
-                    createBtn.disabled = true;
-                    createBtn.style.opacity = '0.5';
-                    createBtn.style.cursor = 'not-allowed';
+                    if (createBtn) {
+                        createBtn.disabled = true;
+                        createBtn.style.opacity = '0.5';
+                        createBtn.style.cursor = 'not-allowed';
+                        console.log('✅ Кнопка создания профиля инициализирована');
+                    } else {
+                        console.error('❌ Кнопка создания профиля не найдена!');
+                    }
                 };
-
-                // Валидация и счетчик символов
-                document.addEventListener('DOMContentLoaded', function() {
-                    const nameInput = document.querySelector('input[name="name"]');
-                    const ageInput = document.querySelector('input[name="age"]');
-                    const hobbiesTextarea = document.querySelector('textarea[name="hobbies"]');
-                    const goalTextarea = document.querySelector('textarea[name="goal"]');
-
-                    // Счетчик для имени
-                    if (nameInput) {
-                        nameInput.addEventListener('input', function() {
-                            const maxLength = 15;
-                            const currentLength = this.value.length;
-                            if (currentLength > maxLength) {
-                                this.value = this.value.substring(0, maxLength);
-                            }
-                        });
-                    }
-
-                    // Валидация возраста
-                    if (ageInput) {
-                        ageInput.addEventListener('input', function() {
-                            const value = this.value;
-                            if (value.length > 3) {
-                                this.value = value.substring(0, 3);
-                            }
-                            if (value < 1) {
-                                this.value = 1;
-                            }
-                            if (value > 999) {
-                                this.value = 999;
-                            }
-                        });
-                    }
-
-                    // Счетчик для увлечений
-                    if (hobbiesTextarea) {
-                        hobbiesTextarea.addEventListener('input', function() {
-                            const maxLength = 100;
-                            const currentLength = this.value.length;
-                            if (currentLength > maxLength) {
-                                this.value = this.value.substring(0, maxLength);
-                            }
-                        });
-                    }
-
-                    // Счетчик для цели
-                    if (goalTextarea) {
-                        goalTextarea.addEventListener('input', function() {
-                            const maxLength = 100;
-                            const currentLength = this.value.length;
-                            if (currentLength > maxLength) {
-                                this.value = this.value.substring(0, maxLength);
-                            }
-                        });
-                    }
-                });
             </script>
         </body>
         </html>
     ''', navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css)
+
+
+# Функции для работы с настройками пользователя
+def get_user_settings(user_id):
+    """Получает настройки пользователя из базы данных"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect('dating_app.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT sound_notifications FROM user_settings WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        conn.close()
+        
+        if result:
+            return {'sound_notifications': bool(result[0])}
+        else:
+            # Создаем настройки по умолчанию
+            return {'sound_notifications': True}
+            
+    except Exception as e:
+        print(f"❌ Ошибка получения настроек для {user_id}: {e}")
+        return {'sound_notifications': True}
+
+
+def update_user_settings(user_id, sound_notifications):
+    """Обновляет настройки пользователя в базе данных"""
+    try:
+        import sqlite3
+        conn = sqlite3.connect('dating_app.db')
+        cursor = conn.cursor()
+        
+        # Проверяем, есть ли уже настройки для пользователя
+        cursor.execute('SELECT id FROM user_settings WHERE user_id = ?', (user_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Обновляем существующие настройки
+            cursor.execute('''
+                UPDATE user_settings 
+                SET sound_notifications = ?, updated_at = ? 
+                WHERE user_id = ?
+            ''', (1 if sound_notifications else 0, datetime.utcnow(), user_id))
+        else:
+            # Создаем новые настройки
+            cursor.execute('''
+                INSERT INTO user_settings (user_id, sound_notifications, created_at, updated_at) 
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, 1 if sound_notifications else 0, datetime.utcnow(), datetime.utcnow()))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Ошибка обновления настроек для {user_id}: {e}")
+        return False
 
 
 def require_profile(view_func):
@@ -1904,25 +2360,27 @@ def require_profile(view_func):
 def view_visitors():
     user_id = request.cookies.get('user_id')
     # Получаем фильтры из query-параметров
-    age_from = request.args.get('age_from', type=int)
-    age_to = request.args.get('age_to', type=int)
-    name_query = request.args.get('name', '').strip().lower()
-    hobby_query = request.args.get('hobby', '').strip().lower()
+    venue_query = request.args.get('venue', '').strip().lower()
     gender_query = request.args.get('gender', '')
     # Фильтруем профили
     other_profiles = [p for p in Profile.query.all() if p.id != user_id]
-    if age_from is not None:
-        other_profiles = [p for p in other_profiles if str(p.age).isdigit() and int(p.age) >= age_from]
-    if age_to is not None:
-        other_profiles = [p for p in other_profiles if str(p.age).isdigit() and int(p.age) <= age_to]
-    if name_query:
-        other_profiles = [p for p in other_profiles if name_query in p.name.lower()]
-    if hobby_query:
-        other_profiles = [p for p in other_profiles if hobby_query in p.hobbies.lower()]
+    if venue_query:
+        other_profiles = [p for p in other_profiles if p.venue and venue_query in p.venue.lower()]
     if gender_query:
         other_profiles = [p for p in other_profiles if p.gender == gender_query]
-    # liked_ids теперь из базы
+    # liked_ids включает лайки и метчи
     liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
+    
+    # Добавляем пользователей из метчей
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    for match in matches:
+        if match.user1_id == user_id:
+            liked_ids.add(match.user2_id)
+        else:
+            liked_ids.add(match.user1_id)
     navbar = render_navbar(user_id, active='visitors', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
@@ -1931,6 +2389,8 @@ def view_visitors():
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Посетители кафе</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -1947,7 +2407,7 @@ def view_visitors():
                     font-size: 1.1em;
                 }
                 .visitor-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -1972,8 +2432,8 @@ def view_visitors():
                     height: 80px;
                 }
                 .visitor-info { flex: 1; }
-                .visitor-card h2 { margin: 0 0 5px 0; }
-                .visitor-card p { margin: 5px 0; color: #666; }
+                .visitor-card h2 { margin: 0 0 5px 0; color: #fff; }
+                .visitor-card p { margin: 5px 0; color: #fff; }
                 .like-btn {
                     background: none;
                     border: none;
@@ -2003,7 +2463,7 @@ def view_visitors():
                     text-align: left;
                 }
                 .filter-form {
-                    background: rgba(255, 255, 255, 0.95);
+                    background: #030202;
                     border-radius: 15px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
                     padding: 20px 25px 15px 25px;
@@ -2017,7 +2477,7 @@ def view_visitors():
                 }
                 .filter-form label {
                     font-size: 0.95em;
-                    color: #444;
+                    color: #fff;
                     margin-right: 6px;
                 }
                 .filter-form input, .filter-form select {
@@ -2043,17 +2503,86 @@ def view_visitors():
                 }
             </style>
             <script>
+                // Функция воспроизведения звука колокольчика
+                function playNotificationSound() {
+                    try {
+                        // Создаем простой звук колокольчика
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        // Классический звук колокольчика
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                        oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                        
+                        console.log('🔔 Звук колокольчика воспроизведен');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука:', error);
+                    }
+                }
+                
+                function showNotification(message, type = 'info') {
+                    // Удаляем существующие уведомления
+                    const existingNotifications = document.querySelectorAll('.notification');
+                    existingNotifications.forEach(notification => notification.remove());
+                    
+                    // Создаем новое уведомление
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.textContent = message;
+                    
+                    // Добавляем в body
+                    document.body.appendChild(notification);
+                    
+                    // Показываем уведомление
+                    setTimeout(() => {
+                        notification.classList.add('show');
+                    }, 100);
+                    
+                    // Звук теперь воспроизводится только при обновлении счетчиков в навигации
+                    
+                    // Скрываем через 3 секунды
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.parentNode.removeChild(notification);
+                            }
+                        }, 300);
+                    }, 3000);
+                }
+                
                 function toggleLike(profileId, btn) {
                     event.stopPropagation();
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
                         .then(r => r.json())
                         .then(data => {
-                            if (data.liked) {
+                            if (data.match_created) {
+                                btn.classList.add('liked'); // Оставляем красным при метче
+                                showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
+                                setTimeout(() => location.reload(), 2000);
+                            } else if (data.liked) {
                                 btn.classList.add('liked');
-                            } else if (data.already_liked) {
-                                btn.classList.add('liked');
-                                alert('Вы уже лайкали эту анкету!');
+                                if (data.already_liked) {
+                                    // Уже лайкал - ничего не показываем
                             } else {
+                                    showNotification('❤️ Лайк отправлен!', 'success');
+                                }
+                            } else {
+                                // Убираем лайк (отмена лайка) - этого больше не должно происходить
                                 btn.classList.remove('liked');
                             }
                         });
@@ -2066,10 +2595,7 @@ def view_visitors():
         <body>
             {{ navbar|safe }}
             <form class="filter-form" method="get">
-                <label>Возраст от <input type="number" name="age_from" min="16" max="120" value="{{ request.args.get('age_from', '') }}"></label>
-                <label>до <input type="number" name="age_to" min="16" max="120" value="{{ request.args.get('age_to', '') }}"></label>
-                <label>Имя <input type="text" name="name" value="{{ request.args.get('name', '') }}" placeholder="Имя"></label>
-                <label>Интересы <input type="text" name="hobby" value="{{ request.args.get('hobby', '') }}" placeholder="Ключевое слово"></label>
+                <label>Заведение <input type="text" name="venue" value="{{ request.args.get('venue', '') }}" placeholder="Название заведения"></label>
                 <label>Пол
                     <select name="gender">
                         <option value="">Любой</option>
@@ -2081,7 +2607,7 @@ def view_visitors():
                 <button type="submit">Фильтровать</button>
             </form>
             <div class="visitor-count">Посетителей: {{ other_profiles|length }}</div>
-            <h1>Посетители кафе</h1>
+            <h1 style="text-align: center;">Посетители кафе</h1>
             {% if other_profiles %}
                 {% for profile in other_profiles %}
                     <div class="visitor-card" onclick="goToProfile('{{ profile.id }}')">
@@ -2115,21 +2641,59 @@ def view_visitors():
 def toggle_like(profile_id):
     user_id = request.cookies.get('user_id')
     if not user_id or Profile.query.get(profile_id) is None or profile_id == user_id:
-        return jsonify({'liked': False, 'already_liked': False, 'likes_count': 0})
-    # Проверяем, лайкал ли уже
-    already = Like.query.filter(and_(Like.user_id == user_id, Like.liked_id == profile_id)).first()
-    profile = Profile.query.get(profile_id)
-    if already:
-        # Уже лайкал
+        return jsonify({'liked': False, 'already_liked': False, 'likes_count': 0, 'match_created': False})
+    
+    # Проверяем, лайкал ли уже текущий пользователь
+    already_liked = Like.query.filter(and_(Like.user_id == user_id, Like.liked_id == profile_id)).first()
+    
+    if already_liked:
+        # Уже лайкал - ничего не делаем, сердечко остается красным
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
-        return jsonify({'liked': False, 'already_liked': True, 'likes_count': likes_count})
-    # Новый лайк
+        return jsonify({'liked': True, 'already_liked': True, 'likes_count': likes_count, 'match_created': False})
+    
+    # Проверяем, лайкал ли уже целевой пользователь текущего
+    mutual_like = Like.query.filter(and_(Like.user_id == profile_id, Like.liked_id == user_id)).first()
+    
+    if mutual_like:
+        # Взаимный лайк - создаем метч и удаляем лайк
+        db.session.delete(mutual_like)
+        db.session.commit()
+        
+        # Создаем метч в базе данных
+        user_profile = Profile.query.get(user_id)
+        matched_profile = Profile.query.get(profile_id)
+        if user_profile and matched_profile:
+            # Проверяем, что метч еще не существует
+            existing_match = Match.query.filter(
+                ((Match.user1_id == user_id) & (Match.user2_id == profile_id)) |
+                ((Match.user1_id == profile_id) & (Match.user2_id == user_id))
+            ).first()
+            
+            if not existing_match:
+                # Создаем метч (всегда user1_id < user2_id для консистентности)
+                user1_id, user2_id = sorted([user_id, profile_id])
+                match = Match(user1_id=user1_id, user2_id=user2_id)
+                db.session.add(match)
+                db.session.commit()
+            
+            add_notification(user_id, f"✨ У вас мэтч с {matched_profile.name}! Теперь вы можете общаться.")
+            add_notification(profile_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
+        
+        likes_count = Like.query.filter_by(liked_id=profile_id).count()
+        return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': True})
+    
+    # Обычный лайк
     db.session.add(Like(user_id=user_id, liked_id=profile_id))
-    profile.likes = Like.query.filter_by(liked_id=profile_id).count() + 1
     db.session.commit()
-    check_for_matches(user_id)
+    
+    # Добавляем уведомление получателю лайка
+    user_profile = Profile.query.get(user_id)
+    liked_profile = Profile.query.get(profile_id)
+    if user_profile and liked_profile:
+        add_notification(profile_id, f"💖 {user_profile.name} лайкнул(а) вас!")
+    
     likes_count = Like.query.filter_by(liked_id=profile_id).count()
-    return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count})
+    return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count, 'match_created': False})
 
 
 @app.route('/my_profile')
@@ -2145,12 +2709,14 @@ def my_profile():
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Моя анкета</title>
             <style>
                 {{ get_starry_night_css()|safe }}
                 body { text-align: center; padding: 20px; }
                 .card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     max-width: 400px; 
@@ -2158,6 +2724,7 @@ def my_profile():
                     padding: 25px;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 img { max-width: 100%; border-radius: 10px; }
                 .modern-btn {
@@ -2268,6 +2835,8 @@ def edit_profile():
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Редактировать анкету</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -2376,17 +2945,24 @@ def edit_profile():
                 let currentLocation = null;
 
                 function initMap() {
+                    console.log('🗺️ Начинаем инициализацию карты на странице создания профиля...');
                     ymaps.ready(function () {
-                        myMap = new ymaps.Map('map', {
-                            center: [55.76, 37.64], // Москва по умолчанию
-                            zoom: 10,
-                            controls: ['zoomControl', 'fullscreenControl']
-                        });
+                        console.log('✅ ymaps.ready() выполнен');
+                        try {
+                            myMap = new ymaps.Map('map', {
+                                center: [55.76, 37.64], // Москва по умолчанию
+                                zoom: 10,
+                                controls: ['zoomControl', 'fullscreenControl']
+                            });
+                            console.log('✅ Карта создана успешно');
 
-                        myMap.events.add('click', function (e) {
-                            var coords = e.get('coords');
-                            setLocation(coords[0], coords[1]);
-                        });
+                            myMap.events.add('click', function (e) {
+                                var coords = e.get('coords');
+                                setLocation(coords[0], coords[1]);
+                            });
+                        } catch (error) {
+                            console.error('❌ Ошибка при создании карты:', error);
+                        }
                     });
                 }
 
@@ -2607,13 +3183,33 @@ def my_likes():
         if liker_profile:
             liked_me_profiles.append(liker_profile)
             liked_me_ids.add(liker_profile.id)
+    # Сбросить счетчик лайков - добавляем все текущие лайки в просмотренные
+    read_likes[user_id].update(liked_me_ids)
+    
+    # liked_ids включает лайки и метчи
+    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
+    
+    # Добавляем пользователей из метчей
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    for match in matches:
+        if match.user1_id == user_id:
+            liked_ids.add(match.user2_id)
+        else:
+            liked_ids.add(match.user1_id)
+    
     navbar = render_navbar(user_id, active='likes', unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id))
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
     return render_template_string('''
         <!DOCTYPE html>
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Меня лайкнули</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -2630,7 +3226,7 @@ def my_likes():
                     font-size: 1.1em;
                 }
                 .like-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -2642,6 +3238,7 @@ def my_likes():
                     transition: all 0.3s ease;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 .like-card:hover { 
                     transform: translateY(-3px) scale(1.02);
@@ -2649,46 +3246,99 @@ def my_likes():
                 }
                 .like-card img { max-width: 80px; border-radius: 10px; margin-right: 15px; object-fit: cover; height: 80px; }
                 .like-info { flex: 1; }
-                .like-card h2 { margin: 0 0 5px 0; color: #333; }
-                .like-card p { margin: 5px 0; color: #666; }
+                .like-card h2 { margin: 0 0 5px 0; color: #fff; }
+                .like-card p { margin: 5px 0; color: #fff; }
                 .like-btn { background: none; border: none; cursor: pointer; outline: none; font-size: 2em; position: absolute; top: 10px; right: 18px; z-index: 2; padding: 0; transition: transform 0.1s; }
                 .like-btn:active { transform: scale(1.2); }
                 .like-heart { color: #bbb; transition: color 0.2s; text-shadow: 0 2px 8px rgba(255,107,107,0.12); }
                 .like-heart.liked { color: #ff6b6b; }
                 .back-btn { background: linear-gradient(90deg, #6c757d 0%, #495057 100%); color: white; border: none; padding: 12px 24px; border-radius: 25px; box-shadow: 0 4px 14px rgba(108,117,125,0.2); font-size: 1.1em; cursor: pointer; transition: box-shadow 0.2s, transform 0.2s; text-decoration: none; display: inline-block; margin-top: 20px; }
                 .back-btn:hover { box-shadow: 0 8px 24px rgba(108,117,125,0.3); transform: translateY(-2px) scale(1.03); }
+                
+                /* Стили для уведомлений */
+                .notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    color: white;
+                    font-weight: bold;
+                    z-index: 1000;
+                    transform: translateX(400px);
+                    transition: transform 0.3s ease;
+                    max-width: 300px;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                }
+                
+                .notification.show {
+                    transform: translateX(0);
+                }
+                
+                .notification.success {
+                    background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+                }
+                
+                .notification.error {
+                    background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
+                }
+                
+                .notification.info {
+                    background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+                }
+                
+                .notification.warning {
+                    background: linear-gradient(90deg, #ff9800 0%, #ffb74d 100%);
+                }
             </style>
             <script>
-                // Отмечаем лайки как прочитанные при загрузке страницы
-                window.addEventListener('load', function() {
-                    fetch('/api/mark_likes_read', {method: 'POST'})
-                        .then(r => r.json())
-                        .then(data => {
-                            if (data.success) {
-                                console.log('✅ Лайки отмечены как прочитанные:', data.marked_count);
-                                // Обновляем счетчик в навбаре
-                                const likeBadge = document.getElementById('like-badge');
-                                if (likeBadge) {
-                                    likeBadge.style.display = 'none';
-                                }
+                function showNotification(message, type = 'info') {
+                    // Удаляем существующие уведомления
+                    const existingNotifications = document.querySelectorAll('.notification');
+                    existingNotifications.forEach(notification => notification.remove());
+                    
+                    // Создаем новое уведомление
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.textContent = message;
+                    
+                    // Добавляем в body
+                    document.body.appendChild(notification);
+                    
+                    // Показываем уведомление
+                    setTimeout(() => {
+                        notification.classList.add('show');
+                    }, 100);
+                    
+                    // Скрываем через 3 секунды
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.parentNode.removeChild(notification);
                             }
-                        })
-                        .catch(error => {
-                            console.error('❌ Ошибка при отметке лайков:', error);
-                        });
-                });
-
+                        }, 300);
+                    }, 3000);
+                }
+                
                 function toggleLike(profileId, btn) {
                     event.stopPropagation();
                     fetch('/toggle_like/' + profileId, {method: 'POST'})
                         .then(r => r.json())
                         .then(data => {
-                            if (data.liked) {
+                            if (data.match_created) {
+                                btn.classList.add('liked'); // Оставляем красным при метче
+                                showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
+                                setTimeout(() => location.reload(), 2000);
+                            } else if (data.liked) {
                                 btn.classList.add('liked');
-                            } else if (data.already_liked) {
-                                btn.classList.add('liked');
-                                alert('Вы уже лайкали эту анкету!');
+                                if (data.already_liked) {
+                                    // Уже лайкал - ничего не показываем
                             } else {
+                                    showNotification('❤️ Лайк отправлен!', 'success');
+                                }
+                            } else {
+                                // Убираем лайк (отмена лайка) - этого больше не должно происходить
                                 btn.classList.remove('liked');
                             }
                         });
@@ -2700,7 +3350,7 @@ def my_likes():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1>Меня лайкнули</h1>
+            <h1 style="text-align: center;">Меня лайкнули</h1>
             {% if liked_me_profiles %}
                 {% for profile in liked_me_profiles %}
                     <div class="like-card" onclick="goToProfile('{{ profile.id }}')">
@@ -2709,10 +3359,10 @@ def my_likes():
                         <h2>{{ profile.name }}, {{ profile.age }}</h2>
                             <p>{{ profile.hobbies[:50] }}{% if profile.hobbies|length > 50 %}...{% endif %}</p>
                             {% if profile.city %}
-                            <p style="color: #666; font-size: 0.9em;">📍 {{ profile.city }}</p>
+                            <p style="color: #fff; font-size: 0.9em;">📍 {{ profile.city }}</p>
                             {% endif %}
                             {% if profile.venue %}
-                            <p style="color: #666; font-size: 0.9em;">🏪 {{ profile.venue }}</p>
+                            <p style="color: #fff; font-size: 0.9em;">🏪 {{ profile.venue }}</p>
                             {% endif %}
                         </div>
                         <button class="like-btn" title="Лайк" onclick="toggleLike('{{ profile.id }}', this.querySelector('span'))">
@@ -2726,7 +3376,7 @@ def my_likes():
         </body>
         </html>
     ''', liked_me_profiles=liked_me_profiles, navbar=navbar, get_photo_url=get_photo_url,
-                                  liked_ids=set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all()),
+                                  liked_ids=liked_ids,
                                   get_starry_night_css=get_starry_night_css)
 
 
@@ -2745,12 +3395,14 @@ def view_profile(id):
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Анкета</title>
             <style>
                 {{ get_starry_night_css()|safe }}
                 body { text-align: center; padding: 20px; }
                 .card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     max-width: 400px; 
@@ -2758,6 +3410,7 @@ def view_profile(id):
                     padding: 25px;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 img { max-width: 100%; border-radius: 10px; }
                 .modern-btn {
@@ -2795,7 +3448,132 @@ def view_profile(id):
                     box-shadow: 0 8px 24px rgba(108,117,125,0.3);
                     transform: translateY(-2px) scale(1.03);
                 }
+                
+                /* Стили для уведомлений */
+                .notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    color: white;
+                    font-weight: bold;
+                    z-index: 1000;
+                    transform: translateX(400px);
+                    transition: transform 0.3s ease;
+                    max-width: 300px;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                }
+                
+                .notification.show {
+                    transform: translateX(0);
+                }
+                
+                .notification.success {
+                    background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+                }
+                
+                .notification.error {
+                    background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
+                }
+                
+                .notification.info {
+                    background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+                }
+                
+                .notification.warning {
+                    background: linear-gradient(90deg, #ff9800 0%, #ffb74d 100%);
+                }
             </style>
+            <script>
+                function showNotification(message, type = 'info') {
+                    // Удаляем существующие уведомления
+                    const existingNotifications = document.querySelectorAll('.notification');
+                    existingNotifications.forEach(notification => notification.remove());
+                    
+                    // Создаем новое уведомление
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.textContent = message;
+                    
+                    // Добавляем в body
+                    document.body.appendChild(notification);
+                    
+                    // Показываем уведомление
+                    setTimeout(() => {
+                        notification.classList.add('show');
+                    }, 100);
+                    
+                    // Скрываем через 3 секунды
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => {
+                            if (notification.parentNode) {
+                                notification.parentNode.removeChild(notification);
+                            }
+                        }, 300);
+                    }, 3000);
+                }
+                
+                function likeProfile(profileId) {
+                    // Показываем индикатор загрузки
+                    const button = event.target;
+                    const originalText = button.textContent;
+                    button.textContent = '⏳ Отправляем...';
+                    button.disabled = true;
+                    
+                    fetch('/like/' + profileId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Успешный лайк
+                            showNotification('❤️ Лайк отправлен!', 'success');
+                            // Перенаправляем на страницу профиля
+                            setTimeout(() => {
+                                window.location.href = '/profile/' + profileId;
+                            }, 1000);
+                        } else {
+                            // Ошибка - пытаемся получить JSON
+                            return response.json().catch(() => response.text());
+                        }
+                    })
+                    .then(data => {
+                        if (data && typeof data === 'object') {
+                            // JSON ответ
+                            if (data.error) {
+                                if (data.error.includes('уже лайкнули')) {
+                                    showNotification('💔 Вы уже лайкнули этого пользователя', 'warning');
+                                } else if (data.error.includes('свою анкету')) {
+                                    showNotification('🤔 Нельзя лайкнуть свою анкету', 'error');
+                                } else {
+                                    showNotification('❌ ' + data.error, 'error');
+                                }
+                            }
+                        } else if (data) {
+                            // Текстовый ответ (для обратной совместимости)
+                            if (data.includes('уже лайкнули')) {
+                                showNotification('💔 Вы уже лайкнули этого пользователя', 'warning');
+                            } else if (data.includes('свою анкету')) {
+                                showNotification('🤔 Нельзя лайкнуть свою анкету', 'error');
+                            } else {
+                                showNotification('❌ Ошибка: ' + data, 'error');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('❌ Ошибка сети', 'error');
+                    })
+                    .finally(() => {
+                        // Восстанавливаем кнопку
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    });
+                }
+            </script>
         </head>
         <body>
             {{ navbar|safe }}
@@ -2811,9 +3589,7 @@ def view_profile(id):
                 <p><strong>🏪 Заведение:</strong> {{ profile.venue }}</p>
                 {% endif %}
                 {% if not is_owner %}
-                    <form action="/like/{{ profile.id }}" method="post">
-                        <button type="submit" class="modern-btn">❤️ Лайк</button>
-                    </form>
+                    <button type="button" class="modern-btn" onclick="likeProfile('{{ profile.id }}')">❤️ Лайк</button>
                 {% endif %}
                 {% if is_owner %}
                     <form action="/delete/{{ profile.id }}" method="post">
@@ -2832,21 +3608,23 @@ def view_profile(id):
 @require_profile
 def like_profile(id):
     if Profile.query.get(id) is None:
-        return "Анкета не найдена", 404
+        return jsonify({'error': 'Анкета не найдена'}), 404
     user_id = request.cookies.get('user_id')
     if not user_id:
-        return redirect(url_for('home'))
+        return jsonify({'error': 'Не авторизован'}), 401
     if Profile.query.get(id).id == user_id:
-        return "Нельзя лайкнуть свою анкету", 400
+        return jsonify({'error': 'Нельзя лайкнуть свою анкету'}), 400
     if Like.query.filter_by(user_id=user_id, liked_id=id).first():
-        return "Вы уже лайкнули этого пользователя", 400
-    db.session.add(Like(user_id=user_id, liked_id=id))
-    profile = Profile.query.get(id)
-    if profile:
-        profile.likes += 1
-    db.session.commit()
-    check_for_matches(user_id)
-    return redirect(url_for('view_profile', id=id))
+        return jsonify({'error': 'Вы уже лайкнули этого пользователя'}), 400
+    
+    try:
+        db.session.add(Like(user_id=user_id, liked_id=id))
+        db.session.commit()
+        check_for_matches(user_id)
+        return jsonify({'success': True, 'message': 'Лайк отправлен'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Ошибка при отправке лайка'}), 500
 
 
 @app.route('/delete/<string:id>', methods=['POST'])
@@ -2873,19 +3651,37 @@ def delete_profile(id):
 @require_profile
 def my_matches():
     user_id = request.cookies.get('user_id')
-    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-    matches_ids = liked_ids & liked_me_ids
-    matched_profiles = [Profile.query.get(mid) for mid in matches_ids if Profile.query.get(mid)]
-    # Сбросить счетчик новых мэтчей
-    new_matches[user_id].clear()
+    # Получаем метчи из базы данных
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    # Отмечаем метчи как просмотренные
+    current_time = datetime.utcnow()
+    for match in matches:
+        if match.user1_id == user_id and match.user1_viewed_at is None:
+            match.user1_viewed_at = current_time
+        elif match.user2_id == user_id and match.user2_viewed_at is None:
+            match.user2_viewed_at = current_time
+    db.session.commit()
+    
+    matched_ids = set()
+    for match in matches:
+        if match.user1_id == user_id:
+            matched_ids.add(match.user2_id)
+        else:
+            matched_ids.add(match.user1_id)
+    
+    matched_profiles = [Profile.query.get(mid) for mid in matched_ids if Profile.query.get(mid)]
     navbar = render_navbar(user_id, active='matches', unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id), unread_matches=0)
+                           unread_likes=get_unread_likes_count(user_id), unread_matches=get_unread_matches_count(user_id))
     return render_template_string('''
         <!DOCTYPE html>
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Мои мэтчи</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -2902,7 +3698,7 @@ def my_matches():
                     font-size: 1.1em;
                 }
                 .match-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -2913,6 +3709,7 @@ def my_matches():
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
                     transition: all 0.3s ease;
+                    color: #fff;
                 }
                 .match-card:hover {
                     transform: translateY(-3px) scale(1.02);
@@ -2950,7 +3747,7 @@ def my_matches():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1>Мои мэтчи</h1>
+            <h1 style="text-align: center;">Мои мэтчи</h1>
             {% if matched_profiles %}
                 {% for profile in matched_profiles %}
                     <div class="match-card">
@@ -2958,10 +3755,10 @@ def my_matches():
                         <div class="match-info">
                             <h2 style="margin: 0 0 10px 0;">{{ profile.name }}, {{ profile.age }}</h2>
                             {% if profile.city %}
-                            <p style="color: #666; margin: 5px 0;">📍 {{ profile.city }}</p>
+                            <p style="color: #fff; margin: 5px 0;">📍 {{ profile.city }}</p>
                             {% endif %}
                             {% if profile.venue %}
-                            <p style="color: #666; margin: 5px 0;">🏪 {{ profile.venue }}</p>
+                            <p style="color: #fff; margin: 5px 0;">🏪 {{ profile.venue }}</p>
                             {% endif %}
                         </div>
                         <a href="/chat/{{ profile.id }}" class="modern-btn">Чат</a>
@@ -2991,6 +3788,18 @@ def my_messages():
         for uid in ids:
             if uid != user_id:
                 chat_partners.add(uid)
+    
+    # Добавляем всех пользователей из метчей из базы данных
+    matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    for match in matches:
+        if match.user1_id == user_id:
+            chat_partners.add(match.user2_id)
+        else:
+            chat_partners.add(match.user1_id)
+    
     chat_profiles = [p for p in Profile.query.all() if p.id in chat_partners]
     # Считаем непрочитанные сообщения по каждому собеседнику
     unread_by_partner = {}
@@ -3007,6 +3816,8 @@ def my_messages():
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Мои сообщения</title>
             <style>
                 {{ get_starry_night_css()|safe }}
@@ -3023,7 +3834,7 @@ def my_messages():
                     font-size: 1.1em;
                 }
                 .chat-card { 
-                    background: rgba(255, 255, 255, 0.95); 
+                    background: #030202; 
                     border-radius: 15px; 
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
                     padding: 20px; 
@@ -3034,6 +3845,7 @@ def my_messages():
                     transition: all 0.3s ease;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
                 }
                 .chat-card:hover {
                     transform: translateY(-3px) scale(1.02);
@@ -3048,8 +3860,8 @@ def my_messages():
                     border: 2px solid #667eea;
                 }
                 .chat-info { flex: 1; }
-                .chat-card h2 { margin: 0 0 5px 0; color: #333; }
-                .chat-card p { margin: 5px 0; color: #666; }
+                .chat-card h2 { margin: 0 0 5px 0; color: #fff; }
+                .chat-card p { margin: 5px 0; color: #fff; }
                 .unread-badge {
                     background: #ff6b6b;
                     color: white;
@@ -3089,7 +3901,7 @@ def my_messages():
         </head>
         <body>
             {{ navbar|safe }}
-            <h1>Мои сообщения</h1>
+            <h1 style="text-align: center;">Мои сообщения</h1>
             {% if chat_profiles %}
                 {% for profile in chat_profiles %}
                     <div class="chat-card" onclick="goToChat('{{ profile.id }}')">
@@ -3118,10 +3930,13 @@ def my_messages():
 @require_profile
 def chat(other_user_id):
     user_id = request.cookies.get('user_id')
-    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-    matches_ids = liked_ids & liked_me_ids
-    if other_user_id not in matches_ids:
+    # Проверяем метчи в базе данных
+    match_exists = Match.query.filter(
+        ((Match.user1_id == user_id) & (Match.user2_id == other_user_id)) |
+        ((Match.user1_id == other_user_id) & (Match.user2_id == user_id))
+    ).first()
+    
+    if not match_exists:
         return "Чат доступен только для мэтчей", 403
     other_profile = Profile.query.get(other_user_id)
     if not other_profile:
@@ -3146,12 +3961,14 @@ def chat(other_user_id):
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
             <title>Чат</title>
             <style>
                 {{ get_starry_night_css()|safe }}
                 body { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .chat-header {
-                    background: rgba(255, 255, 255, 0.95);
+                    background: #030202;
                     border-radius: 15px;
                     padding: 20px;
                     margin-bottom: 20px;
@@ -3172,11 +3989,11 @@ def chat(other_user_id):
                 .chat-info h1 {
                     margin: 0;
                     font-size: 1.4em;
-                    color: #333;
+                    color: #fff;
                 }
                 .chat-info p {
                     margin: 5px 0 0 0;
-                    color: #666;
+                    color: #ccc;
                     font-size: 0.9em;
                 }
                 .message { 
@@ -3193,9 +4010,10 @@ def chat(other_user_id):
                     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
                 }
                 .their-message { 
-                    background: rgba(255, 255, 255, 0.9); 
+                    background: #030202; 
                     margin-right: auto; 
                     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+                    color: #fff;
                 }
                 .modern-btn {
                     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -3230,7 +4048,8 @@ def chat(other_user_id):
                     font-size: 1.1em;
                     border-radius: 15px;
                     border: 1px solid rgba(255, 255, 255, 0.3);
-                    background: rgba(255, 255, 255, 0.9);
+                    background: #030202;
+                    color: #fff;
                     min-height: 48px;
                     margin-bottom: 10px;
                     resize: none;
@@ -3243,18 +4062,18 @@ def chat(other_user_id):
                     box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
                 }
 
+
                 .typing-indicator {
-                    background: rgba(255, 255, 255, 0.9);
-                    border-radius: 12px;
-                    padding: 8px 12px;
-                    margin: 8px;
-                    font-size: 0.8em;
-                    color: #666;
+                    background: #030202;
+                    border-radius: 15px;
+                    padding: 10px 15px;
+                    margin: 10px;
+                    font-size: 0.9em;
+                    color: #fff;
                     display: none;
                     backdrop-filter: blur(10px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
                     align-self: flex-start;
-                    max-width: 200px;
                 }
 
                 .typing-indicator.show {
@@ -3271,23 +4090,8 @@ def chat(other_user_id):
                     50% { opacity: 1; }
                     100% { opacity: 0; }
                 }
-
-                .typing-indicator {
-                    animation: slideIn 0.3s ease-out;
-                }
-
-                @keyframes slideIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
             </style>
-
+            <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
         </head>
         <body>
             {{ navbar|safe }}
@@ -3311,7 +4115,7 @@ def chat(other_user_id):
                 {% endfor %}
             </div>
             <div class="typing-indicator" id="typing-indicator">
-                <span>{{ other_profile.name }} печатает сообщение</span><span class="typing-dots">...</span>
+                <span>{{ other_profile.name }} печатает</span><span class="typing-dots">...</span>
             </div>
             <form id="chat-form" autocomplete="off">
                 <textarea id="message-input" name="message" placeholder="Ваше сообщение..." maxlength="400" required></textarea>
@@ -3324,7 +4128,77 @@ def chat(other_user_id):
                 let lastMessageCount = {{ messages_db|length }};
                 let lastMessageTimestamp = "{{ messages_db[-1].timestamp.isoformat() if messages_db else '' }}";
 
-                // Простой AJAX чат без Socket.IO
+                // Инициализация Socket.IO
+                const socket = io();
+                socket.emit('join', {room: chat_key});
+
+                // Переменные для звука
+                let chatAudioContext = null;
+                let chatUserInteracted = false;
+
+                // Инициализация аудио для чата
+                function initChatAudio() {
+                    try {
+                        chatAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст инициализирован в чате');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в чате:', error.message);
+                    }
+                }
+
+                // Функция воспроизведения звука колокольчика
+                function playNotificationSound() {
+                    // Проверяем настройки пользователя перед воспроизведением
+                    fetch('/api/get_settings')
+                        .then(response => response.json())
+                        .then(settings => {
+                            if (!settings.sound_notifications) {
+                                console.log('🔕 Звук отключен в настройках');
+                                return;
+                            }
+                            
+                            if (!chatUserInteracted) {
+                                chatUserInteracted = true;
+                            }
+                            
+                            try {
+                                if (!chatAudioContext) {
+                                    initChatAudio();
+                                }
+                                
+                                if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                                    chatAudioContext.resume();
+                                }
+                                
+                                const oscillator = chatAudioContext.createOscillator();
+                                const gainNode = chatAudioContext.createGain();
+                                
+                                // Классический звук колокольчика
+                                oscillator.type = 'sine';
+                                oscillator.frequency.setValueAtTime(800, chatAudioContext.currentTime); // 800 Гц
+                                oscillator.frequency.setValueAtTime(600, chatAudioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                                oscillator.frequency.setValueAtTime(1000, chatAudioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                                oscillator.frequency.setValueAtTime(400, chatAudioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                                
+                                gainNode.gain.setValueAtTime(0.3, chatAudioContext.currentTime); // Громкость 30%
+                                gainNode.gain.exponentialRampToValueAtTime(0.01, chatAudioContext.currentTime + 0.5);
+                                
+                                oscillator.connect(gainNode);
+                                gainNode.connect(chatAudioContext.destination);
+                                
+                                oscillator.start(chatAudioContext.currentTime);
+                                oscillator.stop(chatAudioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                                
+                                console.log('🔔 Звук колокольчика воспроизведен при новом сообщении');
+                                
+                            } catch (error) {
+                                console.error('❌ Ошибка воспроизведения звука:', error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('❌ Ошибка получения настроек:', error);
+                        });
+                }
 
                 // Функция добавления сообщения
                 function addMessage(msg, sender, timestamp = null) {
@@ -3351,6 +4225,8 @@ def chat(other_user_id):
 
                     document.getElementById('messages').appendChild(div);
                     window.scrollTo(0, document.body.scrollHeight);
+
+                    // Звук теперь воспроизводится только при обновлении счетчиков в навигации
                 }
 
                 // Функция отметки сообщений как прочитанные
@@ -3373,7 +4249,7 @@ def chat(other_user_id):
                     });
                 }
 
-                // Функция обновления счетчиков в навбаре
+                // Функция обновления счетчиков в навбаре (упрощенная версия)
                 function updateNavbarBadges() {
                     fetch('/api/unread')
                         .then(response => response.json())
@@ -3408,6 +4284,7 @@ def chat(other_user_id):
                                     if (msg.sender !== user_id) {
                                         addMessage(msg.text, msg.sender, msg.timestamp);
                                         hasNewMessagesFromOther = true;
+                                        // Звук теперь воспроизводится только при обновлении счетчиков в навигации
                                     }
                                 });
 
@@ -3427,122 +4304,82 @@ def chat(other_user_id):
                         });
                 }
 
-                // Функция для проверки статуса печати собеседника
-                function checkTypingStatus() {
-                    fetch(`/api/typing-status/${other_user_id}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.is_typing && typingIndicator) {
-                                typingIndicator.classList.add('show');
-                            } else if (typingIndicator) {
-                                typingIndicator.classList.remove('show');
-                            }
-                        })
-                        .catch(error => console.error('Error checking typing status:', error));
-                }
+                // Socket.IO обработчики
+                socket.on('message', function(data) {
+                    addMessage(data.text, data.sender);
+                    // Обновляем счетчик только для сообщений от собеседника
+                    if (data.sender !== user_id) {
+                        lastMessageCount++;
+                        // Автоматически отмечаем сообщение как прочитанное
+                        markMessagesAsRead(other_user_id);
+                        // Звук теперь воспроизводится только при обновлении счетчиков в навигации
+                    }
+                });
 
-                // AJAX чат - обработчики сообщений
+                socket.on('connect', function() {
+                    console.log('✅ Socket.IO подключен');
+                });
 
-                // Обработчик отправки сообщения через AJAX
+                socket.on('disconnect', function() {
+                    console.log('❌ Socket.IO отключен, переключаемся на AJAX');
+                });
+                
+                socket.on('connect_error', function(error) {
+                    console.error('❌ Ошибка подключения Socket.IO:', error);
+                });
+                
+                socket.on('error', function(error) {
+                    console.error('❌ Ошибка Socket.IO:', error);
+                });
+
+                // Обработчик отправки сообщения
                 document.getElementById('chat-form').onsubmit = function(e) {
                     e.preventDefault();
                     const input = document.getElementById('message-input');
                     const msg = input.value;
                     if (msg.trim()) {
-                        // Отправляем через AJAX
-                        fetch('/send_message', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                receiver_id: other_user_id,
-                                message: msg
-                            })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                // Добавляем свое сообщение на страницу
-                                addMessage(msg, user_id);
-                                input.value = '';
-                                lastMessageCount++;
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Ошибка отправки сообщения:', error);
-                        });
+                        console.log('📤 Отправка сообщения через Socket.IO...');
+                        
+                        // Отправляем через Socket.IO
+                        socket.emit('send_message', {room: chat_key, text: msg, sender: user_id});
+                        
+                        // Добавляем сообщение локально для мгновенного отображения
+                        addMessage(msg, user_id);
+                        
+                        // Очищаем поле ввода
+                        input.value = '';
+                        
+                        console.log('✅ Сообщение отправлено');
                     }
                 };
 
-                // Запускаем периодическую проверку новых сообщений каждые 3 секунды
-                setInterval(checkNewMessages, 3000);
-
-                // Запускаем периодическую проверку статуса печати каждые 2 секунды
-                setInterval(checkTypingStatus, 2000);
-
-                // Валидация и счетчик символов для поля ввода сообщений
-                document.getElementById('message-input').addEventListener('input', function() {
-                    const maxLength = 400;
-                    const currentLength = this.value.length;
-
-                    // Обрезаем текст, если превышен лимит
-                    if (currentLength > maxLength) {
-                        this.value = this.value.substring(0, maxLength);
-                    }
-
-                    // Можно добавить визуальную индикацию, если нужно
-                    if (currentLength > 350) {
-                        this.style.borderColor = '#ff6b6b';
-                    } else {
-                        this.style.borderColor = '';
-                    }
-                });
-
-                // Логика индикатора печати
-                let typingTimeout;
-                let typingNotificationTimeout;
+                // Индикатор печати
+                let typingTimer;
                 const typingIndicator = document.getElementById('typing-indicator');
 
-                // Отправляем уведомление о печати собеседнику
-                function sendTypingNotification(isTyping) {
-                    fetch('/api/typing', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            receiver_id: other_user_id,
-                            is_typing: isTyping
-                        })
-                    });
-                }
-
-                // Показываем индикатор печати при вводе
                 document.getElementById('message-input').addEventListener('input', function() {
-                    // Отправляем уведомление о начале печати
-                    sendTypingNotification(true);
+                    if (this.value.trim()) {
+                        socket.emit('typing', {room: chat_key, user: user_id, isTyping: true});
 
-                    // Очищаем предыдущий таймаут уведомления
-                    if (typingNotificationTimeout) {
-                        clearTimeout(typingNotificationTimeout);
-                    }
-
-                    // Отправляем уведомление о прекращении печати через 3 секунды
-                    typingNotificationTimeout = setTimeout(() => {
-                        sendTypingNotification(false);
-                    }, 3000);
-                });
-
-                // Скрываем индикатор при отправке сообщения
-                document.getElementById('chat-form').addEventListener('submit', function() {
-                    // Отправляем уведомление о прекращении печати
-                    sendTypingNotification(false);
-
-                    if (typingNotificationTimeout) {
-                        clearTimeout(typingNotificationTimeout);
+                        clearTimeout(typingTimer);
+                        typingTimer = setTimeout(() => {
+                            socket.emit('typing', {room: chat_key, user: user_id, isTyping: false});
+                        }, 1000);
                     }
                 });
+
+                socket.on('user_typing', function(data) {
+                    if (data.user !== user_id) {
+                        if (data.isTyping) {
+                            typingIndicator.classList.add('show');
+                        } else {
+                            typingIndicator.classList.remove('show');
+                        }
+                    }
+                });
+
+                // Запускаем периодическую проверку новых сообщений каждые 3 секунды
+                setInterval(checkNewMessages, 3000);
 
                 // Проверяем новые сообщения при фокусе на поле ввода
                 document.getElementById('message-input').addEventListener('focus', function() {
@@ -3562,6 +4399,14 @@ def chat(other_user_id):
                     // Отмечаем все сообщения от собеседника как прочитанные при загрузке чата
                     markMessagesAsRead(other_user_id);
                 });
+
+                // Отмечаем взаимодействие пользователя для активации аудио
+                document.addEventListener('click', () => {
+                    chatUserInteracted = true;
+                    if (chatAudioContext && chatAudioContext.state === 'suspended') {
+                        chatAudioContext.resume();
+                    }
+                });
             </script>
         </body>
         </html>
@@ -3580,41 +4425,67 @@ def chat_history(other_user_id):
     ])
 
 
-@app.route('/send_message', methods=['POST'])
-@require_profile
-def send_message():
-    user_id = request.cookies.get('user_id')
-    data = request.get_json()
-    receiver_id = data.get('receiver_id')
-    message_text = data.get('message')
+@socketio.on('join')
+def on_join(data):
+    try:
+        room = data.get('room')
+        if room:
+            join_room(room)
+            print(f"✅ Пользователь присоединился к комнате: {room}")
+        else:
+            print(f"❌ Некорректные данные для присоединения: {data}")
+    except Exception as e:
+        print(f"❌ Ошибка при присоединении к комнате: {e}")
 
-    if not receiver_id or not message_text:
-        return jsonify({'success': False, 'error': 'Missing data'})
 
-    # Создаем chat_key
-    chat_key = '_'.join(sorted([user_id, receiver_id]))
+@socketio.on('send_message')
+def handle_send_message(data):
+    try:
+        room = data['room']
+        text = data['text']
+        sender = data['sender']
+        
+        # Проверяем, что данные корректны
+        if not room or not text or not sender:
+            print(f"❌ Некорректные данные сообщения: {data}")
+            return
+            
+        # Сохраняем сообщение в базу данных
+        new_message = Message(chat_key=room, sender=sender, text=text)
+        db.session.add(new_message)
+        db.session.commit()
+        
+        print(f"✅ Сообщение сохранено: {sender} -> {room}: {text[:50]}...")
+        
+        # Отправляем сообщение всем в комнате
+        emit('message', {'text': text, 'sender': sender}, room=room)
+        print(f"📤 Сообщение отправлено в комнату {room}")
+        
+    except Exception as e:
+        print(f"❌ Ошибка при обработке сообщения: {e}")
+        db.session.rollback()
 
-    # Сохраняем сообщение в базу
-    new_message = Message(chat_key=chat_key, sender=user_id, text=message_text)
-    db.session.add(new_message)
-    db.session.commit()
 
-    return jsonify({'success': True})
+@socketio.on('typing')
+def handle_typing(data):
+    try:
+        room = data.get('room')
+        user = data.get('user')
+        is_typing = data.get('isTyping')
+        
+        if room and user is not None:
+            emit('user_typing', {'user': user, 'isTyping': is_typing}, room=room, include_self=False)
+            print(f"⌨️ Индикатор печати: {user} {'печатает' if is_typing else 'остановился'} в комнате {room}")
+        else:
+            print(f"❌ Некорректные данные для индикатора печати: {data}")
+    except Exception as e:
+        print(f"❌ Ошибка при обработке индикатора печати: {e}")
 
 
 def check_for_matches(user_id):
-    liked_ids = set(l.liked_id for l in Like.query.filter_by(user_id=user_id).all())
-    liked_me_ids = set(l.user_id for l in Like.query.filter_by(liked_id=user_id).all())
-    matches_ids = liked_ids & liked_me_ids
-    for matched_user_id in matches_ids:
-        if matched_user_id not in new_matches[user_id]:
-            user_profile = Profile.query.get(user_id)
-            matched_profile = Profile.query.get(matched_user_id)
-            if user_profile and matched_profile:
-                add_notification(user_id, f"✨ У вас мэтч с {matched_profile.name}! Теперь вы можете общаться.")
-                add_notification(matched_user_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
-                new_matches[user_id].add(matched_user_id)
-                new_matches[matched_user_id].add(user_id)
+    # Эта функция больше не используется, так как метчи создаются напрямую в toggle_like
+    # Оставляем для совместимости, но она не выполняет никаких действий
+    pass
 
 
 # Плейсхолдер для фото
@@ -3636,7 +4507,7 @@ def test_geolocation():
         <head>
             <title>Тест геолокации</title>
             <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
                 body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
                 .success { color: green; font-weight: bold; }
@@ -3698,6 +4569,156 @@ def test_geolocation():
     ''')
 
 
+@app.route('/api/check-profile/<string:user_id>', methods=['GET'])
+def api_check_profile(user_id):
+    """
+    API endpoint для проверки существования профиля по user_id
+    """
+    try:
+        profile = Profile.query.get(user_id)
+        exists = profile is not None
+
+        return jsonify({
+            'success': True,
+            'exists': exists,
+            'user_id': user_id,
+            'profile_data': {
+                'name': profile.name if profile else None,
+                'age': profile.age if profile else None,
+                'gender': profile.gender if profile else None,
+                'city': profile.city if profile else None,
+                'created_at': profile.created_at.isoformat() if profile and profile.created_at else None
+            } if profile else None
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/restore-session', methods=['POST'])
+def api_restore_session():
+    """
+    API endpoint для восстановления сессии пользователя
+    """
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'User ID не предоставлен'
+            }), 400
+
+        profile = Profile.query.get(user_id)
+        if not profile:
+            return jsonify({
+                'success': False,
+                'error': 'Профиль не найден'
+            }), 404
+
+        # Устанавливаем cookie для восстановления сессии
+        response = jsonify({
+            'success': True,
+            'user_id': user_id,
+            'profile_exists': True,
+            'redirect_url': url_for('view_profile', id=user_id)
+        })
+        response.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60)  # 1 год
+
+        return response
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/clear-user-cookie', methods=['POST'])
+def api_clear_user_cookie():
+    """
+    API endpoint для очистки cookie пользователя
+    """
+    try:
+        response = jsonify({
+            'success': True,
+            'message': 'Cookie очищен'
+        })
+        response.delete_cookie('user_id')
+        return response
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/clear-cookie', methods=['GET'])
+def api_clear_cookie():
+    """API для очистки cookie"""
+    response = make_response(jsonify({'success': True, 'message': 'Cookie очищен'}))
+    response.delete_cookie('user_id')
+    return response
+
+
+@app.route('/api/delete-profile/<string:user_id>', methods=['POST'])
+def api_delete_profile(user_id):
+    """
+    API endpoint для удаления профиля и очистки сессии
+    """
+    try:
+        # Удаляем профиль из базы данных
+        profile = Profile.query.get(user_id)
+        if profile:
+            # Удаляем связанные данные
+            Like.query.filter_by(user_id=user_id).delete()
+            Like.query.filter_by(liked_id=user_id).delete()
+
+            # Удаляем сообщения
+            messages_to_delete = []
+            for msg in Message.query.all():
+                if user_id in msg.chat_key.split('_'):
+                    messages_to_delete.append(msg)
+
+            for msg in messages_to_delete:
+                db.session.delete(msg)
+
+            # Удаляем фото
+            if profile.photo:
+                try:
+                    photo_path = os.path.join(app.config['UPLOAD_FOLDER'], profile.photo)
+                    if os.path.exists(photo_path):
+                        os.remove(photo_path)
+                except Exception as e:
+                    print(f"Ошибка при удалении фото: {e}")
+
+            # Удаляем профиль
+            db.session.delete(profile)
+            db.session.commit()
+
+            response = jsonify({
+                'success': True,
+                'message': 'Профиль успешно удален'
+            })
+            response.delete_cookie('user_id')
+            return response
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Профиль не найден'
+            }), 404
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/profiles', methods=['GET'])
 def api_get_profiles_count():
     """
@@ -3735,74 +4756,13 @@ def api_cleanup_profiles():
         }), 500
 
 
-# Словарь для хранения статуса печати пользователей
-typing_status = {}
-
-
-@app.route('/api/typing', methods=['POST'])
-def api_typing():
-    # Проверяем наличие профиля без редиректа
-    user_id = request.cookies.get('user_id')
-    if not user_id or Profile.query.get(user_id) is None:
-        return jsonify({'success': False, 'error': 'Profile required'}), 401
-    """
-    API endpoint для отправки уведомлений о печати
-    """
-    user_id = request.cookies.get('user_id')
-    data = request.get_json()
-    receiver_id = data.get('receiver_id')
-    is_typing = data.get('is_typing')
-
-    if not receiver_id:
-        return jsonify({'success': False, 'error': 'Missing receiver_id'})
-
-    # Создаем ключ для отслеживания статуса печати
-    typing_key = f"{user_id}_{receiver_id}"
-
-    if is_typing:
-        # Устанавливаем статус печати
-        typing_status[typing_key] = {
-            'timestamp': time.time(),
-            'user_id': user_id,
-            'receiver_id': receiver_id
-        }
-    else:
-        # Удаляем статус печати
-        typing_status.pop(typing_key, None)
-
-    return jsonify({'success': True})
-
-
-@app.route('/api/typing-status/<string:other_user_id>')
-def api_typing_status(other_user_id):
-    # Проверяем наличие профиля без редиректа
-    user_id = request.cookies.get('user_id')
-    if not user_id or Profile.query.get(user_id) is None:
-        return jsonify({'success': False, 'error': 'Profile required'}), 401
-    """
-    API endpoint для получения статуса печати собеседника
-    """
-    user_id = request.cookies.get('user_id')
-
-    # Создаем ключ для проверки статуса печати
-    typing_key = f"{other_user_id}_{user_id}"
-
-    if typing_key in typing_status:
-        typing_info = typing_status[typing_key]
-        # Проверяем, не устарел ли статус (больше 5 секунд)
-        if time.time() - typing_info['timestamp'] < 5:
-            return jsonify({'is_typing': True})
-
-    return jsonify({'is_typing': False})
-
-
 @app.route('/terms')
 def terms():
     return render_template_string('''
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Пользовательское соглашение</title>
             <style>
                 body { 
@@ -3985,6 +4945,255 @@ def terms():
     ''')
 
 
+@app.route('/api/update_settings', methods=['POST'])
+@require_profile
+def api_update_settings():
+    """API для обновления настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    data = request.get_json()
+    
+    if not data or 'sound_notifications' not in data:
+        return jsonify({"error": "Неверные данные"}), 400
+    
+    sound_enabled = data['sound_notifications']
+    success = update_user_settings(user_id, sound_enabled)
+    
+    if success:
+        return jsonify({"success": True, "sound_notifications": sound_enabled})
+    else:
+        return jsonify({"error": "Ошибка обновления настроек"}), 500
+
+
+@app.route('/api/get_settings')
+@require_profile
+def api_get_settings():
+    """API для получения настроек пользователя"""
+    user_id = request.cookies.get('user_id')
+    settings = get_user_settings(user_id)
+    return jsonify(settings)
+
+
+@app.route('/settings')
+@require_profile
+def settings():
+    user_id = request.cookies.get('user_id')
+    navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
+            <title>Настройки</title>
+            <style>
+                {{ get_starry_night_css()|safe }}
+                body { max-width: 500px; margin: 0 auto; padding: 20px; }
+                h1 { 
+                    color: #fff; 
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                    margin-bottom: 25px;
+                    font-size: 1.8em;
+                    text-align: center;
+                }
+                .settings-card {
+                    background: #030202;
+                    border-radius: 15px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    padding: 25px;
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #fff;
+                }
+                .setting-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px 0;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                .setting-item:last-child {
+                    border-bottom: none;
+                }
+                .setting-label {
+                    font-size: 1.1em;
+                    color: #fff;
+                }
+                .bell-button {
+                    background: #ff6b6b;
+                    color: #fff;
+                    border: none;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 1.2em;
+                    transition: all 0.3s ease;
+                }
+                .bell-button:hover {
+                    background: #ff5252;
+                    transform: scale(1.05);
+                }
+                .bell-button:active {
+                    transform: scale(0.95);
+                }
+                .setting-description {
+                    font-size: 0.9em;
+                    color: #ccc;
+                    margin-top: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            {{ navbar|safe }}
+            <h1>⚙️ Настройки</h1>
+            <div class="settings-card">
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">🔔 Звуковые уведомления</div>
+                        <div class="setting-description">Включить/выключить звук при получении сообщений</div>
+                    </div>
+                    <button id="sound-toggle" class="bell-button" onclick="toggleSound()">🔔</button>
+                </div>
+            </div>
+            
+            <script>
+                let audioContext = null;
+                let userInteracted = false;
+                let soundEnabled = true;
+                
+                // Загружаем настройки при загрузке страницы
+                window.addEventListener('load', function() {
+                    loadSettings();
+                });
+                
+                // Загрузка настроек
+                function loadSettings() {
+                    fetch('/api/get_settings')
+                        .then(response => response.json())
+                        .then(settings => {
+                            soundEnabled = settings.sound_notifications;
+                            updateBellAppearance();
+                            console.log('📋 Настройки загружены:', settings);
+                        })
+                        .catch(error => {
+                            console.error('❌ Ошибка загрузки настроек:', error);
+                        });
+                }
+                
+                // Обновление внешнего вида колокольчика
+                function updateBellAppearance() {
+                    const bellButton = document.getElementById('sound-toggle');
+                    if (soundEnabled) {
+                        bellButton.textContent = '🔔';
+                        bellButton.style.filter = 'none';
+                        bellButton.style.background = '#ff6b6b';
+                    } else {
+                        bellButton.textContent = '🔕';
+                        bellButton.style.filter = 'grayscale(100%)';
+                        bellButton.style.background = '#666';
+                    }
+                }
+                
+                // Переключение звука
+                function toggleSound() {
+                    soundEnabled = !soundEnabled;
+                    
+                    // Обновляем внешний вид
+                    updateBellAppearance();
+                    
+                    // Сохраняем настройки
+                    fetch('/api/update_settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            sound_notifications: soundEnabled
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('✅ Настройки сохранены:', data);
+                            // Воспроизводим звук только если включен
+                            if (soundEnabled) {
+                                playBellSound();
+                            }
+                        } else {
+                            console.error('❌ Ошибка сохранения настроек:', data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Ошибка сохранения настроек:', error);
+                    });
+                }
+                
+                // Инициализация аудио
+                function initAudio() {
+                    try {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        console.log('✅ Аудио контекст инициализирован в настройках');
+                    } catch (error) {
+                        console.log('⚠️ Аудио не поддерживается в настройках:', error.message);
+                    }
+                }
+                
+                // Функция воспроизведения классического звука колокольчика
+                function playBellSound() {
+                    if (!userInteracted) {
+                        userInteracted = true;
+                    }
+                    
+                    try {
+                        if (!audioContext) {
+                            initAudio();
+                        }
+                        
+                        if (audioContext && audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+                        
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        // Классический звук колокольчика
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Гц
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1); // 600 Гц через 0.1 сек
+                        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2); // 1000 Гц через 0.2 сек
+                        oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.3); // 400 Гц через 0.3 сек
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Громкость 30%
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5); // Длительность 0.5 секунды
+                        
+                        console.log('🔔 Классический звук колокольчика воспроизведен');
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка воспроизведения звука:', error);
+                    }
+                }
+                
+                // Отмечаем взаимодействие пользователя
+                document.addEventListener('click', () => {
+                    userInteracted = true;
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                });
+            </script>
+        </body>
+        </html>
+    ''', navbar=navbar, get_starry_night_css=get_starry_night_css)
+
+
 def cleanup_expired_profiles():
     """
     Удаляет анкеты, которые старше PROFILE_LIFETIME_HOURS часов
@@ -4044,4 +5253,5 @@ if __name__ == '__main__':
         deleted_count = cleanup_expired_profiles()
         print(f"⏰ Время жизни анкеты: {PROFILE_LIFETIME_HOURS} часов")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5001
+                 , debug=True, allow_unsafe_werkzeug=True)

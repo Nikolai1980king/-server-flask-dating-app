@@ -2690,10 +2690,10 @@ def view_visitors():
                         if (data.success && data.remaining_time) {
                             timerElement.textContent = 'Анкета удалится через: ' + data.remaining_time;
                             
-                            // Если время истекло, обновляем страницу
+                            // Если время истекло, перенаправляем на создание анкеты
                             if (data.remaining_time === 'Истекла') {
                                 setTimeout(() => {
-                                    window.location.reload();
+                                    window.location.href = '/create';
                                 }, 2000);
                             }
                         }

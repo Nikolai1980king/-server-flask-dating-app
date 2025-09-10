@@ -32,7 +32,7 @@ db = SQLAlchemy(app)
 MAX_REGISTRATION_DISTANCE = 3000  # 3 км = 3000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
-PROFILE_LIFETIME_HOURS = 1  # Измените это значение для настройки времени жизни анкет
+PROFILE_LIFETIME_HOURS = 0.5  # Измените это значение для настройки времени жизни анкет (30 минут)
 
 
 def get_location_name(lat, lon):
@@ -824,6 +824,12 @@ def debug_geolocation():
 
 @app.route('/')
 def home():
+    # Автоматически запускаем очистку просроченных анкет на главной странице
+    try:
+        cleanup_expired_profiles()
+    except Exception as e:
+        print(f"⚠️ Ошибка при автоматической очистке: {e}")
+    
     user_id = request.cookies.get('user_id')
     user_notifications = notifications.get(user_id, [])
     unread_notifications = [
@@ -1112,6 +1118,12 @@ def home():
 
 @app.route('/create', methods=['GET', 'POST'])
 def create_profile():
+    # Автоматически запускаем очистку просроченных анкет при создании профиля
+    try:
+        cleanup_expired_profiles()
+    except Exception as e:
+        print(f"⚠️ Ошибка при автоматической очистке: {e}")
+    
     # Получаем user_id из cookie или генерируем новый
     user_id = request.cookies.get('user_id')
 
@@ -2387,6 +2399,12 @@ def update_user_settings(user_id, sound_notifications):
 def require_profile(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
+        # Автоматически запускаем очистку просроченных анкет при каждом запросе
+        try:
+            cleanup_expired_profiles()
+        except Exception as e:
+            print(f"⚠️ Ошибка при автоматической очистке: {e}")
+        
         user_id = request.cookies.get('user_id')
         if not user_id or Profile.query.get(user_id) is None:
             return redirect(url_for('create_profile'))
@@ -5954,11 +5972,11 @@ def cleanup_expired_profiles():
 def periodic_cleanup():
     """
     Функция для периодической очистки просроченных анкет
-    Запускается каждые 30 минут
+    Запускается каждые 5 минут
     """
     while True:
         try:
-            time.sleep(30 * 60)  # Ждем 30 минут
+            time.sleep(5 * 60)  # Ждем 5 минут
             with app.app_context():
                 print("🔄 Запуск периодической очистки просроченных анкет...")
                 deleted_count = cleanup_expired_profiles()
@@ -5982,7 +6000,7 @@ if __name__ == '__main__':
         # Запускаем фоновую задачу для периодической очистки
         cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
         cleanup_thread.start()
-        print("🔄 Запущена периодическая очистка анкет (каждые 30 минут)")
+        print("🔄 Запущена периодическая очистка анкет (каждые 5 минут)")
 
     socketio.run(app, host='0.0.0.0', port=5000
                  , debug=True, allow_unsafe_werkzeug=True)

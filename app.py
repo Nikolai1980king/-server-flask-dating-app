@@ -11,6 +11,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import and_
 from functools import wraps
 import requests
+import threading
+import time
 
 app = Flask(__name__)
 app.secret_key = 'super-secret-key'
@@ -30,7 +32,7 @@ db = SQLAlchemy(app)
 MAX_REGISTRATION_DISTANCE = 3000  # 3 км = 3000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
-PROFILE_LIFETIME_HOURS = 24  # Измените это значение для настройки времени жизни анкет
+PROFILE_LIFETIME_HOURS = 1  # Измените это значение для настройки времени жизни анкет
 
 
 def get_location_name(lat, lon):
@@ -244,6 +246,44 @@ def get_unread_matches_count(user_id):
         ((Match.user2_id == user_id) & (Match.user2_viewed_at.is_(None)))
     ).count()
     return unread_matches
+
+
+def get_profile_lifetime_remaining(user_id):
+    """
+    Возвращает оставшееся время жизни анкеты в часах и минутах
+    """
+    if not user_id:
+        return None
+    
+    profile = Profile.query.get(user_id)
+    if not profile or not profile.created_at:
+        return None
+    
+    from datetime import datetime, timezone, timedelta
+    
+    # Преобразуем created_at в UTC если нужно
+    created_at = profile.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    
+    # Вычисляем время истечения
+    expiration_time = created_at + timedelta(hours=PROFILE_LIFETIME_HOURS)
+    current_time = datetime.now(timezone.utc)
+    
+    # Вычисляем оставшееся время
+    remaining = expiration_time - current_time
+    
+    if remaining.total_seconds() <= 0:
+        return "Истекла"
+    
+    # Преобразуем в часы и минуты
+    total_hours = int(remaining.total_seconds() // 3600)
+    total_minutes = int((remaining.total_seconds() % 3600) // 60)
+    
+    if total_hours > 0:
+        return f"{total_hours}ч {total_minutes}м"
+    else:
+        return f"{total_minutes}м"
 
 
 def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unread_matches=0):
@@ -2606,7 +2646,14 @@ def view_visitors():
                 </label>
                 <button type="submit">Фильтровать</button>
             </form>
-            <div class="visitor-count">Посетителей: {{ other_profiles|length }}</div>
+            <div class="visitor-count">
+                Посетителей: {{ other_profiles|length }}
+                {% if get_profile_lifetime_remaining(user_id) %}
+                <span id="lifetime-timer" style="margin-left: 20px; color: #fff; font-weight: normal;">
+                    Анкета удалится через: {{ get_profile_lifetime_remaining(user_id) }}
+                </span>
+                {% endif %}
+            </div>
             <h1 style="text-align: center;">Посетители кафе</h1>
             {% if other_profiles %}
                 {% for profile in other_profiles %}
@@ -2630,10 +2677,42 @@ def view_visitors():
             {% else %}
                 <p>Пока нет других посетителей.</p>
             {% endif %}
+            
+            <script>
+            // Обновление таймера жизни анкеты в реальном времени
+            function updateLifetimeTimer() {
+                const timerElement = document.getElementById('lifetime-timer');
+                if (!timerElement) return;
+                
+                fetch('/api/profile-lifetime')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.remaining_time) {
+                            timerElement.textContent = 'Анкета удалится через: ' + data.remaining_time;
+                            
+                            // Если время истекло, обновляем страницу
+                            if (data.remaining_time === 'Истекла') {
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 2000);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка обновления таймера:', error);
+                    });
+            }
+            
+            // Обновляем таймер каждые 30 секунд
+            setInterval(updateLifetimeTimer, 30000);
+            
+            // Обновляем таймер при загрузке страницы
+            document.addEventListener('DOMContentLoaded', updateLifetimeTimer);
+            </script>
         </body>
         </html>
     ''', other_profiles=other_profiles, liked_ids=liked_ids, navbar=navbar, get_photo_url=get_photo_url,
-                                  get_starry_night_css=get_starry_night_css)
+                                  get_starry_night_css=get_starry_night_css, get_profile_lifetime_remaining=get_profile_lifetime_remaining, user_id=user_id)
 
 
 @app.route('/toggle_like/<string:profile_id>', methods=['POST'])
@@ -2838,35 +2917,146 @@ def edit_profile():
             <meta name="format-detection" content="telephone=no">
             <meta name="msapplication-tap-highlight" content="no">
             <title>Редактировать анкету</title>
+            <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
             <style>
-                {{ get_starry_night_css()|safe }}
-                body { max-width: 500px; margin: 0 auto; padding: 20px; }
-                input, textarea, select { 
-                    width: 100%; 
-                    padding: 12px; 
-                    margin: 10px 0; 
-                    background: rgba(255, 255, 255, 0.9);
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 10px;
-                    color: #333;
-                    font-size: 1em;
+                body { 
+                    font-family: Arial, sans-serif; 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+                    background-size: 400% 400%;
+                    animation: starryNight 15s ease infinite;
+                    position: relative;
+                    min-height: 100vh;
                 }
-                input:focus, textarea:focus, select:focus {
-                    outline: none;
-                    border-color: #667eea;
-                    box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+
+                @keyframes starryNight {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
                 }
-                label {
-                    color: #fff;
-                    font-weight: bold;
-                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+
+                body::before {
+                    content: '';
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-image: 
+                        radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                        radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                        radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                        radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                        radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+                    background-repeat: repeat;
+                    background-size: 200px 100px;
+                    animation: twinkle 4s ease-in-out infinite alternate;
+                    pointer-events: none;
+                    z-index: 1;
                 }
+
+                @keyframes twinkle {
+                    0% { opacity: 0.3; }
+                    100% { opacity: 1; }
+                }
+
+                .form-container {
+                    position: relative;
+                    z-index: 2;
+                    background: rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(10px);
+                    border-radius: 20px;
+                    padding: 30px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                }
+
                 h2 {
                     color: #fff;
                     text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
                     margin-bottom: 25px;
                     font-size: 1.8em;
                 }
+
+                input, textarea, select { 
+                    width: 100%; 
+                    padding: 12px; 
+                    margin: 0; 
+                    background: rgba(76, 175, 80, 0.1);
+                    border: 1px solid rgba(76, 175, 80, 0.3);
+                    border-radius: 10px;
+                    color: #fff;
+                    font-size: 1em;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+                    box-sizing: border-box;
+                }
+
+                input::placeholder, textarea::placeholder, select::placeholder {
+                    color: rgba(255, 255, 255, 0.7);
+                    text-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+                }
+
+                input:focus, textarea:focus, select:focus {
+                    outline: none;
+                    border-color: #4CAF50;
+                    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+                    background: rgba(76, 175, 80, 0.15);
+                }
+
+                select option {
+                    background: rgba(76, 175, 80, 0.9);
+                    color: #fff;
+                    border: none;
+                }
+
+                select option:hover {
+                    background: rgba(76, 175, 80, 1);
+                }
+
+                .field-container {
+                    position: relative;
+                    width: 100%;
+                    margin-bottom: 10px;
+                }
+
+                input[type="file"] {
+                    background: rgba(76, 175, 80, 0.1);
+                    border: 1px solid rgba(76, 175, 80, 0.3);
+                    color: #fff;
+                    padding: 12px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                }
+
+                input[type="file"]:focus {
+                    outline: none;
+                    border-color: #4CAF50;
+                    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+                    background: rgba(76, 175, 80, 0.15);
+                }
+
+                input[type="file"]::-webkit-file-upload-button {
+                    background: rgba(76, 175, 80, 0.3);
+                    color: #fff;
+                    border: 1px solid rgba(76, 175, 80, 0.5);
+                    border-radius: 5px;
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                }
+
+                input[type="file"]::-webkit-file-upload-button:hover {
+                    background: rgba(76, 175, 80, 0.5);
+                }
+
+                label {
+                    color: #fff;
+                    font-weight: bold;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+                }
+
                 .modern-btn {
                     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
                     color: white;
@@ -2916,11 +3106,13 @@ def edit_profile():
                 }
 
                 .location-info {
-                    background: rgba(255, 255, 255, 0.9);
+                    background: rgba(76, 175, 80, 0.1);
+                    border: 1px solid rgba(76, 175, 80, 0.3);
                     padding: 15px;
                     border-radius: 10px;
                     margin: 10px 0;
-                    color: #333;
+                    color: #fff;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
                 }
 
                 .location-btn {
@@ -2938,31 +3130,71 @@ def edit_profile():
                     box-shadow: 0 4px 16px rgba(76,175,80,0.3);
                     transform: translateY(-2px);
                 }
+
+                .location-return-btn {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 0.9em;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 2px 10px rgba(33, 150, 243, 0.3);
+                    z-index: 1000;
+                    font-weight: bold;
+                }
+
+                .location-return-btn:hover {
+                    box-shadow: 0 4px 16px rgba(33, 150, 243, 0.5);
+                    transform: translateY(-2px) scale(1.05);
+                    background: linear-gradient(90deg, #1976D2 0%, #42A5F5 100%);
+                }
+
+                .map-container {
+                    position: relative;
+                }
             </style>
-            <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
             <script>
+                // Функция для проверки длины полей (функциональность ограничений сохранена)
+                function checkFieldLength(field, maxLength) {
+                    // Функциональность ограничений остается, но без визуальных счетчиков
+                    // Пользователь не сможет ввести больше символов благодаря maxlength
+                }
+
+                // Статическое местоположение: карта автоматически определяет местоположение пользователя
+                // и делает его неизменяемым. Пользователь может только выбирать заведения.
                 let myMap, myPlacemark;
                 let currentLocation = null;
 
                 function initMap() {
-                    console.log('🗺️ Начинаем инициализацию карты на странице создания профиля...');
                     ymaps.ready(function () {
-                        console.log('✅ ymaps.ready() выполнен');
-                        try {
                             myMap = new ymaps.Map('map', {
                                 center: [55.76, 37.64], // Москва по умолчанию
                                 zoom: 10,
                                 controls: ['zoomControl', 'fullscreenControl']
                             });
-                            console.log('✅ Карта создана успешно');
 
-                            myMap.events.add('click', function (e) {
-                                var coords = e.get('coords');
-                                setLocation(coords[0], coords[1]);
-                            });
-                        } catch (error) {
-                            console.error('❌ Ошибка при создании карты:', error);
-                        }
+                        // Автоматически определяем местоположение при загрузке страницы
+                        getCurrentLocation();
+
+                        // Убираем возможность клика по карте для изменения местоположения
+                        // myMap.events.add('click', function (e) {
+                        //     var coords = e.get('coords');
+                        //     setLocation(coords[0], coords[1]);
+                        // });
+
+                        // Добавляем обработчик для открытия балунов
+                        myMap.events.add('balloonopen', function (e) {
+                            console.log('🎈 Балун открыт, начинаем парсинг...');
+                            // Добавляем небольшую задержку для полной загрузки балуна
+                            setTimeout(function() {
+                                parseBalloonAndFillVenue();
+                            }, 500);
+                        });
                     });
                 }
 
@@ -2973,6 +3205,12 @@ def edit_profile():
                     document.getElementById('latitude-input').value = lat;
                     document.getElementById('longitude-input').value = lng;
 
+                    // Обновляем поле отображения координат посетителя
+                    const visitorCoordsDisplay = document.getElementById('visitor-coordinates-display');
+                    if (visitorCoordsDisplay) {
+                        visitorCoordsDisplay.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                    }
+
                     // Удаляем предыдущую метку
                     if (myPlacemark) {
                         myMap.geoObjects.remove(myPlacemark);
@@ -2980,7 +3218,7 @@ def edit_profile():
 
                     // Добавляем новую метку
                     myPlacemark = new ymaps.Placemark([lat, lng], {
-                        balloonContent: 'Выбранное местоположение'
+                        balloonContent: 'Выбранное местоположение посетителя'
                     }, {
                         preset: 'islands#redDotIcon'
                     });
@@ -2988,16 +3226,28 @@ def edit_profile():
                     myMap.geoObjects.add(myPlacemark);
                     myMap.setCenter([lat, lng], 15);
 
-                    // Показываем местоположение в интерфейсе
-                    document.getElementById('location-address').textContent = 'Местоположение определено';
-                    document.getElementById('location-coords').textContent = 'Координаты: ' + lat.toFixed(4) + ', ' + lng.toFixed(4);
-                    document.getElementById('location-info').style.display = 'block';
+                    // Показываем кнопку "Я тут" после определения местоположения
+                    const returnBtn = document.getElementById('return-to-location-btn');
+                    if (returnBtn) {
+                        returnBtn.style.display = 'block';
+                    }
 
-                    // Обновляем координаты заведения, если оно уже введено
+                    // Определяем город/поселок (без отображения в интерфейсе)
+                    getLocationName(lat, lng);
+
+                    // Рассчитываем расстояние и обновляем поле заведения, если оно есть
                     const venueInput = document.getElementById('venue-input');
                     if (venueInput && venueInput.value.trim()) {
-                        updateVenueCoordinates();
+                        // Извлекаем оригинальное название заведения (без расстояния)
+                        const venueValue = venueInput.value.trim();
+                        const venueName = venueValue.replace(/\s*\(\d+\.?\d*\s*(м|км)\)$/, ''); // Убираем расстояние в скобках
+                        calculateDistanceAndUpdateVenueField(venueName);
+                    } else {
+                        // Если заведения нет, просто рассчитываем расстояние для отображения
+                        calculateDistance();
                     }
+
+                    console.log('✅ Координаты посетителя установлены:', lat, lng);
                 }
 
                 function getCurrentLocation() {
@@ -3009,16 +3259,29 @@ def edit_profile():
                                 setLocation(lat, lng);
                             },
                             function(error) {
-                                alert('Не удалось получить местоположение. Попробуйте еще раз.');
+                                console.error('Ошибка геолокации:', error);
                             },
                             {
                                 enableHighAccuracy: false,
-                                timeout: 5000,
+                                timeout: 10000,
                                 maximumAge: 300000
                             }
                         );
                 } else {
-                        alert('Геолокация не поддерживается вашим браузером. Попробуйте другой браузер.');
+                        console.log('Геолокация не поддерживается вашим браузером');
+                    }
+                }
+
+                // Функция возврата к своему местоположению
+                function returnToMyLocation() {
+                    if (currentLocation) {
+                        // Возвращаем карту к местоположению пользователя
+                        myMap.setCenter([currentLocation.lat, currentLocation.lng], 15);
+                        console.log('📍 Возвращаемся к вашему местоположению:', currentLocation.lat, currentLocation.lng);
+                    } else {
+                        // Если местоположение не определено, определяем заново
+                        console.log('📍 Местоположение не определено, определяем заново...');
+                        getCurrentLocation();
                     }
                 }
 
@@ -3078,39 +3341,397 @@ def edit_profile():
                 // Функция обновления координат при изменении названия заведения
                 function updateVenueCoordinates() {
                     const venueInput = document.getElementById('venue-input');
-                    const venueName = venueInput.value.trim();
+                    let venueName = venueInput.value.trim();
 
-                    if (venueName && currentLocation) {
-                        showVenueCoordinates(venueName, currentLocation.lat, currentLocation.lng);
-                    } else if (venueName) {
-                        // Если есть название заведения, но нет координат, показываем сообщение
+                    // Убираем расстояние в скобках из названия заведения для обработки
+                    venueName = venueName.replace(/\s*\(\d+\.?\d*\s*(м|км)\)$/, '');
+
+                    if (venueName) {
+                        // Если есть название заведения, очищаем координаты заведения
+                        clearVenueCoordinates();
+                    } else {
+                        // Если название заведения пустое, очищаем координаты заведения
+                        clearVenueCoordinates();
+                    }
+                }
+
+                // Функция очистки координат заведения
+                function clearVenueCoordinates() {
+                    const venueCoordsDisplay = document.getElementById('venue-coordinates-display');
+                    if (venueCoordsDisplay) {
+                        venueCoordsDisplay.value = '';
+                    }
+
+                    // Очищаем расстояние из поля заведения
+                    const venueInput = document.getElementById('venue-input');
+                    if (venueInput && venueInput.value.trim()) {
+                        const venueValue = venueInput.value.trim();
+                        const venueName = venueValue.replace(/\s*\(\d+\.?\d*\s*(м|км)\)$/, ''); // Убираем расстояние в скобках
+                        venueInput.value = venueName;
+                    }
+
+                    console.log('✅ Координаты заведения очищены');
+
+                    // Очищаем расстояние
+                    clearDistance();
+                }
+
+                // Функция очистки расстояния
+                function clearDistance() {
+                    const distanceDisplay = document.getElementById('distance-display');
+                    if (distanceDisplay) {
+                        distanceDisplay.value = '';
+                    }
+                }
+
+                // Функция отображения координат заведения
+                function showVenueCoordinates(venueName, lat, lng) {
+                    // Удаляем предыдущий блок с координатами, если он есть
                         const existingCoordsDiv = document.getElementById('venue-coordinates');
                         if (existingCoordsDiv) {
                             existingCoordsDiv.remove();
                         }
 
-                        const coordsDiv = document.createElement('div');
-                        coordsDiv.id = 'venue-coordinates';
-                        coordsDiv.style.cssText = `
-                            background: rgba(255, 193, 7, 0.1);
-                            border: 1px solid rgba(255, 193, 7, 0.3);
-                            color: #fff;
-                            border-radius: 8px;
-                            padding: 10px;
-                            margin: 10px 0;
-                            font-size: 0.9em;
-                        `;
-
-                        coordsDiv.innerHTML = `
-                            <strong>⚠️ Для отображения координат заведения "${venueName}" выберите местоположение на карте</strong>
-                        `;
-
-                        venueInput.parentNode.insertBefore(coordsDiv, venueInput.nextSibling);
+                    // Обновляем поле отображения координат заведения
+                    const venueCoordsDisplay = document.getElementById('venue-coordinates-display');
+                    if (venueCoordsDisplay) {
+                        venueCoordsDisplay.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                     }
+
+                    // Заполняем скрытые поля для отправки на сервер
+                    const venueLatInput = document.getElementById('venue-lat-input');
+                    const venueLngInput = document.getElementById('venue-lng-input');
+                    if (venueLatInput && venueLngInput) {
+                        venueLatInput.value = lat.toFixed(6);
+                        venueLngInput.value = lng.toFixed(6);
+                    }
+
+                    // Рассчитываем расстояние и обновляем поле заведения
+                    calculateDistanceAndUpdateVenueField(venueName);
+
+                    console.log('✅ Координаты заведения отображены:', lat, lng);
+                }
+
+                // Функция расчета расстояния и обновления поля заведения
+                function calculateDistanceAndUpdateVenueField(venueName) {
+                    const visitorCoordsDisplay = document.getElementById('visitor-coordinates-display');
+                    const venueCoordsDisplay = document.getElementById('venue-coordinates-display');
+                    const venueInput = document.getElementById('venue-input');
+                    const distanceDisplay = document.getElementById('distance-display');
+
+                    if (!visitorCoordsDisplay || !venueCoordsDisplay || !venueInput) {
+                        return;
+                    }
+
+                    const visitorCoords = visitorCoordsDisplay.value.trim();
+                    const venueCoords = venueCoordsDisplay.value.trim();
+
+                    if (!visitorCoords || !venueCoords) {
+                        // Если нет координат посетителя, просто обновляем поле заведения без расстояния
+                        venueInput.value = venueName;
+                        if (distanceDisplay) {
+                            distanceDisplay.value = '';
+                        }
+                        return;
+                    }
+
+                    try {
+                        // Парсим координаты
+                        const [visitorLat, visitorLng] = visitorCoords.split(',').map(coord => parseFloat(coord.trim()));
+                        const [venueLat, venueLng] = venueCoords.split(',').map(coord => parseFloat(coord.trim()));
+
+                        if (isNaN(visitorLat) || isNaN(visitorLng) || isNaN(venueLat) || isNaN(venueLng)) {
+                            venueInput.value = venueName;
+                            if (distanceDisplay) {
+                                distanceDisplay.value = 'Ошибка в координатах';
+                            }
+                            return;
+                        }
+
+                        // Отправляем запрос на сервер для расчета расстояния
+                        fetch('/api/calculate-distance', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                visitor_lat: visitorLat,
+                                visitor_lng: visitorLng,
+                                venue_lat: venueLat,
+                                venue_lng: venueLng
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                const distance = data.distance;
+                                let distanceText;
+
+                                if (distance < 1000) {
+                                    distanceText = `${Math.round(distance)} м`;
+                                } else {
+                                    distanceText = `${(distance / 1000).toFixed(1)} км`;
+                                }
+
+                                // Обновляем поле заведения с расстоянием в скобках
+                                venueInput.value = `${venueName} (${distanceText})`;
+
+                                // Также обновляем поле расстояния
+                                if (distanceDisplay) {
+                                    if (distance < 1000) {
+                                        distanceDisplay.value = `${Math.round(distance)} метров`;
+                                    } else {
+                                        distanceDisplay.value = `${(distance / 1000).toFixed(2)} км`;
+                                    }
+                                }
+
+                                console.log('✅ Расстояние рассчитано и добавлено к названию заведения:', distance, 'метров');
+                            } else {
+                                venueInput.value = venueName;
+                                if (distanceDisplay) {
+                                    distanceDisplay.value = 'Ошибка расчета';
+                                }
+                                console.error('❌ Ошибка расчета расстояния:', data.error);
+                            }
+                        })
+                        .catch(error => {
+                            venueInput.value = venueName;
+                            if (distanceDisplay) {
+                                distanceDisplay.value = 'Ошибка сети';
+                            }
+                            console.error('❌ Ошибка сети при расчете расстояния:', error);
+                        });
+
+                    } catch (error) {
+                        venueInput.value = venueName;
+                        if (distanceDisplay) {
+                            distanceDisplay.value = 'Ошибка в координатах';
+                        }
+                        console.error('❌ Ошибка парсинга координат:', error);
+                    }
+                }
+
+                function getLocationName(lat, lng) {
+                    // Отправляем запрос на сервер для получения названия города/поселка (без отображения в интерфейсе)
+                    fetch('/api/get-location-name', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            latitude: lat,
+                            longitude: lng
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('📍 Определен город/поселок:', data.location_name);
+                        } else {
+                            console.log('❌ Не удалось определить город/поселок');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка при получении названия города/поселка:', error);
+                    });
+                }
+
+                // Функция парсинга балуна
+                function extractNameFromBalloon() {
+                    try {
+                        console.log('🔍 Начинаем парсинг балуна...');
+
+                        // Ищем балун по всем возможным селекторам
+                        let balloonContent = document.querySelector('.ymaps-2-1-79-balloon');
+                        if (!balloonContent) {
+                            balloonContent = document.querySelector('.ymaps-balloon');
+                        }
+                        if (!balloonContent) {
+                            balloonContent = document.querySelector('.balloon');
+                        }
+                        if (!balloonContent) {
+                            balloonContent = document.querySelector('[class*="balloon"]');
+                        }
+                        if (!balloonContent) {
+                            balloonContent = document.querySelector('[class*="ymaps"]');
+                        }
+
+                        if (!balloonContent) {
+                            console.log('❌ Балун не найден');
+                            return null;
+                        }
+
+                        console.log('✅ Балун найден:', balloonContent.className);
+
+                        // Получаем HTML контент
+                        const htmlContent = balloonContent.innerHTML;
+                        console.log('📏 Размер HTML:', htmlContent.length, 'символов');
+
+                        // Ищем все ссылки в балуне
+                        const links = balloonContent.querySelectorAll('a');
+                        console.log('🔗 Найдено ссылок:', links.length);
+
+                        const foundLinks = [];
+                        let firstValidName = null;
+
+                        if (links.length > 0) {
+                            for (let i = 0; i < links.length; i++) {
+                                const link = links[i];
+                                const linkText = link.textContent.trim();
+                                console.log(`🔗 Ссылка ${i + 1}: "${linkText}"`);
+                                foundLinks.push(linkText);
+
+                                // Проверяем, что это не служебная ссылка
+                                if (isValidVenueName(linkText)) {
+                                    // Сохраняем первое валидное название
+                                    if (!firstValidName) {
+                                        firstValidName = linkText;
+                                        console.log(`✅ Найдено первое название в ссылке: "${linkText}"`);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Ищем заголовки
+                        const headers = balloonContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                        console.log('📋 Найдено заголовков:', headers.length);
+
+                        for (let header of headers) {
+                            const headerText = header.textContent.trim();
+                            console.log(`📋 Заголовок: "${headerText}"`);
+                            foundLinks.push(headerText);
+
+                            if (isValidVenueName(headerText)) {
+                                // Сохраняем первое валидное название
+                                if (!firstValidName) {
+                                    firstValidName = headerText;
+                                    console.log(`✅ Найдено первое название в заголовке: "${headerText}"`);
+                                }
+                            }
+                        }
+
+                        // Ищем элементы с классами name/title
+                        const nameElements = balloonContent.querySelectorAll('[class*="name"], [class*="title"]');
+                        console.log('🏷️ Найдено элементов с name/title:', nameElements.length);
+
+                        for (let element of nameElements) {
+                            const elementText = element.textContent.trim();
+                            console.log(`🏷️ Элемент с name/title: "${elementText}"`);
+                            foundLinks.push(elementText);
+
+                            if (isValidVenueName(elementText)) {
+                                // Сохраняем первое валидное название
+                                if (!firstValidName) {
+                                    firstValidName = elementText;
+                                    console.log(`✅ Найдено первое название в элементе с name/title: "${elementText}"`);
+                                }
+                            }
+                        }
+
+                        // Последняя попытка - ищем первый значимый текстовый элемент
+                        const allElements = balloonContent.querySelectorAll('*');
+                        console.log('🔍 Всего элементов в балуне:', allElements.length);
+
+                        for (let element of allElements) {
+                            const text = element.textContent.trim();
+                            if (isValidVenueName(text)) {
+                                // Сохраняем первое валидное название
+                                if (!firstValidName) {
+                                    firstValidName = text;
+                                    console.log(`✅ Найдено первое название в текстовом элементе: "${text}"`);
+                                }
+                            }
+                        }
+
+                        if (firstValidName) {
+                            console.log(`✅ Возвращаем первое найденное название: "${firstValidName}"`);
+                            return { name: firstValidName, links: foundLinks };
+                        } else {
+                            console.log('❌ Название не найдено');
+                            return { name: null, links: foundLinks };
+                        }
+
+                    } catch (error) {
+                        console.log('❌ Ошибка при парсинге:', error);
+                        return { name: null, links: [] };
+                    }
+                }
+
+                // Функция валидации названия заведения
+                function isValidVenueName(name) {
+                    return name && name.length > 2 && name.length < 100 &&
+                        !name.includes('Share') && !name.includes('Поделиться') &&
+                        !name.includes('Телефон') && !name.includes('Адрес') &&
+                        !name.includes('Часы') && !name.includes('Рейтинг') &&
+                        !name.includes('Открыто') && !name.includes('Закрыто') &&
+                        !name.includes('www.') && !name.includes('http') &&
+                        !name.includes('+7') && !name.includes('8-') &&
+                        !name.match(/^\d+$/) && !name.match(/^\d+\.\d+$/) &&
+                        !name.includes('отзыв') && !name.includes('отзывов') &&
+                        !name.includes('Показать') && !name.includes('Написать') &&
+                        !name.includes('Позвонить') && !name.includes('Поделиться') &&
+                        // Исключаем названия, которые начинаются с цифры и пробела (например "1. Название")
+                        !name.match(/^\d+\.\s/) && !name.match(/^\d+\s/) &&
+                        // Исключаем названия, которые содержат только цифры и точки
+                        !name.match(/^[\d\.\s]+$/);
+                }
+
+                // Функция парсинга балуна и заполнения поля заведения
+                function parseBalloonAndFillVenue() {
+                    console.log('=== ПАРСИНГ БАЛУНА ===');
+
+                    const result = extractNameFromBalloon();
+
+                    if (result.name) {
+                        document.getElementById('venue-input').value = result.name;
+                        console.log('✅ Название заведения заполнено:', result.name);
+
+                        // Получаем координаты заведения из балуна или API
+                        let venueLat = null;
+                        let venueLng = null;
+
+                        // Попытка получить координаты из балуна
+                        if (result.coordinates) {
+                            venueLat = result.coordinates.lat;
+                            venueLng = result.coordinates.lng;
+                        } else {
+                            // Если координаты не найдены в балуне, используем координаты центра карты
+                            const mapCenter = myMap.getCenter();
+                            venueLat = mapCenter[0];
+                            venueLng = mapCenter[1];
+                        }
+
+                        // Показываем координаты заведения
+                        if (venueLat && venueLng) {
+                            showVenueCoordinates(result.name, venueLat, venueLng);
+                        }
+                    } else {
+                        console.log('❌ Название заведения не найдено');
+                    }
+
+                    if (result.links && result.links.length > 0) {
+                        console.log('🔗 Найдено ссылок:', result.links.length);
+                    } else {
+                        console.log('❌ Ссылки не найдены');
+                    }
+
+                    console.log('=====================');
                 }
 
                 // Инициализация карты при загрузке страницы
                 window.onload = function() {
+                    console.log('🚀 Страница загружена, начинаем инициализацию...');
+
+                    // Проверяем, есть ли элемент карты
+                    const mapElement = document.getElementById('map');
+                    if (mapElement) {
+                        console.log('✅ Элемент карты найден');
+                    } else {
+                        console.error('❌ Элемент карты не найден!');
+                    }
+
+                    // На странице редактирования профиля карта должна инициализироваться всегда
+                    console.log('🗺️ Инициализируем карту на странице редактирования профиля...');
                     initMap();
 
                     // Если у профиля есть координаты, устанавливаем их как текущее местоположение
@@ -3132,40 +3753,65 @@ def edit_profile():
         </head>
         <body>
             {{ navbar|safe }}
-            <h2>Редактировать анкету</h2>
+            <div class="form-container">
+                <h2 style="text-align: center; margin-top: 10px;">Редактировать анкету</h2>
+                <p style="color: #fff; opacity: 0.8; margin-bottom: 20px; text-align: center;">
+                    📍 Ваше местоположение будет определено автоматически
+                </p>
             <form method="post" enctype="multipart/form-data">
-                <input type="text" name="name" placeholder="Ваше имя" value="{{ profile.name }}" required>
+                <div class="field-container">
+                    <input type="text" name="name" placeholder="Ваше имя" value="{{ profile.name }}" required maxlength="12" oninput="checkFieldLength(this, 12)">
+                </div>
+                <div class="field-container">
                 <input type="number" name="age" placeholder="Ваш возраст" value="{{ profile.age }}" required>
+                </div>
+                <div class="field-container">
                 <select name="gender" required>
                     <option value="">Выберите пол</option>
                     <option value="male" {% if profile.gender == 'male' %}selected{% endif %}>Мужской</option>
                     <option value="female" {% if profile.gender == 'female' %}selected{% endif %}>Женский</option>
                     <option value="other" {% if profile.gender == 'other' %}selected{% endif %}>Другое</option>
                 </select>
-                <textarea name="hobbies" placeholder="Ваши увлечения" required>{{ profile.hobbies }}</textarea>
-                <textarea name="goal" placeholder="Цель знакомства" required>{{ profile.goal }}</textarea>
+                </div>
+                <div class="field-container">
+                    <textarea name="hobbies" placeholder="Ваши увлечения" required maxlength="70" oninput="checkFieldLength(this, 70)">{{ profile.hobbies }}</textarea>
+                </div>
+                <div class="field-container">
+                    <textarea name="goal" placeholder="Цель знакомства" required maxlength="70" oninput="checkFieldLength(this, 70)">{{ profile.goal }}</textarea>
+                </div>
 
                 <div class="map-container">
                     <div id="map"></div>
-                    <div class="location-info" id="location-info" style="display: {% if profile.latitude and profile.longitude %}block{% else %}none{% endif %};">
-                        <strong>Выбранное местоположение:</strong><br>
-                        <span id="location-address">Местоположение определено</span><br>
-                        <small>Координаты: <span id="location-coords">{% if profile.latitude and profile.longitude %}{{ profile.latitude }}, {{ profile.longitude }}{% else %}-{% endif %}</span></small>
-                    </div>
-                    <div style="text-align: center; margin: 10px 0;">
-                        <button type="button" class="location-btn" onclick="getCurrentLocation()">📍 Определить мое местоположение</button>
-                        <button type="button" class="location-btn" onclick="clearLocation()">🗑️ Очистить</button>
-                    </div>
+                        <button type="button" id="return-to-location-btn" class="location-return-btn" onclick="returnToMyLocation()" style="display: none;">
+                            📍 Я тут
+                        </button>
                 </div>
 
+                <div class="field-container">
+                    <input type="text" name="venue" id="venue-input" placeholder="Название заведения (кафе, ресторан и т.д.)" value="{{ profile.venue or '' }}" required onchange="updateVenueCoordinates()">
+                </div>
                 <input type="hidden" name="latitude" id="latitude-input" value="{{ profile.latitude or '' }}">
                 <input type="hidden" name="longitude" id="longitude-input" value="{{ profile.longitude or '' }}">
+                <input type="hidden" name="venue_lat" id="venue-lat-input">
+                <input type="hidden" name="venue_lng" id="venue-lng-input">
 
-                <input type="text" name="venue" placeholder="Название заведения" value="{{ profile.venue or '' }}" required onchange="updateVenueCoordinates()">
+                <!-- Скрытые поля для координат и расстояния (используются для расчетов) -->
+                <input type="hidden" id="visitor-coordinates-display">
+                <input type="hidden" id="venue-coordinates-display">
+                <input type="hidden" id="distance-display">
+
+                <div class="field-container">
                 <input type="file" name="photo" accept="image/*">
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
                 <button type="submit" class="modern-btn">Сохранить</button>
+                </div>
             </form>
+            <div style="text-align: center; margin-top: 15px;">
             <a href="/my_profile" class="back-btn">← Назад</a>
+            </div>
+            </div>
         </body>
         </html>
     ''', profile=profile, navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css)
@@ -4598,6 +5244,29 @@ def api_check_profile(user_id):
         }), 500
 
 
+@app.route('/api/profile-lifetime', methods=['GET'])
+def api_profile_lifetime():
+    """
+    API endpoint для получения оставшегося времени жизни анкеты
+    """
+    try:
+        user_id = request.cookies.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'No user ID'}), 400
+        
+        remaining_time = get_profile_lifetime_remaining(user_id)
+        return jsonify({
+            'success': True,
+            'remaining_time': remaining_time,
+            'user_id': user_id
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/restore-session', methods=['POST'])
 def api_restore_session():
     """
@@ -5205,32 +5874,68 @@ def cleanup_expired_profiles():
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PROFILE_LIFETIME_HOURS)
 
         # Находим просроченные анкеты
-        expired_profiles = Profile.query.filter(Profile.created_at < cutoff_time).all()
+        # Получаем все анкеты и фильтруем вручную для корректной работы с timezone
+        all_profiles = Profile.query.all()
+        expired_profiles = []
+        
+        for profile in all_profiles:
+            created_at = profile.created_at
+            # Если created_at без timezone, добавляем UTC
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            
+            if created_at < cutoff_time:
+                expired_profiles.append(profile)
+
+        print(f"🔍 Найдено {len(expired_profiles)} просроченных анкет для удаления")
 
         deleted_count = 0
         for profile in expired_profiles:
-            # Удаляем связанные записи
-            Like.query.filter_by(user_id=profile.id).delete()
-            Like.query.filter_by(liked_id=profile.id).delete()
+            print(f"🗑️ Удаляем анкету {profile.id} (создана: {profile.created_at})")
+            
+            # Удаляем ВСЕ связанные записи
+            # 1. Удаляем лайки (где пользователь лайкал других)
+            likes_sent = Like.query.filter_by(user_id=profile.id).all()
+            for like in likes_sent:
+                db.session.delete(like)
+            print(f"  🗑️ Удалено лайков отправленных: {len(likes_sent)}")
+            
+            # 2. Удаляем лайки (где лайкали этого пользователя)
+            likes_received = Like.query.filter_by(liked_id=profile.id).all()
+            for like in likes_received:
+                db.session.delete(like)
+            print(f"  🗑️ Удалено лайков полученных: {len(likes_received)}")
 
-            # Удаляем сообщения
-            Message.query.filter(
+            # 3. Удаляем сообщения
+            messages = Message.query.filter(
                 (Message.chat_key.contains(profile.id))
-            ).delete()
+            ).all()
+            for message in messages:
+                db.session.delete(message)
+            print(f"  🗑️ Удалено сообщений: {len(messages)}")
 
-            # Удаляем фото файл
+            # 4. Удаляем матчи (где пользователь участвует)
+            matches = Match.query.filter(
+                (Match.user1_id == profile.id) | (Match.user2_id == profile.id)
+            ).all()
+            for match in matches:
+                db.session.delete(match)
+            print(f"  🗑️ Удалено матчей: {len(matches)}")
+
+            # 5. Удаляем фото файл
             if profile.photo:
                 try:
                     photo_path = os.path.join(app.config['UPLOAD_FOLDER'], profile.photo)
                     if os.path.exists(photo_path):
                         os.remove(photo_path)
-                        print(f"🗑️ Удален файл фото: {profile.photo}")
+                        print(f"  🗑️ Удален файл фото: {profile.photo}")
                 except Exception as e:
-                    print(f"❌ Ошибка удаления файла {profile.photo}: {e}")
+                    print(f"  ❌ Ошибка удаления файла {profile.photo}: {e}")
 
-            # Удаляем анкету
+            # 6. Удаляем саму анкету
             db.session.delete(profile)
             deleted_count += 1
+            print(f"  ✅ Анкета {profile.id} полностью удалена")
 
         if deleted_count > 0:
             db.session.commit()
@@ -5246,6 +5951,25 @@ def cleanup_expired_profiles():
         return 0
 
 
+def periodic_cleanup():
+    """
+    Функция для периодической очистки просроченных анкет
+    Запускается каждые 30 минут
+    """
+    while True:
+        try:
+            time.sleep(30 * 60)  # Ждем 30 минут
+            with app.app_context():
+                print("🔄 Запуск периодической очистки просроченных анкет...")
+                deleted_count = cleanup_expired_profiles()
+                if deleted_count > 0:
+                    print(f"✅ Периодическая очистка: удалено {deleted_count} анкет")
+                else:
+                    print("✅ Периодическая очистка: просроченных анкет не найдено")
+        except Exception as e:
+            print(f"❌ Ошибка в периодической очистке: {e}")
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -5254,6 +5978,11 @@ if __name__ == '__main__':
         print("🧹 Запуск автоматической очистки просроченных анкет...")
         deleted_count = cleanup_expired_profiles()
         print(f"⏰ Время жизни анкеты: {PROFILE_LIFETIME_HOURS} часов")
+        
+        # Запускаем фоновую задачу для периодической очистки
+        cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
+        cleanup_thread.start()
+        print("🔄 Запущена периодическая очистка анкет (каждые 30 минут)")
 
     socketio.run(app, host='0.0.0.0', port=5000
                  , debug=True, allow_unsafe_werkzeug=True)

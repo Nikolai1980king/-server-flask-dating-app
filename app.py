@@ -1532,6 +1532,9 @@ def create_profile():
                     <textarea name="goal" placeholder="Цель знакомства" required maxlength="70" oninput="checkFieldLength(this, 70)"></textarea>
                 </div>
 
+                    <p style="color: #fff; font-size: 0.9em; margin-bottom: 15px; text-align: center; opacity: 0.8;">
+                        На карте кликните на заведение, чтобы выбрать его
+                    </p>
                     <div class="map-container">
                         <div id="map"></div>
                         <button type="button" id="return-to-location-btn" class="location-return-btn" onclick="returnToMyLocation()" style="display: none;">
@@ -1569,6 +1572,11 @@ def create_profile():
                     <button type="submit" class="modern-btn" id="create-btn" disabled>Создать</button>
                 </div>
             </form>
+            <div style="text-align: center; margin-top: 15px; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; border: 1px solid rgba(76, 175, 80, 0.3);">
+                <p style="color: #4CAF50; font-size: 0.9em; margin: 0; text-shadow: 0 0 5px rgba(76, 175, 80, 0.3);">
+                    ⏰ Анкета удалится через {{ PROFILE_LIFETIME_HOURS|int if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else PROFILE_LIFETIME_HOURS * 60|int }} {{ 'час' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int == 1 else 'часа' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int in [2,3,4] else 'часов' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else 'минут' }}
+                </p>
+            </div>
             <div style="text-align: center; margin-top: 15px;">
                 <a href="/" class="back-btn">← На главную</a>
             </div>
@@ -1871,7 +1879,7 @@ def create_profile():
 
                                 console.log('✅ Расстояние рассчитано и добавлено к названию заведения:', distance, 'метров');
                             } else {
-                                venueInput.value = venueName;
+                                venueInput.value = `${venueName} (${distanceText})`;
                                 if (distanceDisplay) {
                                     distanceDisplay.value = 'Ошибка расчета';
                                 }
@@ -2333,7 +2341,7 @@ def create_profile():
             </script>
         </body>
         </html>
-    ''', navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css)
+    ''', navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css, PROFILE_LIFETIME_HOURS=PROFILE_LIFETIME_HOURS)
 
 
 # Функции для работы с настройками пользователя
@@ -2413,15 +2421,51 @@ def require_profile(view_func):
     return wrapper
 
 
+def calculate_distance_between_users(user_profile, other_profile):
+    """Рассчитывает расстояние между двумя пользователями в метрах"""
+    try:
+        # Проверяем, что у обоих пользователей есть координаты
+        if not all([user_profile.latitude, user_profile.longitude, 
+                   other_profile.latitude, other_profile.longitude]):
+            return None
+        
+        # Используем geopy.distance.geodesic для расчета расстояния
+        from geopy.distance import geodesic
+        
+        user_point = (float(user_profile.latitude), float(user_profile.longitude))
+        other_point = (float(other_profile.latitude), float(other_profile.longitude))
+        
+        distance = geodesic(user_point, other_point).meters
+        return distance
+        
+    except (ValueError, TypeError) as e:
+        print(f"❌ Ошибка расчета расстояния между пользователями: {e}")
+        return None
+
 @app.route('/visitors')
 @require_profile
 def view_visitors():
     user_id = request.cookies.get('user_id')
+    user_profile = Profile.query.get(user_id)
+    
     # Получаем фильтры из query-параметров
     venue_query = request.args.get('venue', '').strip().lower()
     gender_query = request.args.get('gender', '')
+    
     # Фильтруем профили
     other_profiles = [p for p in Profile.query.all() if p.id != user_id]
+    
+    # Применяем фильтр по расстоянию MAX_REGISTRATION_DISTANCE
+    if user_profile and user_profile.latitude and user_profile.longitude:
+        filtered_profiles = []
+        for profile in other_profiles:
+            distance = calculate_distance_between_users(user_profile, profile)
+            if distance is not None and distance <= MAX_REGISTRATION_DISTANCE:
+                # Добавляем расстояние к профилю для отображения
+                profile.distance_to_user = distance
+                filtered_profiles.append(profile)
+        other_profiles = filtered_profiles
+    
     if venue_query:
         other_profiles = [p for p in other_profiles if p.venue and venue_query in p.venue.lower()]
     if gender_query:
@@ -2684,7 +2728,7 @@ def view_visitors():
                             <p style="color: #666; font-size: 0.9em;">📍 {{ profile.city }}</p>
                             {% endif %}
                             {% if profile.venue %}
-                            <p style="color: #666; font-size: 0.9em;">🏪 {{ profile.venue }}</p>
+                            <p style="color: #666; font-size: 0.9em;">🏪 {{ profile.venue.split(' (')[0] }}{% if profile.distance_to_user is defined and profile.distance_to_user %} ({{ (profile.distance_to_user/1000)|round(1) if profile.distance_to_user >= 1000 else profile.distance_to_user|round(0)|int }}{{ 'км' if profile.distance_to_user >= 1000 else 'м' }}){% endif %}</p>
                             {% endif %}
                         </div>
                         <button class="like-btn" title="Лайк" onclick="toggleLike('{{ profile.id }}', this.querySelector('span'))">
@@ -3505,7 +3549,7 @@ def edit_profile():
 
                                 console.log('✅ Расстояние рассчитано и добавлено к названию заведения:', distance, 'метров');
                             } else {
-                                venueInput.value = venueName;
+                                venueInput.value = `${venueName} (${distanceText})`;
                                 if (distanceDisplay) {
                                     distanceDisplay.value = 'Ошибка расчета';
                                 }

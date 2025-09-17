@@ -854,8 +854,16 @@ def home():
             <title>Знакомства в кафе</title>
             <style>
                 {{ get_starry_night_css()|safe }}
-                body { text-align: center; padding: 20px; }
-                h1 { color: #ff6b6b; margin-top: 20px; }
+                body { 
+                    text-align: center; 
+                    padding: 20px; 
+                }
+                h1 { 
+                    color: white; 
+                    margin-top: 0; 
+                    margin-bottom: 20px;
+                    font-size: 2.5em;
+                }
                 .welcome-message {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
@@ -906,18 +914,18 @@ def home():
                     padding: 22px 40px;
                     font-size: 1.3em;
                     font-weight: bold;
-                    background: linear-gradient(90deg, #ff6b6b 0%, #ffb86b 100%);
+                    background: #a709b5;
                     color: #fff;
                     border: none;
                     border-radius: 40px;
-                    box-shadow: 0 6px 24px rgba(255,107,107,0.15);
+                    box-shadow: 0 6px 24px rgba(167, 9, 181, 0.3);
                     cursor: pointer;
                     transition: box-shadow 0.2s, transform 0.2s;
                     text-decoration: none;
                     gap: 12px;
                 }
                 .big-create-btn:hover {
-                    box-shadow: 0 12px 32px rgba(255,107,107,0.25);
+                    box-shadow: 0 12px 32px rgba(167, 9, 181, 0.4);
                     transform: translateY(-2px) scale(1.04);
                 }
                 .big-create-btn .icon {
@@ -939,20 +947,19 @@ def home():
             </style>
         </head>
         <body>
-            {{ navbar|safe }}
+            <h1>Добро пожаловать в приложение</h1>
             {% for notification in unread_notifications %}
                 <div class="notification">{{ notification.message }}</div>
             {% endfor %}
             <div class="welcome-message">
                 <p class="welcome-text">Хотите найти приятную компанию за чашечкой кофе? ☕</p>
-                <p class="welcome-description">Наше приложение поможет вам познакомиться с интересными людьми в кафе — для душевных бесед, новых знакомств или просто хорошего времени.</p>
+                <p class="welcome-description">Наше приложение поможет вам познакомиться с интересными людьми в заведениях — для душевных бесед, новых знакомств или просто хорошего времени.</p>
                 <p class="welcome-price">Регистрация — всего 50 рублей, а возможности — бесценны! 😊</p>
             </div>
-            <h1>Добро пожаловать в наше кафе! 🎉</h1>
             <p style="color: white;">Здесь вы можете найти интересных людей для общения.</p>
             <div id="create-profile-section" style="display: {% if not has_profile %}block{% else %}none{% endif %};">
                 <a href="/create" class="big-create-btn">
-                    <span class="icon">📝</span> Создать анкету
+                    Создать анкету
                 </a>
             </div>
 

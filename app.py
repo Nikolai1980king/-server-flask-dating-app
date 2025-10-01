@@ -1816,7 +1816,7 @@ def create_profile():
                 </div>
 
                 <div style="text-align: center; margin-top: 20px;">
-                    <button type="submit" class="modern-btn" id="create-btn" disabled>Создать анкету</button>
+                    <button type="submit" class="modern-btn" id="create-btn" disabled>Создать</button>
                 </div>
             </form>
             <div style="text-align: center; margin-top: 15px; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; border: 1px solid rgba(76, 175, 80, 0.3);">

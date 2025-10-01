@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест AJAX формы</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .test-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .info-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .info-box h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .test-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .debug-info {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .debug-info h4 {
+            color: #FFC107;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🔧 Тест AJAX формы</h2>
+        
+        <div class="info-box">
+            <h3>📋 Проблема:</h3>
+            <p>При нажатии "Создать" пользователь перенаправляется на главную страницу вместо создания анкеты.</p>
+        </div>
+
+        <div class="info-box">
+            <h3>🔍 Диагностика:</h3>
+            <p>Откройте консоль браузера (F12 → Console) и попробуйте создать анкету. В консоли будут видны отладочные сообщения.</p>
+        </div>
+
+        <div class="debug-info">
+            <h4>📊 Ожидаемые сообщения в консоли:</h4>
+            <ul>
+                <li>🚀 Отправка формы...</li>
+                <li>📍 Заведение: [название]</li>
+                <li>📍 Координаты заведения: [lat], [lng]</li>
+                <li>📤 Отправляем данные на сервер...</li>
+                <li>📥 Получен ответ от сервера: [статус]</li>
+                <li>📋 Content-Type: [тип]</li>
+                <li>📄 Обрабатываем JSON ответ...</li>
+                <li>📊 Данные ответа: [данные]</li>
+                <li>✅ Успешная регистрация, перенаправляем на: [URL]</li>
+            </ul>
+        </div>
+
+        <div class="info-box">
+            <h3>🎯 Возможные причины проблемы:</h3>
+            <ul>
+                <li>Сервер возвращает редирект вместо JSON</li>
+                <li>Неправильный Content-Type в ответе</li>
+                <li>Ошибка в обработке AJAX ответа</li>
+                <li>Проблемы с координатами заведения</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" class="test-btn">🚀 Открыть страницу создания анкеты</a>
+            <a href="/" class="test-btn">🏠 На главную</a>
+        </div>
+    </div>
+
+    <script>
+        // Добавляем глобальную функцию для отладки
+        window.debugForm = function() {
+            console.log('🔧 Отладка формы...');
+            
+            const venueInput = document.getElementById('venue-input');
+            const venueLatInput = document.getElementById('venue-lat-input');
+            const venueLngInput = document.getElementById('venue-lng-input');
+            const latitudeInput = document.getElementById('latitude-input');
+            const longitudeInput = document.getElementById('longitude-input');
+            
+            if (venueInput) console.log('📍 Заведение:', venueInput.value);
+            if (venueLatInput) console.log('📍 Lat заведения:', venueLatInput.value);
+            if (venueLngInput) console.log('📍 Lng заведения:', venueLngInput.value);
+            if (latitudeInput) console.log('📍 Lat пользователя:', latitudeInput.value);
+            if (longitudeInput) console.log('📍 Lng пользователя:', longitudeInput.value);
+            
+            console.log('🔧 Отладка завершена');
+        };
+        
+        // Вызываем отладку при загрузке страницы
+        window.onload = function() {
+            console.log('🔧 Страница отладки загружена');
+            console.log('💡 Для отладки формы вызовите: debugForm()');
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест очищенного интерфейса</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .test-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .status-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .status-box h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .removed-box {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .removed-box h3 {
+            color: #F44336;
+            margin-bottom: 15px;
+        }
+
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .test-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .feature-list {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .feature-list h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+        }
+
+        .feature-list ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .feature-list li:before {
+            content: "✅";
+            position: absolute;
+            left: 0;
+        }
+
+        .removed-list li:before {
+            content: "❌";
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🧹 Тест очищенного интерфейса</h2>
+        
+        <div class="status-box">
+            <h3>✅ Что осталось:</h3>
+            <ul>
+                <li>Карта для выбора заведения</li>
+                <li>Поле для ввода названия заведения</li>
+                <li>Все остальные поля формы</li>
+                <li>Автоматическое определение местоположения (в фоне)</li>
+                <li>Проверка расстояния при регистрации</li>
+            </ul>
+        </div>
+
+        <div class="removed-box">
+            <h3>❌ Что удалено:</h3>
+            <ul class="removed-list">
+                <li>Блок "Ваше местоположение:" с координатами</li>
+                <li>Сообщение "Ваше местоположение определено (неизменяемое)"</li>
+                <li>Блок "📍 Местоположение:" с названием города</li>
+                <li>Сообщение "📍 Ваше местоположение определяется автоматически"</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h3>🎯 Как протестировать:</h3>
+            <ul>
+                <li>Откройте страницу создания анкеты</li>
+                <li>Убедитесь, что карта отображается без лишних блоков</li>
+                <li>Разрешите геолокацию</li>
+                <li>Проверьте, что местоположение определяется в фоне</li>
+                <li>Выберите заведение на карте</li>
+                <li>Заполните форму и создайте анкету</li>
+            </ul>
+        </div>
+
+        <div class="status-box">
+            <h3>📊 Ожидаемый результат:</h3>
+            <ul>
+                <li>Интерфейс стал чище и компактнее</li>
+                <li>Карта занимает больше места</li>
+                <li>Нет лишних информационных блоков</li>
+                <li>Функциональность сохранена полностью</li>
+                <li>Местоположение определяется автоматически в фоне</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" class="test-btn">🚀 Открыть страницу создания анкеты</a>
+            <a href="/" class="test-btn">🏠 На главную</a>
+        </div>
+    </div>
+
+    <script>
+        console.log('🧹 Страница тестирования очищенного интерфейса загружена');
+        console.log('💡 Проверьте, что интерфейс стал чище и компактнее');
+    </script>
+</body>
+</html> 

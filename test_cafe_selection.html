@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест выбора кафе</title>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #map {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .success { background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%); }
+        .error { background: linear-gradient(90deg, #f44336 0%, #e57373 100%); }
+        .info { background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест выбора кафе</h1>
+        <p>Кликните на метку кафе на карте, чтобы проверить автоматическое заполнение поля</p>
+        
+        <div id="map"></div>
+        
+        <div class="form-group">
+            <label for="venue-input">🏪 Название заведения:</label>
+            <input type="text" id="venue-input" placeholder="Выберите кафе на карте или введите название вручную">
+            <small style="color: #ccc; font-size: 0.9em; display: block; margin-top: 5px;">
+                💡 Совет: Кликните на метку кафе на карте для автоматического заполнения
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="cafe-lat">📍 Широта кафе:</label>
+            <input type="text" id="cafe-latitude-input" readonly>
+        </div>
+        
+        <div class="form-group">
+            <label for="cafe-lon">📍 Долгота кафе:</label>
+            <input type="text" id="cafe-longitude-input" readonly>
+        </div>
+        
+        <div class="form-group">
+            <label for="user-lat">📍 Ваша широта:</label>
+            <input type="text" id="user-latitude-input" readonly>
+        </div>
+        
+        <div class="form-group">
+            <label for="user-lon">📍 Ваша долгота:</label>
+            <input type="text" id="user-longitude-input" readonly>
+        </div>
+        
+        <button onclick="getLocation()" style="padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0;">
+            📍 Определить мое местоположение
+        </button>
+        
+        <div id="status" style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+            <strong>Статус:</strong> <span id="status-text">Ожидание действий...</span>
+        </div>
+    </div>
+
+    <script>
+        var myMap;
+        var currentLocation = null;
+        
+        // Инициализация карты
+        ymaps.ready(function () {
+            myMap = new ymaps.Map('map', {
+                center: [55.76, 37.64], // Москва
+                zoom: 10,
+                controls: ['zoomControl', 'fullscreenControl']
+            });
+            
+            // Добавляем тестовые кафе
+            var testCafes = [
+                {
+                    name: 'Кафе "Уютное"',
+                    coords: [55.7558, 37.6176]
+                },
+                {
+                    name: 'Ресторан "Вкусно"',
+                    coords: [55.7559, 37.6177]
+                },
+                {
+                    name: 'Кофейня "Аромат"',
+                    coords: [55.7560, 37.6178]
+                }
+            ];
+            
+            // Добавляем метки кафе на карту
+            testCafes.forEach(function(cafe) {
+                var cafePlacemark = new ymaps.Placemark(cafe.coords, {
+                    balloonContent: '<strong>' + cafe.name + '</strong><br>Кликните для выбора'
+                }, {
+                    preset: 'islands#blueDotIcon',
+                    iconColor: '#ff6b6b'
+                });
+                
+                // Добавляем обработчик клика на метку кафе
+                cafePlacemark.events.add('click', function() {
+                    console.log('🖱️ Клик по кафе:', cafe.name, 'координаты:', cafe.coords);
+                    
+                    // Заполняем поле названия заведения
+                    var venueInput = document.getElementById('venue-input');
+                    if (venueInput) {
+                        venueInput.value = cafe.name;
+                        console.log('✅ Поле "Заведение" заполнено:', cafe.name);
+                        
+                        // Добавляем визуальную обратную связь
+                        venueInput.style.border = '2px solid #4CAF50';
+                        venueInput.style.backgroundColor = '#e8f5e8';
+                        setTimeout(() => {
+                            venueInput.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+                            venueInput.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                        }, 2000);
+                    } else {
+                        console.error('❌ Поле venue-input не найдено!');
+                    }
+                    
+                    // Заполняем поля координат кафе
+                    var cafeLatInput = document.getElementById('cafe-latitude-input');
+                    var cafeLonInput = document.getElementById('cafe-longitude-input');
+                    
+                    if (cafeLatInput && cafeLonInput) {
+                        cafeLatInput.value = cafe.coords[0];
+                        cafeLonInput.value = cafe.coords[1];
+                        console.log('✅ Координаты кафе сохранены:', cafe.coords[0], cafe.coords[1]);
+                    }
+                    
+                    // Показываем уведомление
+                    showNotification('🏪 Выбрано кафе: ' + cafe.name, 'success');
+                    updateStatus('Кафе выбрано: ' + cafe.name);
+                    
+                    // Проверяем расстояние если есть местоположение пользователя
+                    if (currentLocation) {
+                        checkDistance(cafe.coords[0], cafe.coords[1]);
+                    }
+                });
+                
+                myMap.geoObjects.add(cafePlacemark);
+            });
+            
+            updateStatus('Карта загружена. Кликните на метку кафе для выбора.');
+        });
+        
+        // Функция получения местоположения
+        function getLocation() {
+            if (navigator.geolocation) {
+                updateStatus('Определение местоположения...');
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        document.getElementById('user-latitude-input').value = currentLocation.lat;
+                        document.getElementById('user-longitude-input').value = currentLocation.lng;
+                        
+                                            // Добавляем метку пользователя на карту
+                    var userPlacemark = new ymaps.Placemark([currentLocation.lat, currentLocation.lng], {
+                        balloonContent: 'Ваше местоположение'
+                    }, {
+                        preset: 'islands#blueDotIcon'
+                    });
+                        
+                        myMap.geoObjects.add(userPlacemark);
+                        myMap.setCenter([currentLocation.lat, currentLocation.lng], 15);
+                        
+                        showNotification('📍 Местоположение определено!', 'success');
+                        updateStatus('Местоположение определено. Теперь выберите кафе.');
+                    },
+                    function(error) {
+                        showNotification('❌ Ошибка определения местоположения', 'error');
+                        updateStatus('Ошибка определения местоположения');
+                    }
+                );
+            } else {
+                showNotification('❌ Геолокация не поддерживается', 'error');
+                updateStatus('Геолокация не поддерживается');
+            }
+        }
+        
+        // Функция проверки расстояния
+        function checkDistance(cafeLat, cafeLon) {
+            if (!currentLocation) {
+                showNotification('❌ Сначала определите ваше местоположение', 'error');
+                return;
+            }
+            
+            // Простой расчет расстояния (для демонстрации)
+            var distance = calculateDistance(
+                currentLocation.lat, currentLocation.lng,
+                cafeLat, cafeLon
+            );
+            
+            if (distance <= 100) {
+                showNotification('✅ Расстояние OK: ' + distance.toFixed(1) + 'м', 'success');
+                updateStatus('Расстояние до кафе: ' + distance.toFixed(1) + 'м - РЕГИСТРАЦИЯ РАЗРЕШЕНА');
+            } else {
+                showNotification('❌ Слишком далеко: ' + distance.toFixed(1) + 'м', 'error');
+                updateStatus('Расстояние до кафе: ' + distance.toFixed(1) + 'м - РЕГИСТРАЦИЯ ЗАБЛОКИРОВАНА');
+            }
+        }
+        
+        // Простая функция расчета расстояния
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            var R = 6371000; // Радиус Земли в метрах
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLon = (lon2 - lon1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        // Функция показа уведомлений
+        function showNotification(message, type) {
+            var notification = document.createElement('div');
+            notification.className = 'notification ' + type;
+            notification.innerHTML = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        // Функция обновления статуса
+        function updateStatus(text) {
+            document.getElementById('status-text').textContent = text;
+        }
+    </script>
+</body>
+</html> 

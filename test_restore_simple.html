@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Простой тест восстановления</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .btn { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Простой тест восстановления сессии</h1>
+        
+        <button class="btn" onclick="testRestore()">🔧 Тест восстановления</button>
+        <button class="btn" onclick="clearAll()">🗑️ Очистить все</button>
+        <button class="btn" onclick="setTestData()">📝 Установить тестовые данные</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function addResult(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `${new Date().toLocaleTimeString()}: ${msg}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        function setCookie(name, value, days = 365) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
+        }
+
+        function saveUserId(userId) {
+            if (userId) {
+                localStorage.setItem('dating_app_user_id', userId);
+                sessionStorage.setItem('dating_app_user_id', userId);
+            }
+        }
+
+        function getUserIdFromStorage() {
+            return localStorage.getItem('dating_app_user_id') || sessionStorage.getItem('dating_app_user_id');
+        }
+
+        async function testRestore() {
+            addResult('🔍 Начинаем тест восстановления...', 'info');
+            
+            const cookie = getCookie('user_id');
+            const storage = getUserIdFromStorage();
+            
+            addResult(`🍪 Cookie: ${cookie || 'не найден'}`, cookie ? 'success' : 'error');
+            addResult(`💾 Storage: ${storage || 'не найден'}`, storage ? 'success' : 'error');
+            
+            const userId = cookie || storage;
+            
+            if (userId) {
+                addResult(`✅ Найден user_id: ${userId}`, 'success');
+                
+                try {
+                    addResult('🌐 Проверяем профиль через API...', 'info');
+                    const response = await fetch(`/api/check-profile/${userId}`);
+                    const data = await response.json();
+                    
+                    addResult(`📊 Ответ API: ${JSON.stringify(data)}`, 'info');
+                    
+                    if (data.exists) {
+                        addResult('✅ Профиль найден!', 'success');
+                        
+                        // Восстанавливаем сессию
+                        setCookie('user_id', userId);
+                        saveUserId(userId);
+                        addResult('💾 Сессия восстановлена', 'success');
+                        
+                        // Переходим на главную страницу
+                        setTimeout(() => {
+                            addResult('🔄 Переходим на главную страницу...', 'info');
+                            window.location.href = '/';
+                        }, 1000);
+                        
+                    } else {
+                        addResult('❌ Профиль не найден в базе', 'error');
+                    }
+                } catch (error) {
+                    addResult(`❌ Ошибка API: ${error}`, 'error');
+                }
+            } else {
+                addResult('❌ User ID не найден', 'error');
+            }
+        }
+
+        function clearAll() {
+            localStorage.removeItem('dating_app_user_id');
+            sessionStorage.removeItem('dating_app_user_id');
+            document.cookie = 'user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            addResult('🗑️ Все данные очищены', 'info');
+        }
+
+        function setTestData() {
+            const testId = '1cf59a5f-8971-41bc-bf8b-ce6348724c27';
+            saveUserId(testId);
+            setCookie('user_id', testId);
+            addResult(`📝 Установлены тестовые данные: ${testId}`, 'success');
+        }
+
+        // Автоматическая проверка при загрузке
+        window.onload = function() {
+            addResult('🚀 Страница загружена', 'info');
+            const cookie = getCookie('user_id');
+            const storage = getUserIdFromStorage();
+            addResult(`📊 Текущее состояние - Cookie: ${cookie || 'нет'}, Storage: ${storage || 'нет'}`, 'info');
+        };
+    </script>
+</body>
+</html> 

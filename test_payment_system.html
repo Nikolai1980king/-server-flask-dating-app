@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест системы оплаты YooKassa</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .test-section h3 {
+            color: #555;
+            margin-top: 0;
+        }
+        .test-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .test-btn:hover {
+            background-color: #0056b3;
+        }
+        .test-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background-color: #28a745; }
+        .status-error { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+        .status-info { background-color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест системы оплаты YooKassa</h1>
+        
+        <div class="test-section">
+            <h3><span class="status-indicator status-info"></span>1. Проверка конфигурации</h3>
+            <button class="test-btn" onclick="testConfig()">Проверить конфигурацию</button>
+            <div id="configResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="status-indicator status-info"></span>2. Тест страницы оплаты</h3>
+            <button class="test-btn" onclick="testPaymentPage()">Открыть страницу оплаты</button>
+            <button class="test-btn" onclick="testPaymentPageDirect()">Прямая ссылка на оплату</button>
+            <div id="paymentPageResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="status-indicator status-info"></span>3. Тест создания платежа</h3>
+            <button class="test-btn" onclick="testCreatePayment()">Создать тестовый платеж</button>
+            <div id="createPaymentResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="status-indicator status-info"></span>4. Админ панель платежей</h3>
+            <button class="test-btn" onclick="testAdminPanel()">Открыть админ панель</button>
+            <div id="adminPanelResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="status-indicator status-info"></span>5. Полный тест системы</h3>
+            <button class="test-btn" onclick="runFullTest()">Запустить полный тест</button>
+            <div id="fullTestResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="status-indicator status-warning"></span>⚠️ Важная информация</h3>
+            <p><strong>Тестовый режим:</strong> Все платежи в тестовом режиме - реальные деньги не списываются</p>
+            <p><strong>Сервер:</strong> Убедитесь, что Flask сервер запущен на localhost:5000</p>
+            <p><strong>База данных:</strong> Убедитесь, что база данных инициализирована</p>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        async function testConfig() {
+            showResult('configResult', '🔄 Проверяем конфигурацию...', 'info');
+            
+            try {
+                const response = await fetch('/payment');
+                if (response.ok) {
+                    showResult('configResult', '✅ Страница оплаты доступна!\n✅ Конфигурация загружена успешно', 'success');
+                } else {
+                    showResult('configResult', `❌ Ошибка доступа к странице оплаты: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('configResult', `❌ Ошибка подключения: ${error.message}`, 'error');
+            }
+        }
+
+        function testPaymentPage() {
+            showResult('paymentPageResult', '🔄 Открываем страницу оплаты...', 'info');
+            
+            try {
+                window.open('/payment', '_blank');
+                showResult('paymentPageResult', '✅ Страница оплаты открыта в новом окне', 'success');
+            } catch (error) {
+                showResult('paymentPageResult', `❌ Ошибка открытия страницы: ${error.message}`, 'error');
+            }
+        }
+
+        function testPaymentPageDirect() {
+            const paymentUrl = window.location.origin + '/payment';
+            showResult('paymentPageResult', `🔗 Прямая ссылка на страницу оплаты:\n${paymentUrl}`, 'info');
+        }
+
+        async function testCreatePayment() {
+            showResult('createPaymentResult', '🔄 Создаем тестовый платеж...', 'info');
+            
+            try {
+                const response = await fetch('/payment/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: 'test_user_' + Date.now(),
+                        amount: 50.0
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('createPaymentResult', `✅ Платеж создан успешно!\n💰 Сумма: ${data.amount} руб.\n🔗 URL: ${data.payment_url}`, 'success');
+                } else {
+                    showResult('createPaymentResult', `❌ Ошибка создания платежа: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('createPaymentResult', `❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        function testAdminPanel() {
+            showResult('adminPanelResult', '🔄 Открываем админ панель...', 'info');
+            
+            try {
+                window.open('/admin/payments', '_blank');
+                showResult('adminPanelResult', '✅ Админ панель открыта в новом окне', 'success');
+            } catch (error) {
+                showResult('adminPanelResult', `❌ Ошибка открытия админ панели: ${error.message}`, 'error');
+            }
+        }
+
+        async function runFullTest() {
+            showResult('fullTestResult', '🔄 Запускаем полный тест системы...\n', 'info');
+            
+            let results = [];
+            
+            // Тест 1: Конфигурация
+            try {
+                const configResponse = await fetch('/payment');
+                if (configResponse.ok) {
+                    results.push('✅ Конфигурация: OK');
+                } else {
+                    results.push('❌ Конфигурация: FAILED');
+                }
+            } catch (error) {
+                results.push(`❌ Конфигурация: ERROR - ${error.message}`);
+            }
+
+            // Тест 2: Создание платежа
+            try {
+                const paymentResponse = await fetch('/payment/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: 'full_test_user_' + Date.now(),
+                        amount: 50.0
+                    })
+                });
+
+                const paymentData = await paymentResponse.json();
+                if (paymentData.success) {
+                    results.push('✅ Создание платежа: OK');
+                } else {
+                    results.push(`❌ Создание платежа: ${paymentData.error}`);
+                }
+            } catch (error) {
+                results.push(`❌ Создание платежа: ERROR - ${error.message}`);
+            }
+
+            // Тест 3: Админ панель
+            try {
+                const adminResponse = await fetch('/admin/payments');
+                if (adminResponse.ok) {
+                    results.push('✅ Админ панель: OK');
+                } else {
+                    results.push('❌ Админ панель: FAILED');
+                }
+            } catch (error) {
+                results.push(`❌ Админ панель: ERROR - ${error.message}`);
+            }
+
+            const finalResult = results.join('\n');
+            const successCount = results.filter(r => r.startsWith('✅')).length;
+            const totalTests = results.length;
+            
+            showResult('fullTestResult', `📊 РЕЗУЛЬТАТЫ ПОЛНОГО ТЕСТА:\n\n${finalResult}\n\n📈 Итого: ${successCount}/${totalTests} тестов пройдено`, 
+                      successCount === totalTests ? 'success' : 'warning');
+        }
+
+        // Автоматически проверяем доступность сервера при загрузке
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/payment');
+                if (response.ok) {
+                    console.log('✅ Сервер доступен, система оплаты готова к тестированию');
+                }
+            } catch (error) {
+                console.warn('⚠️ Сервер недоступен:', error.message);
+            }
+        });
+    </script>
+</body>
+</html>

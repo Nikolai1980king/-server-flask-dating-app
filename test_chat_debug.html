@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест отправки сообщений</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .message {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 10px;
+            max-width: 70%;
+        }
+        
+        .my-message {
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            margin-left: auto;
+        }
+        
+        .their-message {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            margin-right: auto;
+        }
+        
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: none;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🧪 Тест отправки сообщений</h2>
+        <p>Эта страница поможет отладить проблемы с отправкой сообщений в чате.</p>
+        
+        <div>
+            <label>User ID:</label>
+            <input type="text" id="user-id" placeholder="Введите ваш user_id" value="test-user-1">
+        </div>
+        
+        <div>
+            <label>Chat Key:</label>
+            <input type="text" id="chat-key" placeholder="Введите chat_key" value="test-user-1_test-user-2">
+        </div>
+        
+        <div>
+            <label>Сообщение:</label>
+            <input type="text" id="message-input" placeholder="Введите сообщение">
+            <button onclick="sendMessage()">Отправить</button>
+        </div>
+        
+        <button onclick="connectSocket()">Подключиться к Socket.IO</button>
+        <button onclick="disconnectSocket()">Отключиться</button>
+        <button onclick="clearLog()">Очистить лог</button>
+    </div>
+    
+    <div class="test-container">
+        <h3>📨 Сообщения:</h3>
+        <div id="messages"></div>
+    </div>
+    
+    <div class="test-container">
+        <h3>📋 Лог событий:</h3>
+        <div id="log" class="log"></div>
+    </div>
+    
+    <script>
+        let socket = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function connectSocket() {
+            try {
+                log('🔌 Подключение к Socket.IO...');
+                socket = io();
+                
+                socket.on('connect', function() {
+                    log('✅ Socket.IO подключен');
+                    const chatKey = document.getElementById('chat-key').value;
+                    if (chatKey) {
+                        socket.emit('join', {room: chatKey});
+                        log(`📥 Присоединился к комнате: ${chatKey}`);
+                    }
+                });
+                
+                socket.on('disconnect', function() {
+                    log('❌ Socket.IO отключен');
+                });
+                
+                socket.on('connect_error', function(error) {
+                    log(`❌ Ошибка подключения: ${error}`);
+                });
+                
+                socket.on('error', function(error) {
+                    log(`❌ Ошибка Socket.IO: ${error}`);
+                });
+                
+                socket.on('message', function(data) {
+                    log(`📨 Получено сообщение: ${data.sender} -> ${data.text}`);
+                    addMessage(data.text, data.sender);
+                });
+                
+                socket.on('user_typing', function(data) {
+                    log(`⌨️ Пользователь ${data.user} ${data.isTyping ? 'печатает' : 'остановился'}`);
+                });
+                
+            } catch (error) {
+                log(`❌ Ошибка при подключении: ${error}`);
+            }
+        }
+        
+        function disconnectSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                log('🔌 Socket.IO отключен вручную');
+            }
+        }
+        
+        function sendMessage() {
+            const userId = document.getElementById('user-id').value;
+            const chatKey = document.getElementById('chat-key').value;
+            const message = document.getElementById('message-input').value;
+            
+            if (!userId || !chatKey || !message) {
+                log('❌ Заполните все поля');
+                return;
+            }
+            
+            if (!socket || !socket.connected) {
+                log('❌ Socket.IO не подключен');
+                return;
+            }
+            
+            try {
+                log(`📤 Отправка сообщения: ${message}`);
+                socket.emit('send_message', {
+                    room: chatKey,
+                    text: message,
+                    sender: userId
+                });
+                
+                // Добавляем сообщение локально
+                addMessage(message, userId);
+                
+                // Очищаем поле ввода
+                document.getElementById('message-input').value = '';
+                
+                log('✅ Сообщение отправлено');
+                
+            } catch (error) {
+                log(`❌ Ошибка при отправке: ${error}`);
+            }
+        }
+        
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender === document.getElementById('user-id').value ? 'my-message' : 'their-message'}`;
+            messageDiv.textContent = `${sender}: ${text}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Обработчик Enter для отправки сообщения
+        document.getElementById('message-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Автоматическое подключение при загрузке страницы
+        window.addEventListener('load', function() {
+            log('🚀 Страница загружена');
+        });
+    </script>
+</body>
+</html> 

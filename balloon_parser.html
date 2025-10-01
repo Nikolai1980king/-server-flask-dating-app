@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🎈 Парсер балунов Яндекс.Карт</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            color: white;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+
+        .map-container {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 15px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-blue {
+            background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+        }
+
+        .btn-blue:hover {
+            box-shadow: 0 4px 16px rgba(33,150,243,0.3);
+        }
+
+        .btn-orange {
+            background: linear-gradient(90deg, #FF9800 0%, #FFB74D 100%);
+        }
+
+        .btn-orange:hover {
+            box-shadow: 0 4px 16px rgba(255,152,0,0.3);
+        }
+
+        .btn-red {
+            background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
+        }
+
+        .btn-red:hover {
+            box-shadow: 0 4px 16px rgba(244,67,54,0.3);
+        }
+
+        .info-panel {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            color: #333;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            color: #333;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .info-card h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+            font-size: 1.1em;
+        }
+
+        .info-card p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .venue-input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #333;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .status-bar {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #fff;
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #fff;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .log-success {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 3px solid #4CAF50;
+        }
+
+        .log-error {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 3px solid #f44336;
+        }
+
+        .log-info {
+            background: rgba(33, 150, 243, 0.2);
+            border-left: 3px solid #2196F3;
+        }
+
+        .log-warning {
+            background: rgba(255, 152, 0, 0.2);
+            border-left: 3px solid #FF9800;
+        }
+
+        .notification {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            z-index: 1000;
+            animation: fadeInOut 3s forwards;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; top: 0; }
+            10% { opacity: 1; top: 80px; }
+            90% { opacity: 1; top: 80px; }
+            100% { opacity: 0; top: 0; }
+        }
+
+        .extracted-data {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #fff;
+        }
+
+        .data-field {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .data-label {
+            font-weight: bold;
+            color: #64B5F6;
+        }
+
+        .data-value {
+            color: #fff;
+            max-width: 60%;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎈 Парсер балунов Яндекс.Карт</h1>
+        
+        <div class="status-bar">
+            <strong>📋 Инструкция:</strong><br>
+            1. На карте найдите заведение (кафе, ресторан, бар)<br>
+            2. Кликните на название заведения - откроется балун<br>
+            3. Нажмите "🎯 Извлечь информацию из балуна"<br>
+            4. Информация автоматически извлечется и сохранится в файл<br>
+            5. Проверьте лог операций и извлеченные данные ниже
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="controls">
+            <button type="button" class="btn btn-blue" onclick="extractFromActiveBalloon()">
+                🎯 Извлечь информацию из балуна
+            </button>
+            <button type="button" class="btn btn-orange" onclick="createTestVenues()">
+                🏪 Создать тестовые заведения
+            </button>
+            <button type="button" class="btn" onclick="clearMap()">
+                🗑️ Очистить карту
+            </button>
+            <button type="button" class="btn btn-red" onclick="clearLog()">
+                📝 Очистить лог
+            </button>
+        </div>
+
+        <input type="text" name="venue" placeholder="Название заведения (заполнится автоматически)" id="venue-input" class="venue-input" readonly>
+
+        <div class="extracted-data" id="extracted-data" style="display: none;">
+            <h3>📊 Извлеченная информация:</h3>
+            <div id="data-content"></div>
+        </div>
+
+        <div class="log-container">
+            <strong>📝 Лог операций:</strong>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let myMap;
+        let testVenues = [];
+        let extractedInfo = null;
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.7558, 37.6176], // Москва
+                    zoom: 15,
+                    controls: ['zoomControl', 'fullscreenControl', 'searchControl']
+                });
+
+                // Обработка открытия балуна
+                myMap.events.add('balloonopen', function(e) {
+                    addLog('🎈 Балун открыт', 'info');
+                    // Сохраняем geoObject при открытии балуна
+                    try {
+                        const balloonData = myMap.balloon.getData();
+                        if (balloonData && balloonData.geoObject) {
+                            window.lastClickedGeoObject = balloonData.geoObject;
+                            addLog('📍 Сохранен geoObject из балуна', 'info');
+                        }
+                    } catch (e) {
+                        console.warn('Не удалось сохранить geoObject:', e);
+                    }
+                });
+
+                // Обработка закрытия балуна
+                myMap.events.add('balloonclose', function(e) {
+                    addLog('🎈 Балун закрыт', 'info');
+                });
+
+                // Добавляем обработчик кликов для сохранения последнего кликнутого объекта
+                myMap.events.add('click', function (e) {
+                    const clickedObject = e.get('target');
+                    if (clickedObject && clickedObject.geoObjects) {
+                        const geoObjects = clickedObject.geoObjects.getAll();
+                        if (geoObjects.length > 0) {
+                            window.lastClickedGeoObject = geoObjects[0];
+                            addLog('📍 Сохранен кликнутый объект', 'info');
+                        }
+                    }
+                });
+
+                addLog('🗺️ Карта инициализирована', 'success');
+            });
+        }
+
+        function extractFromActiveBalloon() {
+            addLog('🔍 Попытка извлечения информации из активного балуна...', 'info');
+            
+            if (!myMap.balloon || !myMap.balloon.isOpen()) {
+                showNotification('❌ Нет открытого балуна для извлечения!');
+                addLog('❌ Нет открытого балуна', 'error');
+                return;
+            }
+
+            try {
+                // Метод 1: Получение данных из активного балуна (только основные поля)
+                const balloonData = myMap.balloon.getData();
+                addLog('📋 Получены данные балуна', 'success');
+
+                // Метод 2: Извлечение HTML контента (ограниченный размер)
+                const htmlContent = extractHTMLContent();
+                addLog('🌐 Извлечен HTML контент', 'success');
+
+                // Метод 3: Получение информации о geoObject (только основные поля)
+                const geoObjectData = extractGeoObjectData();
+                addLog('📍 Получены данные geoObject', 'success');
+
+                // Метод 4: Если geoObject пустой, пробуем извлечь данные из HTML
+                if (!geoObjectData.name || geoObjectData.name === 'Неизвестное заведение') {
+                    addLog('🔄 geoObject пустой, извлекаем данные из HTML контента', 'info');
+                    const htmlExtractedData = extractDataFromHTML(htmlContent);
+                    if (htmlExtractedData.name && htmlExtractedData.name !== 'Неизвестное заведение') {
+                        addLog('✅ Данные успешно извлечены из HTML', 'success');
+                        // Объединяем данные
+                        Object.assign(geoObjectData, htmlExtractedData);
+                    }
+                }
+
+                // Отправляем данные на сервер для обработки
+                sendDataToServer(geoObjectData, balloonData, htmlContent);
+
+            } catch (error) {
+                console.error('Ошибка при извлечении:', error);
+                addLog(`❌ Ошибка извлечения: ${error.message}`, 'error');
+                showNotification('❌ Ошибка при извлечении информации');
+            }
+        }
+
+        function extractHTMLContent() {
+            try {
+                let fullHTML = '';
+                
+                // 1. Сначала пробуем найти весь балун целиком (это даст нам полную структуру)
+                const balloonSelectors = [
+                    '.ymaps-2-1-79-balloon',
+                    '.ymaps-balloon',
+                    '.balloon',
+                    '.ymaps-2-1-79-balloon__layout',
+                    '.ymaps-balloon__layout',
+                    '.balloon-layout',
+                    '.balloon__layout'
+                ];
+                
+                for (let selector of balloonSelectors) {
+                    try {
+                        const balloon = document.querySelector(selector);
+                        if (balloon && balloon.innerHTML) {
+                            addLog(`🎈 Весь балун найден через селектор: ${selector}`, 'info');
+                            addLog(`📏 Размер всего балуна: ${balloon.innerHTML.length} символов`, 'info');
+                            fullHTML = balloon.innerHTML;
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn(`Ошибка при поиске балуна ${selector}:`, e);
+                        continue;
+                    }
+                }
+                
+                // 2. Если не нашли весь балун, пробуем собрать по частям
+                if (!fullHTML) {
+                    // Сначала ищем заголовок/шапку балуна
+                    const headerSelectors = [
+                        '.ymaps-2-1-79-balloon__header',
+                        '.ymaps-balloon__header',
+                        '.balloon-header',
+                        '.balloon__header',
+                        '.ymaps-2-1-79-balloon__title',
+                        '.ymaps-balloon__title',
+                        '.balloon-title',
+                        '.balloon__title',
+                        '.ymaps-2-1-79-balloon__header-content',
+                        '.ymaps-balloon__header-content',
+                        '.balloon-header-content',
+                        '.balloon__header-content'
+                    ];
+                    
+                    for (let selector of headerSelectors) {
+                        try {
+                            const header = document.querySelector(selector);
+                            if (header && header.innerHTML) {
+                                addLog(`🎯 Заголовок балуна найден через селектор: ${selector}`, 'info');
+                                addLog(`📏 Размер заголовка: ${header.innerHTML.length} символов`, 'info');
+                                fullHTML += `<div class="balloon-header">${header.innerHTML}</div>`;
+                                break;
+                            }
+                        } catch (e) {
+                            console.warn(`Ошибка при поиске заголовка ${selector}:`, e);
+                            continue;
+                        }
+                    }
+                    
+                    // Затем ищем основной контент балуна
+                    const contentSelectors = [
+                        '.ymaps-2-1-79-balloon__content',
+                        '.ymaps-balloon__content',
+                        '.balloon-content',
+                        '.balloon__content',
+                        '.ymaps-2-1-79-balloon__content-body',
+                        '.ymaps-2-1-79-balloon__content-body__content',
+                        '.ymaps-2-1-79-balloon__content-body__content__content',
+                        '.ymaps-2-1-79-balloon__content-body__content__content__content'
+                    ];
+                    
+                    for (let selector of contentSelectors) {
+                        try {
+                            const content = document.querySelector(selector);
+                            if (content && content.innerHTML) {
+                                addLog(`🌐 HTML контент найден через селектор: ${selector}`, 'info');
+                                addLog(`📏 Размер контента: ${content.innerHTML.length} символов`, 'info');
+                                fullHTML += `<div class="balloon-content">${content.innerHTML}</div>`;
+                                break;
+                            }
+                        } catch (e) {
+                            console.warn(`Ошибка при поиске селектора ${selector}:`, e);
+                            continue;
+                        }
+                    }
+                }
+                
+                // 4. Альтернативный метод через overlay
+                if (!fullHTML) {
+                    try {
+                        if (myMap.balloon && myMap.balloon.isOpen()) {
+                            const balloonElement = myMap.balloon.getData().geoObject;
+                            if (balloonElement && balloonElement.getOverlay) {
+                                const overlay = balloonElement.getOverlay();
+                                if (overlay && overlay.getData) {
+                                    const balloonContent = overlay.getData();
+                                    if (balloonContent && balloonContent.innerHTML) {
+                                        addLog('🌐 HTML контент найден через overlay', 'info');
+                                        fullHTML = balloonContent.innerHTML;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Не удалось получить контент через overlay:', e);
+                    }
+                }
+                
+                if (fullHTML) {
+                    addLog(`📏 Общий размер HTML: ${fullHTML.length} символов`, 'info');
+                    return fullHTML;
+                } else {
+                    addLog('⚠️ HTML контент не найден', 'warning');
+                    return '';
+                }
+            } catch (error) {
+                console.error('Ошибка при извлечении HTML контента:', error);
+                addLog(`❌ Ошибка при извлечении HTML контента: ${error.message}`, 'error');
+                return '';
+            }
+        }
+
+        function extractDataFromHTML(htmlContent) {
+            try {
+                if (!htmlContent) {
+                    return {};
+                }
+
+                addLog('🔍 Извлечение данных из HTML контента...', 'info');
+
+                // Отладочная информация о структуре HTML
+                addLog(`📏 Размер HTML для анализа: ${htmlContent.length} символов`, 'info');
+                
+                // Создаем временный элемент для парсинга HTML
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlContent;
+
+                // Отладочная информация о структуре DOM
+                const allElements = tempDiv.querySelectorAll('*');
+                addLog(`🔍 Найдено ${allElements.length} элементов в HTML`, 'info');
+                
+                // Выводим первые несколько элементов для отладки
+                for (let i = 0; i < Math.min(10, allElements.length); i++) {
+                    const element = allElements[i];
+                    const text = element.textContent.trim();
+                    if (text && text.length > 0) {
+                        addLog(`🔍 Элемент ${i+1}: ${element.tagName} "${text.substring(0, 50)}"`, 'info');
+                    }
+                }
+
+                const extractedData = {
+                    name: 'Неизвестное заведение',
+                    address: 'Адрес не указан',
+                    phone: 'Телефон не указан',
+                    website: 'Сайт не указан',
+                    hours: 'Часы работы не указаны',
+                    rating: 'Рейтинг не указан',
+                    reviews_count: 'Отзывы не указаны',
+                    description: 'Описание не указано'
+                };
+
+                        // Извлечение названия - улучшенная версия с приоритетом заголовков
+        const nameSelectors = [
+            // Приоритет 1: Заголовки балуна
+            '.balloon-header', '.balloon__header', '.ymaps-balloon__header', '.ymaps-2-1-79-balloon__header',
+            '.balloon-title', '.balloon__title', '.ymaps-balloon__title', '.ymaps-2-1-79-balloon__title',
+            '.balloon-header-content', '.balloon__header-content', '.ymaps-balloon__header-content', '.ymaps-2-1-79-balloon__header-content',
+            // Приоритет 2: Общие заголовки
+            'h1', 'h2', 'h3', '.name', '.title', '.venue-name', '.place-name',
+            '[class*="name"]', '[class*="title"]', '[class*="venue"]',
+            // Приоритет 3: Заголовки в контенте
+            '.balloon-content h1', '.balloon-content h2', '.balloon-content h3',
+            '.balloon__content h1', '.balloon__content h2', '.balloon__content h3',
+            '.ymaps-balloon__content h1', '.ymaps-balloon__content h2', '.ymaps-balloon__content h3',
+            '.ymaps-2-1-79-balloon__content h1', '.ymaps-2-1-79-balloon__content h2', '.ymaps-2-1-79-balloon__content h3'
+        ];
+        
+        let nameFound = false;
+        for (let selector of nameSelectors) {
+            const element = tempDiv.querySelector(selector);
+            if (element && element.textContent.trim()) {
+                const nameText = element.textContent.trim();
+                if (nameText && nameText.length > 2 && nameText !== 'Неизвестное заведение') {
+                    extractedData.name = nameText;
+                    addLog(`🏪 Название из HTML (${selector}): ${extractedData.name}`, 'info');
+                    nameFound = true;
+                    break;
+                }
+            }
+        }
+        
+        // Если название не найдено через селекторы, пробуем найти первый значимый текст
+        if (!nameFound) {
+            // Ищем первый элемент с текстом, который может быть названием
+            const allElements = tempDiv.querySelectorAll('*');
+            for (let element of allElements) {
+                const text = element.textContent.trim();
+                if (text && text.length > 3 && text.length < 100 && 
+                    !text.includes('Телефон') && !text.includes('Адрес') && 
+                    !text.includes('Часы') && !text.includes('Рейтинг') &&
+                    !text.includes('Отзывы') && !text.includes('Описание') &&
+                    !text.includes('Веб-сайт') && !text.includes('Сайт') &&
+                    !text.includes('https://') && !text.includes('http://') &&
+                    !text.match(/^\d+$/) && !text.match(/^\d+:\d+$/) &&
+                    !text.includes('м') && !text.includes('км') &&
+                    element.children.length === 0) { // Только элементы без дочерних элементов
+                    
+                    extractedData.name = text;
+                    addLog(`🏪 Название из первого значимого текста: ${extractedData.name}`, 'info');
+                    nameFound = true;
+                    break;
+                }
+            }
+        }
+        
+        // Если все еще не найдено, пробуем найти по структуре DOM
+        if (!nameFound) {
+            // Ищем элемент, который находится в самом верху и содержит текст
+            const topElements = tempDiv.querySelectorAll('div, span, p, h1, h2, h3, h4, h5, h6');
+            for (let element of topElements) {
+                const text = element.textContent.trim();
+                if (text && text.length > 2 && text.length < 50 &&
+                    !text.includes('Телефон') && !text.includes('Адрес') &&
+                    !text.includes('Часы') && !text.includes('Рейтинг')) {
+                    
+                    extractedData.name = text;
+                    addLog(`🏪 Название из верхнего элемента: ${extractedData.name}`, 'info');
+                    break;
+                }
+            }
+        }
+        
+        // Если название все еще не найдено, пробуем найти по порядку элементов
+        if (!nameFound) {
+            // Ищем первый элемент с текстом, который может быть названием
+            const textElements = [];
+            for (let element of allElements) {
+                const text = element.textContent.trim();
+                if (text && text.length > 2 && text.length < 100 &&
+                    !text.includes('Телефон') && !text.includes('Адрес') &&
+                    !text.includes('Часы') && !text.includes('Рейтинг') &&
+                    !text.includes('Отзывы') && !text.includes('Описание') &&
+                    !text.includes('Веб-сайт') && !text.includes('Сайт') &&
+                    !text.includes('https://') && !text.includes('http://') &&
+                    !text.match(/^\d+$/) && !text.match(/^\d+:\d+$/) &&
+                    !text.includes('м') && !text.includes('км') &&
+                    element.children.length === 0) {
+                    textElements.push(text);
+                }
+            }
+            
+            if (textElements.length > 0) {
+                extractedData.name = textElements[0];
+                addLog(`🏪 Название из первого текстового элемента: ${extractedData.name}`, 'info');
+            }
+        }
+        
+        // Специальный поиск в заголовке балуна
+        if (!nameFound) {
+            addLog('🔍 Специальный поиск названия в заголовке балуна...', 'info');
+            
+            // Ищем элементы заголовка в DOM
+            const headerElements = document.querySelectorAll('.ymaps-2-1-79-balloon__header, .ymaps-balloon__header, .balloon-header, .balloon__header, .ymaps-2-1-79-balloon__title, .ymaps-balloon__title, .balloon-title, .balloon__title');
+            
+            for (let headerElement of headerElements) {
+                const headerText = headerElement.textContent.trim();
+                if (headerText && headerText.length > 2 && headerText.length < 100 &&
+                    !headerText.includes('Телефон') && !headerText.includes('Адрес') &&
+                    !headerText.includes('Часы') && !headerText.includes('Рейтинг')) {
+                    
+                    extractedData.name = headerText;
+                    addLog(`🏪 Название найдено в заголовке балуна: ${extractedData.name}`, 'info');
+                    nameFound = true;
+                    break;
+                }
+            }
+        }
+        
+        // Извлечение текста всех ссылок из балуна
+        const balloonLinks = document.querySelectorAll('.ymaps-2-1-79-balloon a, .ymaps-balloon a, .balloon a');
+        
+        // Массив для хранения текста всех ссылок
+        const allLinkTexts = [];
+        
+        // Извлекаем текст всех ссылок
+        balloonLinks.forEach((link, index) => {
+            const linkText = link.textContent.trim();
+            
+            if (linkText && linkText.length > 0) {
+                allLinkTexts.push(linkText);
+            }
+        });
+        
+        // Сохраняем все тексты ссылок в extractedData
+        extractedData.all_links = allLinkTexts;
+        extractedData.links_count = allLinkTexts.length;
+        
+        // Если есть ссылки, берем первую как название
+        if (allLinkTexts.length > 0) {
+            extractedData.name = allLinkTexts[0];
+            addLog(`🏪 Название: ${extractedData.name}`, 'success');
+            nameFound = true;
+        } else {
+            addLog('⚠️ Ссылки в балуне не найдены', 'warning');
+        }
+        
+        // Специальный поиск в заголовке балуна (первый элемент заголовка)
+        if (!nameFound) {
+            addLog('🔍 Специальный поиск названия в заголовке балуна...', 'info');
+            
+            // Ищем элементы заголовка в DOM
+            const headerElements = document.querySelectorAll('.ymaps-2-1-79-balloon__header, .ymaps-balloon__header, .balloon-header, .balloon__header, .ymaps-2-1-79-balloon__title, .ymaps-balloon__title, .balloon-title, .balloon__title');
+            
+            addLog(`🔍 Найдено элементов заголовка: ${headerElements.length}`, 'info');
+            
+            for (let headerElement of headerElements) {
+                const headerText = headerElement.textContent.trim();
+                addLog(`📝 Текст заголовка: "${headerText}"`, 'info');
+                
+                if (headerText && headerText.length > 2 && headerText.length < 100) {
+                    // Разбиваем текст заголовка на строки
+                    const lines = headerText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                    
+                    addLog(`📝 Строки заголовка: ${lines.join(' | ')}`, 'info');
+                    
+                    // Берем первую строку как название
+                    if (lines.length > 0) {
+                        const firstLine = lines[0];
+                        if (firstLine && firstLine.length > 2 && firstLine.length < 50 &&
+                            !firstLine.includes('Ресторан, кафе, бар') && !firstLine.includes('кафе, бар') &&
+                            !firstLine.includes('Ресторан') && !firstLine.includes('кафе') && !firstLine.includes('бар')) {
+                            
+                            extractedData.name = firstLine;
+                            addLog(`🏪 Название найдено в первой строке заголовка: ${extractedData.name}`, 'success');
+                            nameFound = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Альтернативный поиск названия в первом элементе балуна (если заголовок не найден)
+        if (!nameFound) {
+            addLog('🔍 Альтернативный поиск названия в первом элементе балуна...', 'info');
+            
+            // Ищем первый элемент с текстом в балуне
+            const balloonElements = document.querySelectorAll('.ymaps-2-1-79-balloon *, .ymaps-balloon *, .balloon *');
+            for (let element of balloonElements) {
+                const text = element.textContent.trim();
+                if (text && text.length > 2 && text.length < 50 &&
+                    !text.includes('Share') && !text.includes('Телефон') && 
+                    !text.includes('Адрес') && !text.includes('Часы') && 
+                    !text.includes('Рейтинг') && !text.includes('Открыто') &&
+                    !text.match(/^\d+[.,]\d+$/) && !text.match(/^\d+:\d+$/) &&
+                    !text.includes('+7') && !text.includes('http')) {
+                    
+                    // Проверяем, что это не служебный текст
+                    const words = text.split(/\s+/);
+                    if (words.length <= 5 && words.every(word => word.length > 1)) {
+                        extractedData.name = text;
+                        addLog(`🏪 Название найдено в первом элементе балуна: ${extractedData.name}`, 'info');
+                        nameFound = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+                // Извлечение адреса
+                const addressSelectors = [
+                    '.address', '.location', '[class*="address"]', '[class*="location"]',
+                    'span[title*="адрес"]', 'span[title*="address"]'
+                ];
+                
+                for (let selector of addressSelectors) {
+                    const element = tempDiv.querySelector(selector);
+                    if (element && element.textContent.trim()) {
+                        extractedData.address = element.textContent.trim();
+                        addLog(`🏠 Адрес из HTML: ${extractedData.address}`, 'info');
+                        break;
+                    }
+                }
+
+                // Извлечение телефона
+                const phoneRegex = /(\+7|8)[\s\-\(]?(\d{3})[\s\-\)]?(\d{3})[\s\-]?(\d{2})[\s\-]?(\d{2})/g;
+                const phoneMatch = htmlContent.match(phoneRegex);
+                if (phoneMatch) {
+                    extractedData.phone = phoneMatch[0];
+                    addLog(`📞 Телефон из HTML: ${extractedData.phone}`, 'info');
+                }
+
+                // Извлечение сайта
+                const websiteRegex = /https?:\/\/[^\s<>"']+/g;
+                const websiteMatch = htmlContent.match(websiteRegex);
+                if (websiteMatch) {
+                    // Исключаем ссылки на Яндекс.Карты
+                    const filteredWebsites = websiteMatch.filter(url => 
+                        !url.includes('yandex.ru/maps') && 
+                        !url.includes('yandex.com/maps')
+                    );
+                    if (filteredWebsites.length > 0) {
+                        extractedData.website = filteredWebsites[0];
+                        addLog(`🌐 Сайт из HTML: ${extractedData.website}`, 'info');
+                    }
+                }
+
+                // Извлечение рейтинга
+                const ratingRegex = /(\d+[.,]\d+|\d+)\s*(звезд|★|⭐|rating|рейтинг)/gi;
+                const ratingMatch = htmlContent.match(ratingRegex);
+                if (ratingMatch) {
+                    extractedData.rating = ratingMatch[0];
+                    addLog(`⭐ Рейтинг из HTML: ${extractedData.rating}`, 'info');
+                }
+
+                // Извлечение часов работы
+                const hoursRegex = /(\d{1,2}:\d{2}\s*[-—]\s*\d{1,2}:\d{2})/g;
+                const hoursMatch = htmlContent.match(hoursRegex);
+                if (hoursMatch) {
+                    extractedData.hours = hoursMatch[0];
+                    addLog(`🕐 Часы работы из HTML: ${extractedData.hours}`, 'info');
+                }
+
+                addLog(`✅ Извлечено ${Object.keys(extractedData).filter(k => extractedData[k] !== 'Не указан' && extractedData[k] !== 'Неизвестное заведение').length} полей из HTML`, 'success');
+                
+                return extractedData;
+            } catch (error) {
+                console.error('Ошибка при извлечении данных из HTML:', error);
+                addLog(`❌ Ошибка при извлечении данных из HTML: ${error.message}`, 'error');
+                return {};
+            }
+        }
+
+        function extractGeoObjectData() {
+            // Получаем информацию о geoObject из балуна
+            const balloonData = myMap.balloon.getData();
+            let geoObject = balloonData.geoObject;
+            
+            // Если geoObject не найден, пробуем альтернативные методы
+            if (!geoObject) {
+                addLog('⚠️ geoObject не найден в данных балуна, пробуем альтернативные методы', 'warning');
+                
+                // Метод 1: Попробуем получить через активные объекты карты
+                try {
+                    const activeObjects = myMap.geoObjects.getActiveObject();
+                    if (activeObjects) {
+                        geoObject = activeObjects;
+                        addLog('✅ geoObject найден через активные объекты карты', 'success');
+                    }
+                } catch (e) {
+                    console.warn('Не удалось получить через активные объекты:', e);
+                }
+                
+                // Метод 2: Попробуем получить через последний кликнутый объект
+                if (!geoObject && window.lastClickedGeoObject) {
+                    geoObject = window.lastClickedGeoObject;
+                    addLog('✅ geoObject найден через последний кликнутый объект', 'success');
+                }
+                
+                // Метод 3: Попробуем получить через все объекты на карте
+                if (!geoObject) {
+                    try {
+                        const allObjects = myMap.geoObjects.getAll();
+                        if (allObjects && allObjects.length > 0) {
+                            // Берем первый объект (обычно это тот, который был кликнут)
+                            geoObject = allObjects[0];
+                            addLog('✅ geoObject найден через все объекты карты', 'success');
+                        }
+                    } catch (e) {
+                        console.warn('Не удалось получить через все объекты:', e);
+                    }
+                }
+            }
+            
+            if (!geoObject) {
+                addLog('❌ geoObject не найден ни одним из методов', 'error');
+                return {};
+            }
+
+            try {
+                // Безопасное извлечение свойств
+                const safeProperties = {};
+                try {
+                    const properties = geoObject.properties.getAll();
+                    addLog(`📋 Найдено ${Object.keys(properties).length} свойств geoObject`, 'info');
+                    for (let key in properties) {
+                        try {
+                            const value = properties[key];
+                            if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                                safeProperties[key] = value;
+                            } else {
+                                safeProperties[key] = String(value);
+                            }
+                        } catch (e) {
+                            safeProperties[key] = '<error reading property>';
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Не удалось получить свойства geoObject:', e);
+                    addLog('⚠️ Не удалось получить свойства geoObject', 'warning');
+                }
+
+                // Безопасное извлечение координат
+                let lat = null, lng = null;
+                try {
+                    const geometry = geoObject.geometry.getCoordinates();
+                    if (geometry && Array.isArray(geometry) && geometry.length >= 2) {
+                        lat = geometry[0];
+                        lng = geometry[1];
+                        addLog(`📍 Координаты: ${lat}, ${lng}`, 'info');
+                    }
+                } catch (e) {
+                    console.warn('Не удалось получить координаты:', e);
+                    addLog('⚠️ Не удалось получить координаты', 'warning');
+                }
+
+                // Безопасное извлечение адреса
+                let address = 'Адрес не указан';
+                try {
+                    const addressLine = geoObject.getAddressLine();
+                    if (addressLine && typeof addressLine === 'string') {
+                        address = addressLine;
+                        addLog(`🏠 Адрес: ${address}`, 'info');
+                    }
+                } catch (e) {
+                    console.warn('Не удалось получить адрес:', e);
+                    addLog('⚠️ Не удалось получить адрес', 'warning');
+                }
+
+                // Попытка получить название из разных источников
+                let name = 'Неизвестное заведение';
+                try {
+                    // Сначала пробуем получить из свойств
+                    if (safeProperties.name) {
+                        name = safeProperties.name;
+                    } else if (safeProperties.hint) {
+                        name = safeProperties.hint;
+                    } else if (safeProperties.title) {
+                        name = safeProperties.title;
+                    } else if (safeProperties.text) {
+                        name = safeProperties.text;
+                    } else {
+                        // Пробуем получить из самого geoObject
+                        const geoObjectName = geoObject.get('name') || geoObject.get('hint') || geoObject.get('title');
+                        if (geoObjectName) {
+                            name = geoObjectName;
+                        }
+                    }
+                    addLog(`🏪 Название: ${name}`, 'info');
+                } catch (e) {
+                    console.warn('Не удалось получить название:', e);
+                }
+                
+                return {
+                    name: name,
+                    address: address,
+                    phone: safeProperties.phone || safeProperties.Phones || 'Телефон не указан',
+                    website: safeProperties.website || safeProperties.url || 'Сайт не указан',
+                    hours: safeProperties.hours || safeProperties.working_hours || 'Часы работы не указаны',
+                    rating: safeProperties.rating || safeProperties.rating_value || 'Рейтинг не указан',
+                    reviews_count: safeProperties.reviews_count || safeProperties.reviews || 'Отзывы не указаны',
+                    description: safeProperties.description || safeProperties.comment || 'Описание не указано',
+                    type: safeProperties.kind || safeProperties.type || 'venue',
+                    lat: lat,
+                    lng: lng,
+                    full_properties: safeProperties
+                };
+            } catch (error) {
+                console.error('Ошибка при извлечении данных geoObject:', error);
+                addLog(`❌ Ошибка при извлечении данных geoObject: ${error.message}`, 'error');
+                return {
+                    name: 'Ошибка извлечения данных',
+                    address: 'Не удалось получить адрес',
+                    phone: 'Не указан',
+                    website: 'Не указан',
+                    hours: 'Не указаны',
+                    rating: 'Не указан',
+                    reviews_count: 'Не указаны',
+                    description: 'Ошибка при извлечении данных',
+                    type: 'venue',
+                    lat: null,
+                    lng: null,
+                    full_properties: {}
+                };
+            }
+        }
+
+        function safeStringify(obj) {
+            const seen = new WeakSet();
+            return JSON.stringify(obj, function(key, val) {
+                if (val != null && typeof val === "object") {
+                    if (seen.has(val)) {
+                        return "<circular reference>";
+                    }
+                    seen.add(val);
+                }
+                return val;
+            });
+        }
+
+        function sendDataToServer(geoObjectData, balloonData, htmlContent) {
+            addLog('📤 Отправка данных на сервер...', 'info');
+
+            // Ограничиваем размер HTML контента (увеличиваем лимит)
+            const limitedHtmlContent = htmlContent ? htmlContent.substring(0, 2000) : '';
+            
+            // Безопасная подготовка данных для отправки (включаем больше полей)
+            const safeData = {
+                geoObject: {
+                    name: geoObjectData.name,
+                    address: geoObjectData.address,
+                    phone: geoObjectData.phone,
+                    website: geoObjectData.website,
+                    hours: geoObjectData.hours,
+                    rating: geoObjectData.rating,
+                    reviews_count: geoObjectData.reviews_count,
+                    description: geoObjectData.description,
+                    type: geoObjectData.type,
+                    lat: geoObjectData.lat,
+                    lng: geoObjectData.lng,
+                    full_properties: geoObjectData.full_properties || {},
+                    all_links: geoObjectData.all_links || [],
+                    links_count: geoObjectData.links_count || 0
+                },
+                balloonData: {
+                    content: balloonData.content ? balloonData.content.substring(0, 1000) : '',
+                    properties: balloonData.properties || {}
+                },
+                htmlContent: limitedHtmlContent
+            };
+
+            try {
+                // Безопасная сериализация данных
+                let jsonData = safeStringify(safeData);
+                
+                addLog(`📏 Размер данных для отправки: ${jsonData.length} символов`, 'info');
+                
+                // Проверяем размер данных (увеличиваем лимит)
+                if (jsonData.length > 100000) { // 100KB лимит
+                    addLog('⚠️ Данные слишком большие, отправляем только основную информацию', 'warning');
+                    // Отправляем только основные данные
+                    const minimalData = {
+                        geoObject: {
+                            name: geoObjectData.name,
+                            address: geoObjectData.address,
+                            phone: geoObjectData.phone,
+                            website: geoObjectData.website,
+                            lat: geoObjectData.lat,
+                            lng: geoObjectData.lng
+                        },
+                        balloonData: {},
+                        htmlContent: ''
+                    };
+                    jsonData = safeStringify(minimalData);
+                    addLog(`📏 Размер сокращенных данных: ${jsonData.length} символов`, 'info');
+                }
+                
+                fetch('/api/extract-balloon-data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: jsonData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 413) {
+                            throw new Error('Данные слишком большие. Попробуйте еще раз.');
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        extractedInfo = data.data;
+                        displayExtractedData(extractedInfo);
+                        saveToFile(extractedInfo);
+                        addLog('✅ Данные успешно извлечены и обработаны', 'success');
+                        showNotification('✅ Информация успешно извлечена!');
+                    } else {
+                        addLog(`❌ Ошибка сервера: ${data.error}`, 'error');
+                        showNotification('❌ Ошибка при обработке данных');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при отправке данных:', error);
+                    addLog(`❌ Ошибка сети: ${error.message}`, 'error');
+                    showNotification('❌ Ошибка сети при отправке данных');
+                });
+            } catch (error) {
+                console.error('Ошибка при подготовке данных:', error);
+                addLog(`❌ Ошибка подготовки данных: ${error.message}`, 'error');
+                showNotification('❌ Ошибка при подготовке данных');
+            }
+        }
+
+        function displayExtractedData(data) {
+            const container = document.getElementById('extracted-data');
+            const content = document.getElementById('data-content');
+            
+            content.innerHTML = '';
+            
+            const fields = [
+                { label: 'Название', key: 'name' }
+            ];
+
+            fields.forEach(field => {
+                let value = data[field.key];
+                
+                if (field.key === 'coords') {
+                    value = data.lat && data.lng ? `${data.lat}, ${data.lng}` : 'Не указаны';
+                } else if (field.key === 'all_links') {
+                    if (Array.isArray(value) && value.length > 0) {
+                        value = value.join(' | ');
+                    } else {
+                        value = 'Ссылки не найдены';
+                    }
+                }
+                
+                if (value && value !== 'Не указано' && value !== 'Не указан' && value !== 'Не указаны' && value !== 'Ссылки не найдены') {
+                    const fieldDiv = document.createElement('div');
+                    fieldDiv.className = 'data-field';
+                    fieldDiv.innerHTML = `
+                        <span class="data-label">${field.label}:</span>
+                        <span class="data-value">${value}</span>
+                    `;
+                    content.appendChild(fieldDiv);
+                }
+            });
+            
+            container.style.display = 'block';
+            
+            // Заполняем поле ввода
+            document.getElementById('venue-input').value = data.name;
+        }
+
+        function saveToFile(data) {
+            addLog('💾 Сохранение информации в файл...', 'info');
+
+            fetch('/api/save-balloon-info', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    balloon_info: data
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    addLog(`✅ Файл сохранен: ${result.filename}`, 'success');
+                    addLog(`📁 Путь: ${result.filepath}`, 'info');
+                    showNotification(`✅ Информация сохранена в файл: ${result.filename}`);
+                } else {
+                    addLog(`❌ Ошибка сохранения: ${result.error}`, 'error');
+                    showNotification('❌ Ошибка при сохранении файла');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка при сохранении:', error);
+                addLog(`❌ Ошибка сети при сохранении: ${error.message}`, 'error');
+                showNotification('❌ Ошибка сети при сохранении');
+            });
+        }
+
+        function createTestVenues() {
+            // Удаляем существующие тестовые заведения
+            testVenues.forEach(function(venue) {
+                myMap.geoObjects.remove(venue);
+            });
+            testVenues = [];
+
+            const center = myMap.getCenter();
+            const venues = [
+                {
+                    name: 'Кафе "Уютное место"',
+                    phone: '+7 (495) 123-45-67',
+                    address: 'ул. Тверская, 15',
+                    website: 'https://cafe-uyut.ru',
+                    hours: '09:00 - 23:00',
+                    rating: '4.5',
+                    reviews_count: '127',
+                    description: 'Уютное кафе с домашней кухней',
+                    lat: center[0] + 0.001,
+                    lng: center[1] + 0.001
+                },
+                {
+                    name: 'Ресторан "Вкусная еда"',
+                    phone: '+7 (495) 234-56-78',
+                    address: 'ул. Арбат, 25',
+                    website: 'https://vkusnoe-ed.ru',
+                    hours: '10:00 - 00:00',
+                    rating: '4.8',
+                    reviews_count: '89',
+                    description: 'Ресторан европейской кухни',
+                    lat: center[0] - 0.001,
+                    lng: center[1] + 0.002
+                },
+                {
+                    name: 'Кофейня "Аромат"',
+                    phone: '+7 (495) 345-67-89',
+                    address: 'Кутузовский пр-т, 10',
+                    website: 'https://coffee-aromat.ru',
+                    hours: '07:00 - 22:00',
+                    rating: '4.3',
+                    reviews_count: '203',
+                    description: 'Кофейня с авторскими напитками',
+                    lat: center[0] + 0.002,
+                    lng: center[1] - 0.001
+                }
+            ];
+
+            venues.forEach(function(venue) {
+                const balloonContent = `
+                    <div style="padding: 15px; font-family: Arial, sans-serif; max-width: 300px;">
+                        <h3 style="margin: 0 0 10px 0; color: #333; font-size: 1.2em;">${venue.name}</h3>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>📞 Телефон:</strong> <a href="tel:${venue.phone}" style="color: #2196F3;">${venue.phone}</a>
+                        </p>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>📍 Адрес:</strong> ${venue.address}
+                        </p>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>🌐 Сайт:</strong> <a href="${venue.website}" target="_blank" style="color: #2196F3;">${venue.website}</a>
+                        </p>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>🕒 Часы работы:</strong> ${venue.hours}
+                        </p>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>⭐ Рейтинг:</strong> ${venue.rating} (${venue.reviews_count} отзывов)
+                        </p>
+                        <p style="margin: 5px 0; color: #666;">
+                            <strong>📝 Описание:</strong> ${venue.description}
+                        </p>
+                        <div style="text-align: center; margin-top: 15px;">
+                            <button onclick="extractFromActiveBalloon()" 
+                                    style="background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                                🎯 Извлечь информацию
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                const venuePlacemark = new ymaps.Placemark([venue.lat, venue.lng], {
+                    balloonContent: balloonContent
+                }, {
+                    preset: 'islands#blueDotIcon',
+                    iconColor: '#2196F3'
+                });
+
+                // Устанавливаем свойства для извлечения
+                venuePlacemark.properties.set('name', venue.name);
+                venuePlacemark.properties.set('phone', venue.phone);
+                venuePlacemark.properties.set('address', venue.address);
+                venuePlacemark.properties.set('website', venue.website);
+                venuePlacemark.properties.set('hours', venue.hours);
+                venuePlacemark.properties.set('rating', venue.rating);
+                venuePlacemark.properties.set('reviews_count', venue.reviews_count);
+                venuePlacemark.properties.set('description', venue.description);
+                venuePlacemark.properties.set('kind', 'venue');
+
+                myMap.geoObjects.add(venuePlacemark);
+                testVenues.push(venuePlacemark);
+            });
+
+            addLog(`🏪 Создано ${venues.length} тестовых заведений`, 'success');
+            showNotification(`✅ Создано ${venues.length} тестовых заведений! Кликните на синие метки.`);
+        }
+
+        function clearMap() {
+            testVenues.forEach(function(venue) {
+                myMap.geoObjects.remove(venue);
+            });
+            testVenues = [];
+            
+            if (myMap.balloon && myMap.balloon.isOpen()) {
+                myMap.balloon.close();
+            }
+            
+            addLog('🗑️ Карта очищена', 'info');
+            showNotification('🗑️ Карта очищена');
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            addLog('📝 Лог очищен', 'info');
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
+        }
+
+        function addLog(message, type = 'info') {
+            const logContainer = document.getElementById('log');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            logContainer.appendChild(logEntry);
+            
+            // Прокручиваем к последней записи
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html> 

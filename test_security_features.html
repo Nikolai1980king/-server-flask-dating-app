@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест функций безопасности</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 1em;
+        }
+        .btn:hover {
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a52 100%);
+        }
+        .btn-success {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #667eea;
+        }
+        .result.success {
+            border-left-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        .result.error {
+            border-left-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+        .result.warning {
+            border-left-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: #333;
+        }
+        .location-info {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .accuracy-indicator {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .accuracy-excellent {
+            background: #4CAF50;
+            color: white;
+        }
+        .accuracy-good {
+            background: #ff9800;
+            color: white;
+        }
+        .accuracy-poor {
+            background: #ff6b6b;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Тест функций безопасности</h1>
+        <p>Эта страница позволяет протестировать новые функции защиты от фейковых посетителей кафе.</p>
+    </div>
+
+    <div class="container">
+        <div class="test-section">
+            <h2>📍 Тест геолокации и точности</h2>
+            <button class="btn" onclick="testGeolocation()">Получить текущее местоположение</button>
+            <div id="geolocation-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🏪 Тест проверки расстояния до кафе</h2>
+            <input type="text" id="cafe-name" placeholder="Название кафе" value="Кофейня Центральная">
+            <input type="number" id="cafe-lat" placeholder="Широта кафе" value="55.7558" step="0.000001">
+            <input type="number" id="cafe-lon" placeholder="Долгота кафе" value="37.6176" step="0.000001">
+            <button class="btn" onclick="testDistanceCheck()">Проверить расстояние</button>
+            <div id="distance-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Тест комплексной верификации</h2>
+            <input type="text" id="user-id" placeholder="ID пользователя (оставьте пустым для теста)">
+            <button class="btn" onclick="testLocationVerification()">Проверить верификацию</button>
+            <div id="verification-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>⚠️ Тест проверки подозрительной активности</h2>
+            <input type="text" id="suspicious-user-id" placeholder="ID пользователя для проверки">
+            <button class="btn" onclick="testSuspiciousActivity()">Проверить активность</button>
+            <div id="suspicious-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Симуляция подозрительной активности</h2>
+            <p>Тестируем различные сценарии подозрительной активности:</p>
+            <button class="btn btn-danger" onclick="simulateSuspiciousMovement()">Симулировать подозрительное перемещение</button>
+            <button class="btn btn-danger" onclick="simulateLowAccuracy()">Симулировать низкую точность</button>
+            <button class="btn btn-danger" onclick="simulateFarLocation()">Симулировать далекое местоположение</button>
+            <div id="simulation-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentLocation = null;
+        let currentAccuracy = null;
+
+        function testGeolocation() {
+            const resultDiv = document.getElementById('geolocation-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '🔄 Получаем местоположение...';
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        currentAccuracy = position.coords.accuracy;
+
+                        let accuracyClass = 'accuracy-poor';
+                        let accuracyText = '❌ Низкая точность';
+                        
+                        if (currentAccuracy <= 50) {
+                            accuracyClass = 'accuracy-excellent';
+                            accuracyText = '✅ Отличная точность';
+                        } else if (currentAccuracy <= 100) {
+                            accuracyClass = 'accuracy-good';
+                            accuracyText = '⚠️ Средняя точность';
+                        }
+
+                        resultDiv.className = 'result success';
+                        resultDiv.innerHTML = `
+                            <h3>📍 Местоположение получено</h3>
+                            <div class="location-info">
+                                <strong>Координаты:</strong> ${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}<br>
+                                <strong>Точность:</strong> <span class="accuracy-indicator ${accuracyClass}">${accuracyText} (${currentAccuracy.toFixed(1)}м)</span><br>
+                                <strong>Время:</strong> ${new Date().toLocaleString()}
+                            </div>
+                        `;
+                    },
+                    function(error) {
+                        resultDiv.className = 'result error';
+                        resultDiv.innerHTML = `
+                            <h3>❌ Ошибка получения местоположения</h3>
+                            <p>Код ошибки: ${error.code}</p>
+                            <p>Сообщение: ${error.message}</p>
+                        `;
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '<h3>❌ Геолокация не поддерживается</h3><p>Ваш браузер не поддерживает геолокацию.</p>';
+            }
+        }
+
+        function testDistanceCheck() {
+            if (!currentLocation) {
+                alert('Сначала получите местоположение!');
+                return;
+            }
+
+            const cafeLat = parseFloat(document.getElementById('cafe-lat').value);
+            const cafeLon = parseFloat(document.getElementById('cafe-lon').value);
+            const cafeName = document.getElementById('cafe-name').value;
+
+            const resultDiv = document.getElementById('distance-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '🔄 Проверяем расстояние...';
+
+            fetch('/api/check-distance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_lat: currentLocation.lat,
+                    user_lon: currentLocation.lng,
+                    cafe_lat: cafeLat,
+                    cafe_lon: cafeLon
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<h3>❌ Ошибка</h3><p>${data.error}</p>`;
+                } else {
+                    const isNear = data.is_near;
+                    resultDiv.className = isNear ? 'result success' : 'result warning';
+                    resultDiv.innerHTML = `
+                        <h3>${isNear ? '✅' : '⚠️'} Результат проверки расстояния</h3>
+                        <div class="location-info">
+                            <strong>Кафе:</strong> ${cafeName}<br>
+                            <strong>Расстояние:</strong> ${data.distance} метров<br>
+                            <strong>Максимальное расстояние:</strong> ${data.max_distance} метров<br>
+                            <strong>Статус:</strong> ${isNear ? 'Достаточно близко' : 'Слишком далеко'}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>❌ Ошибка сети</h3><p>${error.message}</p>`;
+            });
+        }
+
+        function testLocationVerification() {
+            if (!currentLocation) {
+                alert('Сначала получите местоположение!');
+                return;
+            }
+
+            const userId = document.getElementById('user-id').value || 'test-user-' + Date.now();
+            const cafeLat = parseFloat(document.getElementById('cafe-lat').value);
+            const cafeLon = parseFloat(document.getElementById('cafe-lon').value);
+
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '🔄 Проверяем верификацию...';
+
+            fetch('/api/verify-location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    user_lat: currentLocation.lat,
+                    user_lon: currentLocation.lng,
+                    accuracy: currentAccuracy,
+                    cafe_lat: cafeLat,
+                    cafe_lon: cafeLon
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<h3>❌ Ошибка</h3><p>${data.error}</p>`;
+                } else {
+                    const isSuccess = data.success;
+                    resultDiv.className = isSuccess ? 'result success' : 'result warning';
+                    resultDiv.innerHTML = `
+                        <h3>${isSuccess ? '✅' : '⚠️'} Результат верификации</h3>
+                        <div class="location-info">
+                            <strong>Сообщение:</strong> ${data.message}<br>
+                            <strong>Расстояние:</strong> ${data.distance} метров<br>
+                            <strong>Точность:</strong> ${data.accuracy ? data.accuracy.toFixed(1) + 'м' : 'Неизвестно'}<br>
+                            <strong>Максимальное расстояние:</strong> ${data.max_distance} метров
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>❌ Ошибка сети</h3><p>${error.message}</p>`;
+            });
+        }
+
+        function testSuspiciousActivity() {
+            const userId = document.getElementById('suspicious-user-id').value;
+            if (!userId) {
+                alert('Введите ID пользователя!');
+                return;
+            }
+
+            const resultDiv = document.getElementById('suspicious-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '🔄 Проверяем подозрительную активность...';
+
+            fetch('/api/check-suspicious-activity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<h3>❌ Ошибка</h3><p>${data.error}</p>`;
+                } else {
+                    const isSuspicious = data.is_suspicious;
+                    resultDiv.className = isSuspicious ? 'result warning' : 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>${isSuspicious ? '⚠️' : '✅'} Результат проверки активности</h3>
+                        <div class="location-info">
+                            <strong>Подозрительная активность:</strong> ${isSuspicious ? 'Да' : 'Нет'}<br>
+                            <strong>Верифицирован:</strong> ${data.is_verified ? 'Да' : 'Нет'}<br>
+                            <strong>Количество проверок местоположения:</strong> ${data.location_checks_count}<br>
+                            <strong>Время с регистрации:</strong> ${Math.round(data.time_since_registration / 60)} минут<br>
+                            ${isSuspicious ? `<strong>Причины:</strong><ul>${data.reasons.map(r => '<li>' + r + '</li>').join('')}</ul>` : ''}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>❌ Ошибка сети</h3><p>${error.message}</p>`;
+            });
+        }
+
+        function simulateSuspiciousMovement() {
+            const resultDiv = document.getElementById('simulation-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result warning';
+            resultDiv.innerHTML = `
+                <h3>⚠️ Симуляция подозрительного перемещения</h3>
+                <div class="location-info">
+                    <strong>Сценарий:</strong> Пользователь переместился на 50 км за 10 минут<br>
+                    <strong>Скорость:</strong> 300 км/ч<br>
+                    <strong>Результат:</strong> Обнаружена подозрительная активность<br>
+                    <strong>Действие:</strong> Пользователь будет помечен как подозрительный
+                </div>
+            `;
+        }
+
+        function simulateLowAccuracy() {
+            const resultDiv = document.getElementById('simulation-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result warning';
+            resultDiv.innerHTML = `
+                <h3>⚠️ Симуляция низкой точности</h3>
+                <div class="location-info">
+                    <strong>Сценарий:</strong> Точность геолокации 200 метров<br>
+                    <strong>Требуемая точность:</strong> Не более 50 метров<br>
+                    <strong>Результат:</strong> Регистрация заблокирована<br>
+                    <strong>Рекомендация:</strong> Использовать GPS или WiFi для повышения точности
+                </div>
+            `;
+        }
+
+        function simulateFarLocation() {
+            const resultDiv = document.getElementById('simulation-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result warning';
+            resultDiv.innerHTML = `
+                <h3>⚠️ Симуляция далекого местоположения</h3>
+                <div class="location-info">
+                    <strong>Сценарий:</strong> Пользователь находится в 2 км от кафе<br>
+                    <strong>Максимальное расстояние:</strong> 100 метров<br>
+                    <strong>Результат:</strong> Регистрация заблокирована<br>
+                    <strong>Требование:</strong> Необходимо находиться в радиусе 100 метров от кафе
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html> 

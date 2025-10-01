@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест калькулятора расстояния</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 2em;
+            text-align: center;
+        }
+
+        .test-section {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            color: #333;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(90deg, #FF9800 0%, #FFB74D 100%);
+        }
+
+        .result {
+            background: linear-gradient(135deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .error {
+            background: linear-gradient(135deg, #f44336 0%, #e57373 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест калькулятора расстояния</h1>
+        
+        <div class="test-section">
+            <h3>📋 Инструкция по тестированию:</h3>
+            <ol>
+                <li>Нажмите "🧭 Открыть калькулятор расстояния" для перехода к основной функциональности</li>
+                <li>Или используйте "📍 Тест геолокации" для проверки определения местоположения</li>
+                <li>Проверьте "📏 Тест расчета расстояния" для математических вычислений</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🚀 Основные тесты:</h3>
+            <button class="btn btn-secondary" onclick="openDistanceCalculator()">
+                🧭 Открыть калькулятор расстояния
+            </button>
+            <button class="btn btn-warning" onclick="testGeolocation()">
+                📍 Тест геолокации
+            </button>
+            <button class="btn" onclick="testDistanceCalculation()">
+                📏 Тест расчета расстояния
+            </button>
+        </div>
+
+        <div id="test-results"></div>
+
+        <div class="info">
+            <h3>📖 Что тестируется:</h3>
+            <ul>
+                <li><strong>Геолокация:</strong> Определение местоположения пользователя</li>
+                <li><strong>Карта:</strong> Загрузка и отображение Яндекс Карт</li>
+                <li><strong>Объекты:</strong> Создание и выбор объектов на карте</li>
+                <li><strong>Расчеты:</strong> Математические вычисления расстояния</li>
+                <li><strong>Визуализация:</strong> Отображение линий и меток</li>
+            </ul>
+        </div>
+
+        <div class="info">
+            <h3>🔧 Технические требования:</h3>
+            <ul>
+                <li>Поддержка HTML5 Geolocation API</li>
+                <li>Подключение к интернету для загрузки карт</li>
+                <li>Разрешение на доступ к местоположению</li>
+                <li>Современный браузер с поддержкой JavaScript ES6+</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function openDistanceCalculator() {
+            window.open('/distance-calculator', '_blank');
+            showResult('✅ Калькулятор расстояния открыт в новой вкладке', 'success');
+        }
+
+        function testGeolocation() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<div class="info">📍 Проверяем геолокацию...</div>';
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const distance = calculateHaversineDistance(
+                            position.coords.latitude, position.coords.longitude,
+                            55.7558, 37.6176 // Москва
+                        );
+                        
+                        resultsDiv.innerHTML = `
+                            <div class="result">
+                                ✅ Геолокация работает!<br>
+                                Координаты: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}<br>
+                                Точность: ±${position.coords.accuracy} метров<br>
+                                Расстояние до Москвы: ${distance.toFixed(2)} км
+                            </div>
+                        `;
+                    },
+                    function(error) {
+                        let errorMessage = '';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = '❌ Доступ к местоположению запрещен';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = '❌ Информация о местоположении недоступна';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = '❌ Превышено время ожидания';
+                                break;
+                            default:
+                                errorMessage = '❌ Ошибка: ' + error.message;
+                        }
+                        resultsDiv.innerHTML = `<div class="error">${errorMessage}</div>`;
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            } else {
+                resultsDiv.innerHTML = '<div class="error">❌ Геолокация не поддерживается</div>';
+            }
+        }
+
+        function testDistanceCalculation() {
+            const resultsDiv = document.getElementById('test-results');
+            
+            // Тестовые координаты
+            const testCases = [
+                {
+                    name: 'Москва - Санкт-Петербург',
+                    lat1: 55.7558, lon1: 37.6176,
+                    lat2: 59.9311, lon2: 30.3609,
+                    expected: 635 // примерное расстояние
+                },
+                {
+                    name: 'Москва - Екатеринбург',
+                    lat1: 55.7558, lon1: 37.6176,
+                    lat2: 56.8519, lon2: 60.6122,
+                    expected: 1800 // примерное расстояние
+                },
+                {
+                    name: 'Близкие точки (1 км)',
+                    lat1: 55.7558, lon1: 37.6176,
+                    lat2: 55.7648, lon2: 37.6276,
+                    expected: 1 // примерное расстояние
+                }
+            ];
+
+            let results = '<div class="info">📏 Тестируем расчет расстояний...</div>';
+            
+            testCases.forEach(testCase => {
+                const calculated = calculateHaversineDistance(
+                    testCase.lat1, testCase.lon1,
+                    testCase.lat2, testCase.lon2
+                );
+                
+                const accuracy = Math.abs(calculated - testCase.expected) / testCase.expected * 100;
+                const status = accuracy < 10 ? '✅' : '⚠️';
+                
+                results += `
+                    <div class="result">
+                        ${status} ${testCase.name}<br>
+                        Рассчитано: ${calculated.toFixed(2)} км<br>
+                        Ожидалось: ~${testCase.expected} км<br>
+                        Погрешность: ${accuracy.toFixed(1)}%
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = results;
+        }
+
+        function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Радиус Земли в километрах
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function showResult(message, type) {
+            const resultsDiv = document.getElementById('test-results');
+            const className = type === 'success' ? 'result' : 'error';
+            resultsDiv.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+
+        // Автоматический тест при загрузке страницы
+        window.onload = function() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<div class="info">🔄 Готов к тестированию. Выберите тест выше.</div>';
+        };
+    </script>
+</body>
+</html> 

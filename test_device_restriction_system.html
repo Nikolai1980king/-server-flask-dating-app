@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест системы ограничений по устройствам</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+        }
+        .btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+        }
+        .btn-danger {
+            background: linear-gradient(90deg, #f44336 0%, #e57373 100%);
+        }
+        .btn-info {
+            background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+        }
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .success { background: rgba(76, 175, 80, 0.2); }
+        .error { background: rgba(244, 67, 54, 0.2); }
+        .info { background: rgba(33, 150, 243, 0.2); }
+        .warning { background: rgba(255, 193, 7, 0.2); }
+        h1, h2 { text-align: center; }
+        .device-info {
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 Тест системы ограничений по устройствам</h1>
+    
+    <div class="test-section">
+        <h2>📱 Информация об устройстве</h2>
+        <button class="btn btn-info" onclick="showDeviceInfo()">Показать отпечаток устройства</button>
+        <div id="device-info" class="result info" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Тестирование ограничений</h2>
+        <p>Эта система предотвращает создание множественных анкет с одного устройства, независимо от браузера.</p>
+        
+        <button class="btn" onclick="testCreateProfile()">Попробовать создать анкету</button>
+        <button class="btn btn-info" onclick="checkDeviceRestriction()">Проверить ограничения</button>
+        <button class="btn btn-danger" onclick="clearDeviceData()">Очистить данные устройства</button>
+        
+        <div id="test-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Статистика</h2>
+        <button class="btn btn-info" onclick="getDeviceStats()">Получить статистику</button>
+        <div id="stats-result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔗 Навигация</h2>
+        <a href="/" class="btn">🏠 На главную</a>
+        <a href="/create" class="btn">📝 Создать анкету</a>
+        <a href="/my_profile" class="btn">👤 Мой профиль</a>
+    </div>
+
+    <script>
+        function showDeviceInfo() {
+            const deviceInfo = {
+                user_agent: navigator.userAgent,
+                language: navigator.language,
+                platform: navigator.platform,
+                screen_resolution: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                cookie_enabled: navigator.cookieEnabled,
+                on_line: navigator.onLine
+            };
+
+            // Создаем отпечаток устройства (как на сервере)
+            const fingerprintData = `${deviceInfo.user_agent}|${deviceInfo.language}|gzip, deflate`;
+            const fingerprint = btoa(fingerprintData).substring(0, 32); // Упрощенная версия
+
+            const resultDiv = document.getElementById('device-info');
+            resultDiv.innerHTML = `
+                <h3>🔍 Отпечаток устройства:</h3>
+                <div class="device-info">${fingerprint}</div>
+                <h3>🌐 IP-адрес:</h3>
+                <div class="device-info">Определяется сервером автоматически</div>
+                <h3>📋 Детали устройства:</h3>
+                <div class="device-info">${JSON.stringify(deviceInfo, null, 2)}</div>
+                <h3>⚠️ Важно:</h3>
+                <div class="device-info" style="background: rgba(255, 193, 7, 0.2);">
+                    Система теперь контролирует по IP-адресу!<br>
+                    Один IP = одна анкета, независимо от браузера.
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+        }
+
+        function testCreateProfile() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<div class="info">⏳ Пытаемся создать анкету...</div>';
+            resultDiv.style.display = 'block';
+
+            // Отправляем запрос на создание анкеты
+            fetch('/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'name': 'Тестовый пользователь',
+                    'age': '25',
+                    'gender': 'male',
+                    'hobbies': 'Тестирование системы',
+                    'goal': 'Проверка ограничений',
+                    'venue': 'Тестовое кафе',
+                    'latitude': '55.7558',
+                    'longitude': '37.6176',
+                    'venue_lat': '55.7558',
+                    'venue_lng': '37.6176',
+                    'terms_accepted': 'on'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Анкета создана успешно!<br>
+                            User ID: ${data.user_id}<br>
+                            <a href="${data.redirect}" class="btn">Перейти к профилю</a>
+                        </div>
+                    `;
+                } else {
+                    if (data.redirect_url) {
+                        resultDiv.innerHTML = `
+                            <div class="warning">
+                                ⚠️ ${data.error}<br>
+                                <a href="${data.redirect_url}" class="btn">Перейти к существующему профилю</a>
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="error">
+                                ❌ ${data.error}
+                            </div>
+                        `;
+                    }
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Ошибка: ${error.message}
+                    </div>
+                `;
+            });
+        }
+
+        function checkDeviceRestriction() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<div class="info">⏳ Проверяем ограничения...</div>';
+            resultDiv.style.display = 'block';
+
+            // Создаем отпечаток устройства
+            const deviceInfo = {
+                user_agent: navigator.userAgent,
+                language: navigator.language,
+                platform: navigator.platform,
+                screen_resolution: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+
+            const fingerprintData = `${deviceInfo.user_agent}|${deviceInfo.language}|gzip, deflate`;
+            const deviceFingerprint = btoa(fingerprintData).substring(0, 32);
+
+            fetch('/api/check-device-restriction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    device_fingerprint: deviceFingerprint,
+                    device_info: deviceInfo
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.restricted) {
+                    resultDiv.innerHTML = `
+                        <div class="warning">
+                            ⚠️ Устройство ограничено!<br>
+                            Уже есть анкета: ${data.profile_id}<br>
+                            <a href="/view_profile/${data.profile_id}" class="btn">Перейти к профилю</a>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Устройство не ограничено<br>
+                            Можно создавать анкету
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Ошибка проверки: ${error.message}
+                    </div>
+                `;
+            });
+        }
+
+        function clearDeviceData() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<div class="info">⏳ Очищаем данные устройства...</div>';
+            resultDiv.style.display = 'block';
+
+            // Очищаем cookie
+            document.cookie = 'user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            
+            // Очищаем localStorage
+            try {
+                localStorage.removeItem('dating_app_user_id');
+                sessionStorage.removeItem('dating_app_user_id');
+            } catch (e) {
+                console.warn('Не удалось очистить localStorage:', e);
+            }
+
+            resultDiv.innerHTML = `
+                <div class="success">
+                    ✅ Данные устройства очищены<br>
+                    Cookie и localStorage удалены
+                </div>
+            `;
+        }
+
+        function getDeviceStats() {
+            const resultDiv = document.getElementById('stats-result');
+            resultDiv.innerHTML = '<div class="info">⏳ Получаем статистику...</div>';
+            resultDiv.style.display = 'block';
+
+            fetch('/api/device-stats')
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.innerHTML = `
+                    <div class="info">
+                        📊 Статистика устройств:<br>
+                        Всего устройств: ${data.total_devices}<br>
+                        Устройств с анкетами: ${data.devices_with_profiles}<br>
+                        Последнее обновление: ${new Date().toLocaleString()}
+                    </div>
+                `;
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Ошибка получения статистики: ${error.message}
+                    </div>
+                `;
+            });
+        }
+
+        // Автоматически показываем информацию об устройстве при загрузке
+        window.onload = function() {
+            showDeviceInfo();
+        };
+    </script>
+</body>
+</html>

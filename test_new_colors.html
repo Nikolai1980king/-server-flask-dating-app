@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест новой цветовой гаммы</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .test-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .color-info {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .color-info h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        input, textarea, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1em;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+
+        input::placeholder, textarea::placeholder, select::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+            background: rgba(76, 175, 80, 0.15);
+        }
+
+        select option {
+            background: rgba(76, 175, 80, 0.9);
+            color: #fff;
+            border: none;
+        }
+
+        select option:hover {
+            background: rgba(76, 175, 80, 1);
+        }
+
+        input[type="file"] {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #fff;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+            background: rgba(76, 175, 80, 0.15);
+        }
+
+        input[type="file"]::-webkit-file-upload-button {
+            background: rgba(76, 175, 80, 0.3);
+            color: #fff;
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            border-radius: 5px;
+            padding: 8px 12px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        input[type="file"]::-webkit-file-upload-button:hover {
+            background: rgba(76, 175, 80, 0.5);
+        }
+
+        .test-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .test-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        .field-demo {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .field-demo h4 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🎨 Новая цветовая гамма полей</h2>
+        
+        <div class="color-info">
+            <h3>📋 Изменения в дизайне:</h3>
+            <ul>
+                <li>✅ Все поля теперь имеют зеленоватый фон (как поле "Местоположение")</li>
+                <li>✅ Белый текст с легким свечением</li>
+                <li>✅ Зеленоватые рамки и эффекты фокуса</li>
+                <li>✅ Стилизованные placeholder'ы</li>
+                <li>✅ Обновленные стили для select и file input</li>
+            </ul>
+        </div>
+
+        <div class="field-demo">
+            <h4>📝 Текстовое поле</h4>
+            <input type="text" placeholder="Введите ваше имя">
+        </div>
+
+        <div class="field-demo">
+            <h4>🔢 Числовое поле</h4>
+            <input type="number" placeholder="Введите ваш возраст">
+        </div>
+
+        <div class="field-demo">
+            <h4>📋 Выпадающий список</h4>
+            <select>
+                <option value="">Выберите пол</option>
+                <option value="male">Мужской</option>
+                <option value="female">Женский</option>
+                <option value="other">Другое</option>
+            </select>
+        </div>
+
+        <div class="field-demo">
+            <h4>📄 Текстовое поле (textarea)</h4>
+            <textarea placeholder="Расскажите о ваших увлечениях" rows="3"></textarea>
+        </div>
+
+        <div class="field-demo">
+            <h4>📁 Загрузка файла</h4>
+            <input type="file" accept="image/*">
+        </div>
+
+        <div class="color-info">
+            <h3>🎯 Цветовая схема:</h3>
+            <ul>
+                <li><strong>Фон полей:</strong> rgba(76, 175, 80, 0.1) - светло-зеленый</li>
+                <li><strong>Рамки:</strong> rgba(76, 175, 80, 0.3) - зеленый</li>
+                <li><strong>Текст:</strong> #fff - белый с свечением</li>
+                <li><strong>Placeholder:</strong> rgba(255, 255, 255, 0.7) - полупрозрачный белый</li>
+                <li><strong>Фокус:</strong> rgba(76, 175, 80, 0.15) - более яркий зеленый</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" class="test-btn">🚀 Открыть страницу создания анкеты</a>
+            <a href="/" class="test-btn">🏠 На главную</a>
+        </div>
+    </div>
+</body>
+</html> 

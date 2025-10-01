@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Выбор кафе - Выпадающий список</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+        select, input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        select:focus, input[type="text"]:focus {
+            border-color: #2196f3;
+            outline: none;
+        }
+        .btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #1976d2;
+        }
+        .btn-success {
+            background: #4caf50;
+        }
+        .btn-success:hover {
+            background: #388e3c;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .coordinates {
+            display: flex;
+            gap: 10px;
+        }
+        .coordinates input {
+            flex: 1;
+        }
+        .cafe-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .cafe-name {
+            font-weight: bold;
+            color: #2196f3;
+            margin-bottom: 5px;
+        }
+        .cafe-coords {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Выбор кафе</h1>
+            <p>Выберите кафе из выпадающего списка</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="cafe-select">🏪 Выберите кафе:</label>
+            <select id="cafe-select" onchange="selectCafe()">
+                <option value="">-- Выберите кафе --</option>
+                <option value="cafe1">Кафе "Уютное"</option>
+                <option value="cafe2">Ресторан "Вкусно"</option>
+                <option value="cafe3">Кофейня "Аромат"</option>
+                <option value="cafe4">Пиццерия "Италия"</option>
+                <option value="cafe5">Бар "Вечерний"</option>
+                <option value="cafe6">Столовая "Домашняя"</option>
+                <option value="cafe7">Кафе "Солнышко"</option>
+                <option value="cafe8">Ресторан "Элитный"</option>
+                <option value="cafe9">Кофейня "Утро"</option>
+                <option value="cafe10">Пиццерия "Рома"</option>
+            </select>
+        </div>
+        
+        <div id="cafe-info" class="cafe-info" style="display: none;">
+            <div class="cafe-name" id="selected-cafe-name"></div>
+            <div class="cafe-coords" id="selected-cafe-coords"></div>
+        </div>
+        
+        <div class="form-group">
+            <label for="venue-input">🏪 Название заведения:</label>
+            <input type="text" id="venue-input" placeholder="Автоматически заполнится при выборе кафе" readonly>
+        </div>
+        
+        <div class="form-group">
+            <label>📍 Координаты:</label>
+            <div class="coordinates">
+                <input type="text" id="latitude-input" placeholder="Широта" readonly>
+                <input type="text" id="longitude-input" placeholder="Долгота" readonly>
+            </div>
+        </div>
+        
+        <div class="form-group" style="text-align: center;">
+            <button class="btn" onclick="getLocation()">📍 Получить мое местоположение</button>
+            <button class="btn btn-success" onclick="confirmSelection()">✅ Подтвердить выбор</button>
+            <button class="btn" onclick="clearSelection()">🧹 Очистить</button>
+        </div>
+        
+        <div id="status" class="status info">Выберите кафе из списка выше</div>
+    </div>
+
+    <script>
+        // База данных кафе
+        var cafeDatabase = {
+            'cafe1': { name: 'Кафе "Уютное"', lat: 55.7558, lng: 37.6176 },
+            'cafe2': { name: 'Ресторан "Вкусно"', lat: 55.7559, lng: 37.6177 },
+            'cafe3': { name: 'Кофейня "Аромат"', lat: 55.7557, lng: 37.6175 },
+            'cafe4': { name: 'Пиццерия "Италия"', lat: 55.7556, lng: 37.6178 },
+            'cafe5': { name: 'Бар "Вечерний"', lat: 55.7555, lng: 37.6179 },
+            'cafe6': { name: 'Столовая "Домашняя"', lat: 55.7554, lng: 37.6180 },
+            'cafe7': { name: 'Кафе "Солнышко"', lat: 55.7553, lng: 37.6181 },
+            'cafe8': { name: 'Ресторан "Элитный"', lat: 55.7552, lng: 37.6182 },
+            'cafe9': { name: 'Кофейня "Утро"', lat: 55.7551, lng: 37.6183 },
+            'cafe10': { name: 'Пиццерия "Рома"', lat: 55.7550, lng: 37.6184 }
+        };
+        
+        var selectedCafe = null;
+        var currentLocation = null;
+        
+        // Функция выбора кафе
+        function selectCafe() {
+            var select = document.getElementById('cafe-select');
+            var cafeId = select.value;
+            
+            if (cafeId && cafeDatabase[cafeId]) {
+                selectedCafe = cafeDatabase[cafeId];
+                
+                console.log('🏪 Выбрано кафе:', selectedCafe.name, '(', selectedCafe.lat, selectedCafe.lng, ')');
+                
+                // Заполняем поле названия заведения
+                var venueInput = document.getElementById('venue-input');
+                if (venueInput) {
+                    venueInput.value = selectedCafe.name;
+                    console.log('✅ Поле "Название заведения" заполнено:', selectedCafe.name);
+                    
+                    // Визуальная обратная связь
+                    venueInput.style.border = '2px solid #4caf50';
+                    venueInput.style.backgroundColor = '#d4edda';
+                    setTimeout(() => {
+                        venueInput.style.border = '2px solid #ddd';
+                        venueInput.style.backgroundColor = 'white';
+                    }, 2000);
+                } else {
+                    console.log('❌ ОШИБКА: Поле venue-input не найдено!');
+                }
+                
+                // Заполняем поля координат
+                var latInput = document.getElementById('latitude-input');
+                var lngInput = document.getElementById('longitude-input');
+                
+                if (latInput && lngInput) {
+                    latInput.value = selectedCafe.lat;
+                    lngInput.value = selectedCafe.lng;
+                    console.log('✅ Координаты сохранены:', selectedCafe.lat, selectedCafe.lng);
+                } else {
+                    console.log('❌ ОШИБКА: Поля координат не найдены!');
+                }
+                
+                // Показываем информацию о кафе
+                showCafeInfo(selectedCafe);
+                
+                updateStatus('Выбрано кафе: ' + selectedCafe.name, 'success');
+                
+            } else {
+                selectedCafe = null;
+                clearFields();
+                hideCafeInfo();
+                updateStatus('Выберите кафе из списка', 'info');
+            }
+        }
+        
+        // Функция показа информации о кафе
+        function showCafeInfo(cafe) {
+            var cafeInfo = document.getElementById('cafe-info');
+            var cafeName = document.getElementById('selected-cafe-name');
+            var cafeCoords = document.getElementById('selected-cafe-coords');
+            
+            cafeName.textContent = cafe.name;
+            cafeCoords.textContent = 'Координаты: ' + cafe.lat + ', ' + cafe.lng;
+            cafeInfo.style.display = 'block';
+        }
+        
+        // Функция скрытия информации о кафе
+        function hideCafeInfo() {
+            var cafeInfo = document.getElementById('cafe-info');
+            cafeInfo.style.display = 'none';
+        }
+        
+        // Функция очистки полей
+        function clearFields() {
+            var venueInput = document.getElementById('venue-input');
+            var latInput = document.getElementById('latitude-input');
+            var lngInput = document.getElementById('longitude-input');
+            
+            if (venueInput) venueInput.value = '';
+            if (latInput) latInput.value = '';
+            if (lngInput) lngInput.value = '';
+        }
+        
+        // Функция получения местоположения
+        function getLocation() {
+            console.log('📍 Запрос местоположения...');
+            updateStatus('Определение местоположения...', 'info');
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        console.log('✅ Местоположение получено:', currentLocation.lat, currentLocation.lng);
+                        updateStatus('Местоположение определено! Координаты: ' + currentLocation.lat + ', ' + currentLocation.lng, 'success');
+                        
+                        // Можно добавить логику для поиска ближайшего кафе
+                        findNearestCafe();
+                        
+                    },
+                    function(error) {
+                        console.log('❌ Ошибка получения местоположения:', error.message);
+                        updateStatus('Ошибка определения местоположения: ' + error.message, 'error');
+                    }
+                );
+            } else {
+                console.log('❌ Геолокация не поддерживается');
+                updateStatus('Геолокация не поддерживается вашим браузером', 'error');
+            }
+        }
+        
+        // Функция поиска ближайшего кафе
+        function findNearestCafe() {
+            if (!currentLocation) {
+                console.log('❌ Местоположение не определено');
+                return;
+            }
+            
+            console.log('🔍 Поиск ближайшего кафе...');
+            
+            var nearestCafe = null;
+            var minDistance = Infinity;
+            
+            // Простой расчет расстояния (можно улучшить формулой гаверсинуса)
+            for (var cafeId in cafeDatabase) {
+                var cafe = cafeDatabase[cafeId];
+                var distance = Math.sqrt(
+                    Math.pow(cafe.lat - currentLocation.lat, 2) + 
+                    Math.pow(cafe.lng - currentLocation.lng, 2)
+                );
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestCafe = cafeId;
+                }
+            }
+            
+            if (nearestCafe) {
+                console.log('✅ Ближайшее кафе найдено:', cafeDatabase[nearestCafe].name);
+                
+                // Автоматически выбираем ближайшее кафе
+                document.getElementById('cafe-select').value = nearestCafe;
+                selectCafe();
+                
+                updateStatus('Автоматически выбрано ближайшее кафе: ' + cafeDatabase[nearestCafe].name, 'success');
+            }
+        }
+        
+        // Функция подтверждения выбора
+        function confirmSelection() {
+            if (selectedCafe) {
+                var message = '✅ Выбор подтвержден!\n\n';
+                message += '🏪 Кафе: ' + selectedCafe.name + '\n';
+                message += '📍 Координаты: ' + selectedCafe.lat + ', ' + selectedCafe.lng;
+                
+                if (currentLocation) {
+                    message += '\n📍 Ваше местоположение: ' + currentLocation.lat + ', ' + currentLocation.lng;
+                }
+                
+                alert(message);
+                console.log('✅ Выбор кафе подтвержден:', selectedCafe);
+                updateStatus('Выбор подтвержден! Кафе: ' + selectedCafe.name, 'success');
+            } else {
+                alert('❌ Сначала выберите кафе из списка');
+                console.log('❌ Кафе не выбрано');
+                updateStatus('Сначала выберите кафе', 'error');
+            }
+        }
+        
+        // Функция очистки выбора
+        function clearSelection() {
+            document.getElementById('cafe-select').value = '';
+            selectedCafe = null;
+            currentLocation = null;
+            clearFields();
+            hideCafeInfo();
+            updateStatus('Выбор очищен. Выберите кафе из списка', 'info');
+            console.log('🧹 Выбор очищен');
+        }
+        
+        // Функция обновления статуса
+        function updateStatus(message, type) {
+            var statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+        }
+        
+        // Проверяем наличие элементов при загрузке
+        window.onload = function() {
+            console.log('📄 Страница загружена');
+            
+            var venueInput = document.getElementById('venue-input');
+            var latInput = document.getElementById('latitude-input');
+            var lngInput = document.getElementById('longitude-input');
+            var cafeSelect = document.getElementById('cafe-select');
+            
+            if (venueInput) {
+                console.log('✅ Поле venue-input найдено');
+            } else {
+                console.log('❌ ОШИБКА: Поле venue-input НЕ найдено!');
+            }
+            
+            if (latInput) {
+                console.log('✅ Поле latitude-input найдено');
+            } else {
+                console.log('❌ ОШИБКА: Поле latitude-input НЕ найдено!');
+            }
+            
+            if (lngInput) {
+                console.log('✅ Поле longitude-input найдено');
+            } else {
+                console.log('❌ ОШИБКА: Поле longitude-input НЕ найдено!');
+            }
+            
+            if (cafeSelect) {
+                console.log('✅ Выпадающий список кафе найден');
+            } else {
+                console.log('❌ ОШИБКА: Выпадающий список кафе НЕ найден!');
+            }
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест поиска заведений</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: twinkle 4s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .map-container {
+            margin: 20px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+        }
+
+        .location-info {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .venue-results {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 15px;
+            display: none;
+        }
+
+        .venue-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            transition: all 0.2s ease;
+        }
+
+        .venue-item:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .venue-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .venue-address {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .venue-distance {
+            font-size: 0.8em;
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        .form-group label {
+            display: block;
+            color: #fff;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Поиск заведений на карте</h1>
+        
+        <div class="form-group">
+            <label for="venue-input">Название заведения:</label>
+            <input type="text" id="venue-input" placeholder="Выберите заведение на карте или введите вручную">
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="location-info" id="location-info">
+                <strong>Выбранное местоположение:</strong><br>
+                <span id="location-address">Не выбрано</span><br>
+                <small>Координаты: <span id="location-coords">-</span></small>
+            </div>
+        </div>
+
+        <div class="venue-results" id="venue-results">
+            <h4 style="margin: 0 0 15px 0; color: #333;">Ближайшие заведения:</h4>
+            <div id="venue-list"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="getCurrentLocation()">📍 Определить мое местоположение</button>
+            <button class="btn" onclick="clearLocation()">🗑️ Очистить</button>
+            <button class="btn" onclick="searchVenues()">🔍 Найти заведения</button>
+        </div>
+    </div>
+
+    <script>
+        let myMap, myPlacemark;
+        let currentLocation = null;
+        let venueMarkers = [];
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва по умолчанию
+                    zoom: 12,
+                    controls: ['zoomControl', 'fullscreenControl', 'searchControl']
+                });
+
+                myMap.events.add('click', function (e) {
+                    var coords = e.get('coords');
+                    setLocation(coords[0], coords[1]);
+                });
+            });
+        }
+
+        function setLocation(lat, lng) {
+            currentLocation = {lat: lat, lng: lng};
+
+            // Удаляем предыдущую метку
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+            }
+
+            // Добавляем новую метку
+            myPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Выбранное местоположение'
+            }, {
+                preset: 'islands#redDotIcon'
+            });
+
+            myMap.geoObjects.add(myPlacemark);
+            myMap.setCenter([lat, lng], 16);
+
+            // Показываем местоположение в интерфейсе
+            document.getElementById('location-address').textContent = 'Местоположение определено';
+            document.getElementById('location-coords').textContent = 'Координаты: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+            document.getElementById('location-info').style.display = 'block';
+
+            // Автоматически ищем заведения
+            searchVenues();
+        }
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        setLocation(lat, lng);
+                    },
+                    function(error) {
+                        alert('Не удалось получить местоположение. Попробуйте еще раз.');
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 5000,
+                        maximumAge: 300000
+                    }
+                );
+            } else {
+                alert('Геолокация не поддерживается вашим браузером.');
+            }
+        }
+
+        function clearLocation() {
+            currentLocation = null;
+            document.getElementById('location-info').style.display = 'none';
+            document.getElementById('venue-results').style.display = 'none';
+            document.getElementById('venue-input').value = '';
+
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+                myPlacemark = null;
+            }
+
+            // Удаляем метки заведений
+            venueMarkers.forEach(function(marker) {
+                myMap.geoObjects.remove(marker);
+            });
+            venueMarkers = [];
+        }
+
+        function searchVenues() {
+            if (!currentLocation) {
+                alert('Сначала выберите местоположение на карте или определите ваше местоположение.');
+                return;
+            }
+
+            // Очищаем предыдущие результаты
+            clearVenueResults();
+
+            var lat = currentLocation.lat;
+            var lng = currentLocation.lng;
+
+            // Создаем поисковые запросы для разных типов заведений
+            var venueTypes = [
+                'кафе',
+                'ресторан', 
+                'бар',
+                'кофейня',
+                'пиццерия',
+                'столовая',
+                'фастфуд'
+            ];
+
+            var results = [];
+            var completedSearches = 0;
+
+            venueTypes.forEach(function(type) {
+                // Создаем поисковый запрос
+                var searchQuery = type + ' ' + lat.toFixed(6) + ' ' + lng.toFixed(6);
+                
+                // Выполняем поиск через геокодер
+                ymaps.geocode(searchQuery, {
+                    boundedBy: myMap.getBounds(),
+                    strictBounds: true,
+                    results: 3
+                }).then(function (geocodeResults) {
+                    if (geocodeResults.geoObjects.getLength() > 0) {
+                        for (var i = 0; i < geocodeResults.geoObjects.getLength(); i++) {
+                            var result = geocodeResults.geoObjects.get(i);
+                            var venueName = result.properties.get('name') || type + ' ' + (i + 1);
+                            var venueAddress = result.properties.get('description') || result.getAddressLine();
+                            var coords = result.geometry.getCoordinates();
+                            
+                            // Вычисляем расстояние
+                            var distance = calculateDistance(lat, lng, coords[1], coords[0]);
+                            
+                            // Добавляем только если расстояние меньше 2 км
+                            if (distance <= 2000) {
+                                results.push({
+                                    name: venueName,
+                                    address: venueAddress,
+                                    distance: distance,
+                                    coords: coords,
+                                    type: type
+                                });
+                            }
+                        }
+                    }
+                    
+                    completedSearches++;
+                    if (completedSearches === venueTypes.length) {
+                        displayVenueResults(results);
+                    }
+                }).catch(function (error) {
+                    console.log('Ошибка поиска ' + type + ':', error);
+                    completedSearches++;
+                    if (completedSearches === venueTypes.length) {
+                        displayVenueResults(results);
+                    }
+                });
+            });
+        }
+
+        function displayVenueResults(results) {
+            var venueContainer = document.getElementById('venue-results');
+            var venueList = document.getElementById('venue-list');
+            
+            if (results.length === 0) {
+                venueList.innerHTML = '<p style="color: #666; text-align: center;">Заведения не найдены в радиусе 2 км</p>';
+                venueContainer.style.display = 'block';
+                return;
+            }
+
+            // Сортируем по расстоянию
+            results.sort(function(a, b) {
+                return a.distance - b.distance;
+            });
+
+            // Ограничиваем количество результатов
+            var maxResults = Math.min(results.length, 15);
+            
+            venueList.innerHTML = '';
+            
+            for (var i = 0; i < maxResults; i++) {
+                var result = results[i];
+                
+                var venueElement = document.createElement('div');
+                venueElement.className = 'venue-item';
+                venueElement.innerHTML = `
+                    <div class="venue-name">${result.name}</div>
+                    <div class="venue-address">${result.address}</div>
+                    <div class="venue-distance">${result.distance} м</div>
+                `;
+                
+                venueElement.onclick = function(name, address) {
+                    return function() {
+                        document.getElementById('venue-input').value = name;
+                        venueContainer.style.display = 'none';
+                        
+                        // Добавляем метку на карту
+                        addVenueMarker(name, address, this.coords);
+                    };
+                }(result.name, result.address);
+                
+                venueElement.coords = result.coords;
+                venueList.appendChild(venueElement);
+            }
+            
+            venueContainer.style.display = 'block';
+        }
+
+        function addVenueMarker(name, address, coords) {
+            // Удаляем предыдущие метки заведений
+            venueMarkers.forEach(function(marker) {
+                myMap.geoObjects.remove(marker);
+            });
+            venueMarkers = [];
+
+            // Добавляем новую метку
+            var marker = new ymaps.Placemark(coords, {
+                balloonContent: `<strong>${name}</strong><br>${address}`
+            }, {
+                preset: 'islands#blueDotIcon'
+            });
+
+            myMap.geoObjects.add(marker);
+            venueMarkers.push(marker);
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            var R = 6371e3; // радиус Земли в метрах
+            var φ1 = lat1 * Math.PI / 180;
+            var φ2 = lat2 * Math.PI / 180;
+            var Δφ = (lat2 - lat1) * Math.PI / 180;
+            var Δλ = (lng2 - lng1) * Math.PI / 180;
+
+            var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return Math.round(R * c);
+        }
+
+        function clearVenueResults() {
+            var venueContainer = document.getElementById('venue-results');
+            venueContainer.style.display = 'none';
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html> 

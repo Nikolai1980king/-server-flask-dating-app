@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Восстановление анкеты</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .restore-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .info-box {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .info-box h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            background: rgba(76, 175, 80, 0.1);
+            color: #fff;
+            font-size: 1em;
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .restore-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .restore-btn:hover {
+            box-shadow: 0 8px 30px rgba(76, 175, 80, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .create-new-btn {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ff8e8e 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 15px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .create-new-btn:hover {
+            box-shadow: 0 8px 30px rgba(255, 107, 107, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .error-message {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #ff6b6b;
+            display: none;
+        }
+
+        .success-message {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            color: #4CAF50;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="restore-container">
+        <h2>🔍 Восстановление анкеты</h2>
+        
+        <div class="info-box">
+            <h3>ℹ️ Информация</h3>
+            <p>Если вы уже создавали анкету, но потеряли доступ к ней, введите ваше имя и возраст для восстановления.</p>
+        </div>
+
+        <form id="restoreForm">
+            <div class="form-group">
+                <label for="name">Имя:</label>
+                <input type="text" id="name" name="name" placeholder="Введите ваше имя" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="age">Возраст:</label>
+                <input type="number" id="age" name="age" placeholder="Введите ваш возраст" min="18" max="100" required>
+            </div>
+            
+            <button type="submit" class="restore-btn">🔍 Найти мою анкету</button>
+        </form>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <a href="/create" class="create-new-btn">📝 Создать новую анкету</a>
+        <a href="/" class="create-new-btn" style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);">🏠 На главную</a>
+    </div>
+
+    <script>
+        document.getElementById('restoreForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('name').value.trim();
+            const age = document.getElementById('age').value.trim();
+            
+            if (!name || !age) {
+                showError('Пожалуйста, заполните все поля');
+                return;
+            }
+            
+            // Отправляем запрос на поиск анкеты
+            const url = `/create?search_profile=1&name=${encodeURIComponent(name)}&age=${encodeURIComponent(age)}`;
+            
+            console.log('🔍 Ищем анкету:', { name, age });
+            console.log('🔗 URL:', url);
+            
+            // Переходим на страницу поиска
+            window.location.href = url;
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Проверяем, есть ли уже cookie
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        const userCookie = getCookie('user_id');
+        if (userCookie) {
+            console.log('✅ Найден cookie, перенаправляем на анкету');
+            window.location.href = `/profile/${userCookie}`;
+        } else {
+            console.log('❌ Cookie не найден, показываем форму восстановления');
+        }
+    </script>
+</body>
+</html> 

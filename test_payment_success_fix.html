@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест исправления перенаправления после оплаты</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+        .test-result {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .description {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Тест исправления перенаправления после оплаты</h1>
+        
+        <div class="description">
+            <h3>📋 Описание проблемы:</h3>
+            <p>После успешной оплаты пользователь попадал на страницу создания анкеты вместо страницы профиля.</p>
+            
+            <h3>✅ Ожидаемое поведение:</h3>
+            <p>После успешной оплаты пользователь должен попасть на страницу своего профиля (/my_profile).</p>
+        </div>
+
+        <div class="test-result">
+            <h3>🔗 Тестовые ссылки:</h3>
+            <p>Нажмите на ссылку ниже, чтобы протестировать страницу успешной оплаты:</p>
+            
+            <a href="/payment/success?user_id=594247dd-cdad-4845-860d-d142c4183aa5" class="btn" target="_blank">
+                🧪 Тест страницы успешной оплаты
+            </a>
+            
+            <a href="/my_profile" class="btn" target="_blank">
+                👤 Проверить страницу профиля
+            </a>
+        </div>
+
+        <div class="test-result">
+            <h3>📝 Инструкции по тестированию:</h3>
+            <ol>
+                <li>Нажмите на "Тест страницы успешной оплаты"</li>
+                <li>Проверьте, что на странице есть кнопка "Перейти к профилю" (НЕ "Создать анкету")</li>
+                <li>Нажмите на кнопку "Перейти к профилю"</li>
+                <li>Убедитесь, что вы попали на страницу профиля пользователя</li>
+            </ol>
+        </div>
+
+        <div class="test-result">
+            <h3>✅ Критерии успеха:</h3>
+            <ul>
+                <li>✅ На странице успешной оплаты есть кнопка "Перейти к профилю"</li>
+                <li>✅ Кнопка ведет на /my_profile</li>
+                <li>✅ НЕТ кнопки "Создать анкету"</li>
+            </ul>
+        </div>
+
+        <div class="test-result">
+            <h3>🔧 Дополнительная информация:</h3>
+            <p><strong>URL для тестирования:</strong> <code>http://localhost:5000/payment/success?user_id=594247dd-cdad-4845-860d-d142c4183aa5</code></p>
+            <p><strong>Ожидаемый редирект:</strong> <code>http://localhost:5000/my_profile</code></p>
+        </div>
+    </div>
+</body>
+</html>

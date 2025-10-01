@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔒 Тест строгой защиты "Одно устройство - одна анкета"</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            margin: 10px 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .btn-success {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+        }
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+        .btn-info {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+        .btn-warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+        }
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+        }
+        .info {
+            background: rgba(52, 152, 219, 0.2);
+            border: 1px solid #3498db;
+        }
+        .warning {
+            background: rgba(241, 196, 15, 0.2);
+            border: 1px solid #f1c40f;
+        }
+        .protection-status {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .protected {
+            background: rgba(231, 76, 60, 0.3);
+            border: 2px solid #e74c3c;
+            color: #ff6b6b;
+        }
+        .unprotected {
+            background: rgba(46, 204, 113, 0.3);
+            border: 2px solid #2ecc71;
+            color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Тест строгой защиты "Одно устройство - одна анкета"</h1>
+        
+        <div id="protection-status" class="protection-status">
+            <div>🔍 Проверяем статус защиты...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>📱 Информация об устройстве</h3>
+            <button class="btn btn-info" onclick="checkDeviceInfo()">Проверить информацию об устройстве</button>
+            <div id="device-info" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🛡️ Проверка защиты</h3>
+            <button class="btn btn-warning" onclick="checkProtection()">Проверить защиту</button>
+            <div id="protection" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Тестирование создания анкеты</h3>
+            <button class="btn btn-success" onclick="testCreateProfile()">Попробовать создать анкету</button>
+            <button class="btn btn-info" onclick="goToCreatePage()">Перейти на страницу создания</button>
+            <div id="create-test" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Статистика системы</h3>
+            <button class="btn btn-info" onclick="checkDeviceControl()">Показать записи в базе данных</button>
+            <div id="device-control" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧹 Управление системой</h3>
+            <button class="btn btn-danger" onclick="clearDeviceData()">Очистить данные устройств</button>
+            <div id="clear-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Сценарии тестирования</h3>
+            <div class="info">
+                <strong>🔒 Строгая защита активирована:</strong><br><br>
+                
+                <strong>✅ Что должно работать:</strong><br>
+                1. <strong>Первая анкета:</strong> Создается успешно<br>
+                2. <strong>Повторная попытка:</strong> Блокируется с сообщением "С этого устройства уже создана анкета!"<br>
+                3. <strong>Другой браузер:</strong> Блокируется (тот же IP)<br>
+                4. <strong>Приватный режим:</strong> Блокируется (тот же IP)<br>
+                5. <strong>Очистка cookies:</strong> Блокируется (тот же IP)<br><br>
+                
+                <strong>❌ Что НЕ должно работать:</strong><br>
+                • Создание нескольких анкет с одного устройства<br>
+                • Обход через разные браузеры<br>
+                • Обход через приватный режим<br>
+                • Обход через очистку cookies<br><br>
+                
+                <strong>🎯 Ожидаемый результат:</strong><br>
+                • При блокировке: "🚫 С этого устройства уже создана анкета! Одно устройство = одна анкета."<br>
+                • При GET запросе: автоматическое перенаправление на существующий профиль<br>
+                • При POST запросе: JSON ответ с ошибкой и детальной информацией
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, data, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function updateProtectionStatus(isProtected, message) {
+            const statusDiv = document.getElementById('protection-status');
+            if (isProtected) {
+                statusDiv.className = 'protection-status protected';
+                statusDiv.innerHTML = `🔒 ЗАЩИТА АКТИВНА<br>${message}`;
+            } else {
+                statusDiv.className = 'protection-status unprotected';
+                statusDiv.innerHTML = `🟢 ЗАЩИТА НЕ АКТИВНА<br>${message}`;
+            }
+        }
+
+        function checkDeviceInfo() {
+            fetch('/check_device')
+                .then(response => response.json())
+                .then(data => {
+                    showResult('device-info', data, 'info');
+                })
+                .catch(error => {
+                    showResult('device-info', { error: error.message }, 'error');
+                });
+        }
+
+        function checkProtection() {
+            fetch('/check_device')
+                .then(response => response.json())
+                .then(data => {
+                    const restrictions = data.restrictions;
+                    const hasRestrictions = restrictions.ip_restriction.has_existing || restrictions.device_restriction.has_existing;
+                    
+                    updateProtectionStatus(hasRestrictions, 
+                        hasRestrictions ? 
+                        'Создание анкеты заблокировано' : 
+                        'Создание анкеты разрешено'
+                    );
+                    
+                    showResult('protection', {
+                        ip_restriction: restrictions.ip_restriction,
+                        device_restriction: restrictions.device_restriction,
+                        blocked: hasRestrictions,
+                        message: hasRestrictions ? '🚫 Создание анкеты заблокировано' : '✅ Создание анкеты разрешено',
+                        device_info: {
+                            ip: data.ip,
+                            device_fingerprint: data.device_fingerprint.substring(0, 16) + '...',
+                            is_mobile: data.device_info.is_mobile
+                        }
+                    }, hasRestrictions ? 'warning' : 'success');
+                })
+                .catch(error => {
+                    showResult('protection', { error: error.message }, 'error');
+                });
+        }
+
+        function testCreateProfile() {
+            // Симулируем попытку создания профиля
+            fetch('/create', {
+                method: 'GET'
+            })
+                .then(response => {
+                    if (response.redirected) {
+                        showResult('create-test', {
+                            status: 'redirected',
+                            message: 'Перенаправление на существующий профиль',
+                            redirected_url: response.url,
+                            protection: 'АКТИВНА'
+                        }, 'warning');
+                    } else {
+                        showResult('create-test', {
+                            status: 'allowed',
+                            message: 'Создание анкеты разрешено',
+                            protection: 'НЕ АКТИВНА'
+                        }, 'success');
+                    }
+                })
+                .catch(error => {
+                    showResult('create-test', { error: error.message }, 'error');
+                });
+        }
+
+        function goToCreatePage() {
+            window.location.href = '/create';
+        }
+
+        function checkDeviceControl() {
+            fetch('/check_device_control')
+                .then(response => response.json())
+                .then(data => {
+                    showResult('device-control', data, 'info');
+                })
+                .catch(error => {
+                    showResult('device-control', { error: error.message }, 'error');
+                });
+        }
+
+        function clearDeviceData() {
+            if (confirm('⚠️ ВНИМАНИЕ! Это удалит ВСЕ ограничения защиты. Продолжить?')) {
+                fetch('/clear_device_control', {
+                    method: 'POST'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        showResult('clear-result', data, data.success ? 'success' : 'error');
+                        if (data.success) {
+                            // Обновляем статус защиты
+                            setTimeout(checkProtection, 1000);
+                        }
+                    })
+                    .catch(error => {
+                        showResult('clear-result', { error: error.message }, 'error');
+                    });
+            }
+        }
+
+        // Автоматическая проверка при загрузке страницы
+        window.onload = function() {
+            console.log('🔒 Страница тестирования строгой защиты загружена');
+            checkProtection();
+        };
+    </script>
+</body>
+</html>

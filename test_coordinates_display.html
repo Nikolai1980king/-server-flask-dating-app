@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест отображения координат</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .coordinates-display {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .coordinates-display label {
+            color: #333;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .coordinates-display input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+            color: #333;
+            font-family: monospace;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #5a6fd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-section">
+        <h1>🧪 Тест отображения координат</h1>
+        <p>Этот тест демонстрирует, как будут выглядеть поля отображения координат в форме создания анкеты.</p>
+        
+        <h2>📍 Поля координат</h2>
+        <div class="coordinates-display">
+            <div style="margin-bottom: 10px;">
+                <label>📍 Координаты местоположения посетителя:</label>
+                <input type="text" id="visitor-coordinates-display" readonly placeholder="Выберите местоположение на карте">
+            </div>
+            <div>
+                <label>🏪 Координаты выбранного заведения:</label>
+                <input type="text" id="venue-coordinates-display" readonly placeholder="Введите название заведения">
+            </div>
+        </div>
+
+        <h2>🎯 Тестовые кнопки</h2>
+        <button class="btn" onclick="setVisitorCoordinates()">📍 Установить координаты посетителя</button>
+        <button class="btn" onclick="setVenueCoordinates()">🏪 Установить координаты заведения</button>
+        <button class="btn" onclick="clearCoordinates()">🗑️ Очистить координаты</button>
+    </div>
+
+    <script>
+        function setVisitorCoordinates() {
+            const visitorCoords = document.getElementById('visitor-coordinates-display');
+            visitorCoords.value = '55.755826, 37.617300'; // Москва
+        }
+
+        function setVenueCoordinates() {
+            const venueCoords = document.getElementById('venue-coordinates-display');
+            venueCoords.value = '55.755826, 37.617300'; // Координаты заведения
+        }
+
+        function clearCoordinates() {
+            document.getElementById('visitor-coordinates-display').value = '';
+            document.getElementById('venue-coordinates-display').value = '';
+        }
+    </script>
+</body>
+</html> 

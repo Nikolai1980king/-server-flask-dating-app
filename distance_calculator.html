@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Калькулятор расстояния</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 2em;
+            text-align: center;
+        }
+
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 15px;
+            margin: 20px 0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(90deg, #FF9800 0%, #FFB74D 100%);
+        }
+
+        .info-panel {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            color: #333;
+        }
+
+        .distance-display {
+            background: linear-gradient(135deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            display: none;
+        }
+
+        .status {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            color: #333;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .selected-object {
+            background: linear-gradient(135deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧭 Калькулятор расстояния</h1>
+        
+        <div id="map"></div>
+        
+        <div class="controls">
+            <button type="button" class="btn btn-secondary" onclick="getCurrentLocation()">
+                📍 Определить мое местоположение
+            </button>
+            <button type="button" class="btn btn-warning" onclick="createTestObjects()">
+                🏪 Создать тестовые объекты
+            </button>
+            <button type="button" class="btn" onclick="calculateDistance()" id="calculate-btn" disabled>
+                📏 Рассчитать расстояние
+            </button>
+            <button type="button" class="btn btn-warning" onclick="clearAll()">
+                🗑️ Очистить все
+            </button>
+        </div>
+
+        <div class="status" id="status">
+            🔄 Ожидание определения местоположения...
+        </div>
+
+        <div class="selected-object" id="selected-object">
+            Выбранный объект: <span id="selected-name">-</span>
+        </div>
+
+        <div class="distance-display" id="distance-display">
+            <div>📏 Расстояние до объекта:</div>
+            <div id="distance-value">-</div>
+        </div>
+
+        <div class="info-panel">
+            <h3>📋 Информация о местоположении:</h3>
+            <div><strong>Ваши координаты:</strong> <span id="user-coords">Не определены</span></div>
+            <div><strong>Выбранный объект:</strong> <span id="object-info">Не выбран</span></div>
+            <div><strong>Координаты объекта:</strong> <span id="object-coords">-</span></div>
+        </div>
+    </div>
+
+    <script>
+        let myMap;
+        let userLocation = null;
+        let selectedObject = null;
+        let userPlacemark = null;
+        let selectedPlacemark = null;
+        let distanceLine = null;
+        let testObjects = [];
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва
+                    zoom: 12,
+                    controls: ['zoomControl', 'fullscreenControl', 'geolocationControl']
+                });
+                console.log('✅ Карта инициализирована');
+            });
+        }
+
+        function getCurrentLocation() {
+            const statusDiv = document.getElementById('status');
+            const calculateBtn = document.getElementById('calculate-btn');
+            
+            statusDiv.textContent = '📍 Определяем ваше местоположение...';
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        // Добавляем метку пользователя на карту
+                        if (userPlacemark) {
+                            myMap.geoObjects.remove(userPlacemark);
+                        }
+                        
+                        userPlacemark = new ymaps.Placemark([userLocation.lat, userLocation.lng], {
+                            balloonContent: '📍 Ваше местоположение'
+                        }, {
+                            preset: 'islands#blueDotIcon',
+                            iconColor: '#2196F3'
+                        });
+                        
+                        myMap.geoObjects.add(userPlacemark);
+                        myMap.setCenter([userLocation.lat, userLocation.lng], 15);
+                        
+                        // Обновляем информацию
+                        document.getElementById('user-coords').textContent = 
+                            userLocation.lat.toFixed(6) + ', ' + userLocation.lng.toFixed(6);
+                        document.getElementById('status').textContent = '✅ Местоположение определено!';
+                        
+                        // Включаем кнопку расчета расстояния если есть выбранный объект
+                        if (selectedObject) {
+                            calculateBtn.disabled = false;
+                        }
+                        
+                        console.log('✅ Местоположение определено:', userLocation);
+                    },
+                    function(error) {
+                        statusDiv.textContent = '❌ Ошибка определения местоположения';
+                        console.error('❌ Ошибка геолокации:', error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 300000
+                    }
+                );
+            } else {
+                statusDiv.textContent = '❌ Геолокация не поддерживается';
+            }
+        }
+
+        function createTestObjects() {
+            // Удаляем существующие тестовые объекты
+            testObjects.forEach(function(obj) {
+                myMap.geoObjects.remove(obj);
+            });
+            testObjects = [];
+
+            const center = myMap.getCenter();
+            const objects = [
+                {
+                    name: 'Кафе "Уютное место"',
+                    type: 'cafe',
+                    lat: center[0] + 0.002,
+                    lng: center[1] + 0.002
+                },
+                {
+                    name: 'Ресторан "Вкусная еда"',
+                    type: 'restaurant',
+                    lat: center[0] - 0.002,
+                    lng: center[1] + 0.003
+                },
+                {
+                    name: 'Кофейня "Аромат"',
+                    type: 'coffee',
+                    lat: center[0] + 0.003,
+                    lng: center[1] - 0.002
+                },
+                {
+                    name: 'Пиццерия "Итальянская"',
+                    type: 'pizza',
+                    lat: center[0] - 0.001,
+                    lng: center[1] - 0.003
+                }
+            ];
+
+            objects.forEach(function(obj) {
+                const placemark = new ymaps.Placemark([obj.lat, obj.lng], {
+                    balloonContent: '<div style="padding: 10px;"><h3>' + obj.name + '</h3><p>Кликните для выбора</p></div>'
+                }, {
+                    preset: 'islands#redDotIcon',
+                    iconColor: '#FF5722'
+                });
+
+                // Добавляем обработчик клика
+                placemark.events.add('click', function() {
+                    selectObject(obj, placemark);
+                });
+
+                myMap.geoObjects.add(placemark);
+                testObjects.push(placemark);
+            });
+
+            document.getElementById('status').textContent = '✅ Создано ' + objects.length + ' тестовых объектов! Кликните на метки для выбора.';
+            console.log('✅ Создано ' + objects.length + ' тестовых объектов');
+        }
+
+        function selectObject(obj, placemark) {
+            // Убираем выделение с предыдущего объекта
+            if (selectedPlacemark) {
+                selectedPlacemark.options.set('preset', 'islands#redDotIcon');
+                selectedPlacemark.options.set('iconColor', '#FF5722');
+            }
+
+            // Выделяем новый объект зеленым цветом
+            placemark.options.set('preset', 'islands#greenDotIcon');
+            placemark.options.set('iconColor', '#4CAF50');
+
+            selectedObject = obj;
+            selectedPlacemark = placemark;
+
+            // Показываем информацию о выбранном объекте
+            document.getElementById('selected-name').textContent = obj.name;
+            document.getElementById('object-info').textContent = obj.name;
+            document.getElementById('object-coords').textContent = obj.lat.toFixed(6) + ', ' + obj.lng.toFixed(6);
+            document.getElementById('selected-object').style.display = 'block';
+
+            // Включаем кнопку расчета расстояния если есть местоположение пользователя
+            if (userLocation) {
+                document.getElementById('calculate-btn').disabled = false;
+            }
+
+            document.getElementById('status').textContent = '✅ Выбран объект: ' + obj.name;
+            console.log('✅ Выбран объект:', obj);
+        }
+
+        function calculateDistance() {
+            if (!userLocation || !selectedObject) {
+                alert('❌ Необходимо определить местоположение и выбрать объект!');
+                return;
+            }
+
+            // Рассчитываем расстояние по формуле гаверсинуса
+            const distance = calculateHaversineDistance(
+                userLocation.lat, userLocation.lng,
+                selectedObject.lat, selectedObject.lng
+            );
+
+            // Отображаем расстояние
+            const distanceDisplay = document.getElementById('distance-display');
+            const distanceValue = document.getElementById('distance-value');
+            
+            distanceValue.textContent = distance.toFixed(2) + ' км';
+            distanceDisplay.style.display = 'block';
+
+            // Рисуем линию на карте
+            drawDistanceLine();
+
+            document.getElementById('status').textContent = '✅ Расстояние рассчитано: ' + distance.toFixed(2) + ' км';
+            console.log('✅ Расстояние рассчитано:', distance.toFixed(2), 'км');
+        }
+
+        function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Радиус Земли в километрах
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function drawDistanceLine() {
+            // Удаляем предыдущую линию
+            if (distanceLine) {
+                myMap.geoObjects.remove(distanceLine);
+            }
+
+            // Создаем новую линию
+            distanceLine = new ymaps.Polyline([
+                [userLocation.lat, userLocation.lng],
+                [selectedObject.lat, selectedObject.lng]
+            ], {
+                balloonContent: 'Расстояние: ' + calculateHaversineDistance(
+                    userLocation.lat, userLocation.lng,
+                    selectedObject.lat, selectedObject.lng
+                ).toFixed(2) + ' км'
+            }, {
+                strokeColor: '#FF5722',
+                strokeWidth: 3,
+                strokeOpacity: 0.8
+            });
+
+            myMap.geoObjects.add(distanceLine);
+        }
+
+        function clearAll() {
+            // Очищаем все объекты
+            if (userPlacemark) {
+                myMap.geoObjects.remove(userPlacemark);
+                userPlacemark = null;
+            }
+            if (selectedPlacemark) {
+                myMap.geoObjects.remove(selectedPlacemark);
+                selectedPlacemark = null;
+            }
+            if (distanceLine) {
+                myMap.geoObjects.remove(distanceLine);
+                distanceLine = null;
+            }
+            testObjects.forEach(function(obj) {
+                myMap.geoObjects.remove(obj);
+            });
+            testObjects = [];
+
+            // Сбрасываем переменные
+            userLocation = null;
+            selectedObject = null;
+
+            // Очищаем интерфейс
+            document.getElementById('status').textContent = '🔄 Ожидание определения местоположения...';
+            document.getElementById('user-coords').textContent = 'Не определены';
+            document.getElementById('object-info').textContent = 'Не выбран';
+            document.getElementById('object-coords').textContent = '-';
+            document.getElementById('selected-object').style.display = 'none';
+            document.getElementById('distance-display').style.display = 'none';
+            document.getElementById('calculate-btn').disabled = true;
+
+            console.log('✅ Все объекты очищены');
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html> 

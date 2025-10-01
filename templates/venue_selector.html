@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Выбор заведения</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=YOUR_API_KEY&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        #map { 
+            width: 100%; 
+            height: calc(100vh - 60px); 
+            margin-top: 60px; 
+        }
+        .venue-info {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            max-width: 350px;
+            z-index: 1000;
+            border: 2px solid #ff6b6b;
+        }
+        .venue-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+            text-align: center;
+        }
+        .venue-address {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .select-btn {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ffb86b 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .select-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.3);
+        }
+        .select-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+            text-align: center;
+        }
+        .notification {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            z-index: 1001;
+            animation: fadeInOut 4s forwards;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; top: 60px; }
+            10% { opacity: 1; top: 80px; }
+            90% { opacity: 1; top: 80px; }
+            100% { opacity: 0; top: 60px; }
+        }
+        .instructions {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 250px;
+            z-index: 1000;
+            font-size: 14px;
+            color: #333;
+        }
+        .instructions h3 {
+            margin: 0 0 10px 0;
+            color: #ff6b6b;
+        }
+        .instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="instructions">
+        <h3>🎯 Как выбрать заведение:</h3>
+        <ul>
+            <li>Кликните на карту в нужном месте</li>
+            <li>Дождитесь появления балуна</li>
+            <li>Название заведения извлечется автоматически</li>
+            <li>Нажмите "Выбрать заведение"</li>
+        </ul>
+    </div>
+    
+    <div class="venue-info" id="venue-info" style="display: none;">
+        <div class="venue-name" id="venue-name">Название заведения</div>
+        <div class="venue-address" id="venue-address">Адрес</div>
+        <button class="select-btn" id="select-btn" onclick="selectVenue()" disabled>Выбрать заведение</button>
+    </div>
+
+    <script>
+        let myMap;
+        let selectedVenue = null;
+        let currentPlacemark = null;
+
+        function initMap() {
+            // Получаем текущую геолокацию
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    myMap = new ymaps.Map('map', {
+                        center: [lat, lng],
+                        zoom: 15,
+                        controls: ['zoomControl', 'fullscreenControl']
+                    });
+
+                    // Добавляем поиск организаций
+                    const searchControl = new ymaps.control.SearchControl({
+                        options: {
+                            provider: 'yandex#search',
+                            boundedBy: myMap.getBounds()
+                        }
+                    });
+
+                    myMap.controls.add(searchControl);
+
+                    // Обработчик клика по карте
+                    myMap.events.add('click', function(e) {
+                        const coords = e.get('coords');
+                        searchVenues(coords);
+                    });
+
+                }, function(error) {
+                    // Если геолокация недоступна, показываем Москву
+                    myMap = new ymaps.Map('map', {
+                        center: [55.7558, 37.6176],
+                        zoom: 10,
+                        controls: ['zoomControl', 'fullscreenControl']
+                    });
+                });
+            }
+        }
+
+        function searchVenues(coords) {
+            // Удаляем предыдущую метку
+            if (currentPlacemark) {
+                myMap.geoObjects.remove(currentPlacemark);
+            }
+
+            // Добавляем метку в точке клика
+            currentPlacemark = new ymaps.Placemark(coords, {
+                balloonContent: 'Поиск заведений...'
+            }, {
+                preset: 'islands#redDotIcon'
+            });
+            myMap.geoObjects.add(currentPlacemark);
+
+            // Открываем балун
+            currentPlacemark.balloon.open();
+
+            // Поиск организаций в точке клика
+            ymaps.geocode(coords, {
+                results: 10,
+                kind: 'biz'
+            }).then(function(res) {
+                if (res.geoObjects.getLength() > 0) {
+                    const geoObject = res.geoObjects.get(0);
+                    const name = geoObject.getAddressLine();
+                    const address = geoObject.getAddressLine();
+                    
+                    // Обновляем содержимое балуна
+                    currentPlacemark.properties.set('balloonContent', 
+                        `<div style="padding: 10px;">
+                            <h3>${name}</h3>
+                            <p>${address}</p>
+                            <button onclick="parseBalloonAndSelect('${name}', '${address}', ${coords[0]}, ${coords[1]})" 
+                                    style="background: #ff6b6b; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">
+                                Выбрать это заведение
+                            </button>
+                        </div>`
+                    );
+                    
+                    // Автоматически парсим название из балуна
+                    parseBalloonAndSelect(name, address, coords[0], coords[1]);
+                }
+            });
+        }
+
+        function parseBalloonAndSelect(name, address, lat, lng) {
+            // Имитируем парсинг балуна (как в balloon_parser.html)
+            const parsedName = extractNameFromBalloon();
+            
+            selectedVenue = {
+                name: parsedName || name,
+                address: address,
+                lat: lat,
+                lng: lng
+            };
+            
+            showVenueInfo(selectedVenue.name, address);
+            showNotification('Название заведения извлечено автоматически!');
+        }
+
+        function extractNameFromBalloon() {
+            // Функция извлечения названия из балуна (упрощенная версия)
+            try {
+                // Ищем все ссылки в балуне
+                const balloonLinks = document.querySelectorAll('.ymaps-2-1-79-balloon a, .ymaps-balloon a, .balloon a');
+                
+                if (balloonLinks.length > 0) {
+                    const firstLink = balloonLinks[0];
+                    const linkText = firstLink.textContent.trim();
+                    
+                    if (linkText && linkText.length > 2 && linkText.length < 100) {
+                        return linkText;
+                    }
+                }
+                
+                // Если ссылки не найдены, ищем первый текстовый элемент
+                const balloonElements = document.querySelectorAll('.ymaps-2-1-79-balloon *, .ymaps-balloon *, .balloon *');
+                for (let element of balloonElements) {
+                    const text = element.textContent.trim();
+                    if (text && text.length > 2 && text.length < 50 &&
+                        !text.includes('Share') && !text.includes('Телефон') && 
+                        !text.includes('Адрес') && !text.includes('Часы') && 
+                        !text.includes('Рейтинг') && !text.includes('Открыто')) {
+                        return text;
+                    }
+                }
+            } catch (error) {
+                console.log('Ошибка при парсинге балуна:', error);
+            }
+            
+            return null;
+        }
+
+        function showVenueInfo(name, address) {
+            document.getElementById('venue-name').textContent = name;
+            document.getElementById('venue-address').textContent = address;
+            document.getElementById('venue-info').style.display = 'block';
+            document.getElementById('select-btn').disabled = false;
+        }
+
+        function selectVenue() {
+            if (selectedVenue) {
+                // Сохраняем выбранное заведение в localStorage
+                localStorage.setItem('selectedVenue', JSON.stringify(selectedVenue));
+                
+                // Показываем уведомление
+                showNotification('Заведение выбрано! Переходим к созданию анкеты...');
+                
+                // Переходим к созданию анкеты
+                setTimeout(() => {
+                    window.location.href = '/create_profile';
+                }, 2000);
+            }
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 4000);
+        }
+
+        // Инициализация карты при загрузке страницы
+        ymaps.ready(initMap);
+    </script>
+</body>
+</html> 

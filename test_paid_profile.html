@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест оплаченного профиля</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .btn { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 5px; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест оплаченного профиля</h1>
+        
+        <div class="success">
+            <h3>✅ Профиль оплачен!</h3>
+            <p><strong>ID профиля:</strong> 0780098c-3e59-41dd-bb5e-e3536dca2276</p>
+            <p><strong>Статус:</strong> Оплачен и активен</p>
+        </div>
+
+        <h3>🔗 Полезные ссылки:</h3>
+        <a href="/" class="btn">🏠 Главная страница</a>
+        <a href="/my_profile" class="btn btn-success">👤 Мой профиль</a>
+        <a href="/admin/payments" class="btn">👁️ Админ панель</a>
+        <a href="/payment/success?user_id=0780098c-3e59-41dd-bb5e-e3536dca2276" class="btn">✅ Страница успешной оплаты</a>
+
+        <h3>📊 Проверка статуса:</h3>
+        <button onclick="checkProfileStatus()" class="btn">Проверить статус профиля</button>
+        <div id="statusResult" class="result info" style="display: none;"></div>
+
+        <h3>💡 Информация:</h3>
+        <p>После успешной оплаты:</p>
+        <ol>
+            <li>Профиль автоматически помечается как оплаченный</li>
+            <li>Получается доступ ко всем функциям приложения</li>
+            <li>Профиль не удаляется системой очистки</li>
+            <li>Доступен просмотр других профилей</li>
+        </ol>
+    </div>
+
+    <script>
+        function showResult(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.innerHTML = message;
+        }
+
+        async function checkProfileStatus() {
+            showResult('statusResult', '🔄 Проверяем статус профиля...');
+            
+            try {
+                const response = await fetch('/api/check-profile/0780098c-3e59-41dd-bb5e-e3536dca2276');
+                const data = await response.json();
+                
+                if (data.exists) {
+                    showResult('statusResult', 
+                        `✅ Профиль найден!<br>
+                         📝 Имя: ${data.name}<br>
+                         💰 Оплачен: ${data.is_paid ? 'Да' : 'Нет'}<br>
+                         📅 Дата создания: ${data.created_at}<br>
+                         📅 Дата оплаты: ${data.payment_date || 'Не оплачен'}`
+                    );
+                } else {
+                    showResult('statusResult', '❌ Профиль не найден');
+                }
+            } catch (error) {
+                showResult('statusResult', `❌ Ошибка: ${error.message}`);
+            }
+        }
+
+        // Автоматически проверяем статус при загрузке
+        window.addEventListener('load', () => {
+            setTimeout(checkProfileStatus, 1000);
+        });
+    </script>
+</body>
+</html>

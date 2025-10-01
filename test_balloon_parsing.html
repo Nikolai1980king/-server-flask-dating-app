@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест парсинга балунов</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .controls {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ffb86b 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+        .result {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .info { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест парсинга балунов Яндекс.Карт</h1>
+        
+        <div class="controls">
+            <h3>Инструкции:</h3>
+            <ol>
+                <li>Кликните на карту в любом месте</li>
+                <li>Дождитесь появления балуна с информацией о заведении</li>
+                <li>Нажмите кнопку "🔍 Парсить балун"</li>
+                <li>Проверьте результаты в консоли и ниже</li>
+            </ol>
+            
+            <button onclick="parseCurrentBalloon()">🔍 Парсить балун</button>
+            <button onclick="clearResults()">🗑️ Очистить результаты</button>
+            <button onclick="showAllElements()">🔍 Показать все элементы</button>
+        </div>
+
+        <div id="map"></div>
+        
+        <div class="controls">
+            <h3>Результаты парсинга:</h3>
+            <div id="results" class="result">Нажмите "Парсить балун" для начала...</div>
+        </div>
+    </div>
+
+    <script>
+        let myMap, myPlacemark;
+        let results = [];
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва
+                    zoom: 12,
+                    controls: ['zoomControl', 'fullscreenControl']
+                });
+
+                myMap.events.add('click', function (e) {
+                    var coords = e.get('coords');
+                    setLocation(coords[0], coords[1]);
+                });
+            });
+        }
+
+        function setLocation(lat, lng) {
+            if (myPlacemark) {
+                myMap.geoObjects.remove(myPlacemark);
+            }
+
+            myPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Выбранное местоположение'
+            }, {
+                preset: 'islands#redDotIcon'
+            });
+
+            myMap.geoObjects.add(myPlacemark);
+            myMap.setCenter([lat, lng], 15);
+
+            // Ищем заведения в этой точке
+            searchVenuesAtLocation(lat, lng);
+        }
+
+        function searchVenuesAtLocation(lat, lng) {
+            ymaps.geocode([lat, lng], {
+                results: 10,
+                kind: 'biz'
+            }).then(function(res) {
+                if (res.geoObjects.getLength() > 0) {
+                    const geoObject = res.geoObjects.get(0);
+                    const name = geoObject.getAddressLine();
+                    const address = geoObject.getAddressLine();
+                    
+                    myPlacemark.properties.set('balloonContent',
+                        `<div style="padding: 10px;">
+                            <h3>${name}</h3>
+                            <p>${address}</p>
+                            <button onclick="parseBalloonAndShowResults('${name}', '${address}', ${lat}, ${lng})"
+                                    style="background: #ff6b6b; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">
+                                🔍 Парсить это заведение
+                            </button>
+                        </div>`
+                    );
+                    myPlacemark.balloon.open();
+                }
+            });
+        }
+
+        function parseCurrentBalloon() {
+            addResult('🔍 Начинаем парсинг текущего балуна...', 'info');
+            
+            const parsedName = extractNameFromBalloon();
+            
+            if (parsedName) {
+                addResult(`✅ Найдено название: "${parsedName}"`, 'success');
+            } else {
+                addResult('❌ Название не найдено', 'error');
+            }
+            
+            // Показываем отладочную информацию
+            debugBalloonStructure();
+        }
+
+        function parseBalloonAndShowResults(name, address, lat, lng) {
+            addResult(`🎯 Парсинг заведения: ${name}`, 'info');
+            
+            const parsedName = extractNameFromBalloon();
+            
+            addResult(`📋 Результаты:`, 'info');
+            addResult(`  Исходное название: ${name}`, 'info');
+            addResult(`  Распарсенное название: ${parsedName || 'НЕ НАЙДЕНО'}`, parsedName ? 'success' : 'error');
+            addResult(`  Финальное название: ${parsedName || name}`, 'info');
+            
+            // Отладочная информация
+            debugBalloonStructure();
+        }
+
+        function extractNameFromBalloon() {
+            try {
+                addResult('🔍 Начинаем поиск балуна...', 'info');
+                
+                // Ищем балун по всем возможным селекторам
+                let balloonContent = document.querySelector('.ymaps-2-1-79-balloon');
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('.ymaps-balloon');
+                }
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('.balloon');
+                }
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('[class*="balloon"]');
+                }
+                if (!balloonContent) {
+                    balloonContent = document.querySelector('[class*="ymaps"]');
+                }
+                
+                if (!balloonContent) {
+                    addResult('❌ Балун не найден', 'error');
+                    return null;
+                }
+                
+                addResult(`✅ Балун найден: ${balloonContent.className}`, 'success');
+                
+                // Получаем HTML контент
+                const htmlContent = balloonContent.innerHTML;
+                addResult(`📏 Размер HTML: ${htmlContent.length} символов`, 'info');
+                
+                // Ищем все ссылки в балуне
+                const links = balloonContent.querySelectorAll('a');
+                addResult(`🔗 Найдено ссылок: ${links.length}`, 'info');
+                
+                if (links.length > 0) {
+                    for (let i = 0; i < links.length; i++) {
+                        const link = links[i];
+                        const linkText = link.textContent.trim();
+                        addResult(`🔗 Ссылка ${i + 1}: "${linkText}"`, 'info');
+                        
+                        // Проверяем, что это не служебная ссылка
+                        if (isValidVenueName(linkText)) {
+                            addResult(`✅ Найдено название в ссылке: "${linkText}"`, 'success');
+                            return linkText;
+                        }
+                    }
+                }
+                
+                // Ищем заголовки
+                const headers = balloonContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                addResult(`📋 Найдено заголовков: ${headers.length}`, 'info');
+                
+                for (let header of headers) {
+                    const headerText = header.textContent.trim();
+                    addResult(`📋 Заголовок: "${headerText}"`, 'info');
+                    
+                    if (isValidVenueName(headerText)) {
+                        addResult(`✅ Найдено название в заголовке: "${headerText}"`, 'success');
+                        return headerText;
+                    }
+                }
+                
+                // Ищем элементы с классами name/title
+                const nameElements = balloonContent.querySelectorAll('[class*="name"], [class*="title"]');
+                addResult(`🏷️ Найдено элементов с name/title: ${nameElements.length}`, 'info');
+                
+                for (let element of nameElements) {
+                    const elementText = element.textContent.trim();
+                    addResult(`🏷️ Элемент с name/title: "${elementText}"`, 'info');
+                    
+                    if (isValidVenueName(elementText)) {
+                        addResult(`✅ Найдено название в элементе с name/title: "${elementText}"`, 'success');
+                        return elementText;
+                    }
+                }
+                
+                // Последняя попытка - ищем первый значимый текстовый элемент
+                const allElements = balloonContent.querySelectorAll('*');
+                addResult(`🔍 Всего элементов в балуне: ${allElements.length}`, 'info');
+                
+                for (let element of allElements) {
+                    const text = element.textContent.trim();
+                    if (isValidVenueName(text)) {
+                        addResult(`✅ Найдено название в текстовом элементе: "${text}"`, 'success');
+                        return text;
+                    }
+                }
+                
+                addResult('❌ Название не найдено', 'error');
+                
+            } catch (error) {
+                addResult(`❌ Ошибка при парсинге: ${error.message}`, 'error');
+            }
+            
+            return null;
+        }
+
+        function isValidVenueName(name) {
+            return name && name.length > 2 && name.length < 100 &&
+                !name.includes('Share') && !name.includes('Поделиться') &&
+                !name.includes('Телефон') && !name.includes('Адрес') &&
+                !name.includes('Часы') && !name.includes('Рейтинг') &&
+                !name.includes('Открыто') && !name.includes('Закрыто') &&
+                !name.includes('www.') && !name.includes('http') &&
+                !name.includes('+7') && !name.includes('8-') &&
+                !name.match(/^\d+$/) && !name.match(/^\d+\.\d+$/) &&
+                !name.includes('отзыв') && !name.includes('отзывов') &&
+                !name.includes('Показать') && !name.includes('Написать') &&
+                !name.includes('Позвонить') && !name.includes('Поделиться');
+        }
+
+        function debugBalloonStructure() {
+            addResult('🔍 Отладка структуры балуна...', 'info');
+            
+            const selectors = [
+                '.ymaps-2-1-79-balloon',
+                '.ymaps-balloon', 
+                '.balloon',
+                '[class*="balloon"]',
+                '[class*="ymaps"]'
+            ];
+            
+            for (let selector of selectors) {
+                const elements = document.querySelectorAll(selector);
+                addResult(`🔍 Селектор "${selector}": найдено ${elements.length} элементов`, 'info');
+                
+                for (let i = 0; i < elements.length; i++) {
+                    const element = elements[i];
+                    addResult(`  Элемент ${i + 1}: ${element.className} (${element.tagName})`, 'info');
+                    addResult(`    Текст: "${element.textContent.substring(0, 50)}..."`, 'info');
+                }
+            }
+            
+            const allLinks = document.querySelectorAll('a');
+            addResult(`🔗 Всего ссылок на странице: ${allLinks.length}`, 'info');
+            
+            for (let i = 0; i < Math.min(allLinks.length, 5); i++) {
+                const link = allLinks[i];
+                addResult(`  Ссылка ${i + 1}: "${link.textContent.trim()}"`, 'info');
+            }
+        }
+
+        function showAllElements() {
+            addResult('🔍 Показываем все элементы на странице...', 'info');
+            
+            const allElements = document.querySelectorAll('*');
+            addResult(`📊 Всего элементов на странице: ${allElements.length}`, 'info');
+            
+            // Группируем по тегам
+            const tagCounts = {};
+            for (let element of allElements) {
+                const tag = element.tagName;
+                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            }
+            
+            for (let tag in tagCounts) {
+                addResult(`  ${tag}: ${tagCounts[tag]}`, 'info');
+            }
+        }
+
+        function addResult(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const result = `[${timestamp}] ${message}`;
+            results.push({ message: result, type: type });
+            
+            updateResultsDisplay();
+            console.log(result);
+        }
+
+        function updateResultsDisplay() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = results.map(r => 
+                `<div class="${r.type}">${r.message}</div>`
+            ).join('');
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function clearResults() {
+            results = [];
+            updateResultsDisplay();
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+            addResult('🚀 Страница загружена, карта инициализирована', 'success');
+        };
+    </script>
+</body>
+</html> 

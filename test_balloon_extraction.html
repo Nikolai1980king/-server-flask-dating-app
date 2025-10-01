@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест извлечения информации из балунов</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .info-panel {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            color: #333;
+        }
+        
+        .venue-input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #333;
+            font-size: 1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест извлечения информации из балунов</h1>
+        
+        <div id="map"></div>
+        
+        <div style="text-align: center; margin: 10px 0;">
+            <button type="button" class="btn" onclick="createTestCafes()">🏪 Создать тестовые кафе</button>
+            <button type="button" class="btn" onclick="readBalloonInfo()" style="background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);">
+                📋 Читать информацию из балуна
+            </button>
+        </div>
+        
+        <label for="venue-input" style="display: block; margin-top: 15px; margin-bottom: 5px;">📋 Извлеченная информация:</label>
+        <input type="text" name="venue" id="venue-input" class="venue-input" placeholder="Информация появится здесь после извлечения" readonly>
+        
+        <div class="info-panel">
+            <h3>📋 Инструкция:</h3>
+            <ol>
+                <li>Нажмите "🏪 Создать тестовые кафе" для добавления меток на карту</li>
+                <li>Кликните на любую синюю метку - откроется балун с информацией</li>
+                <li>В балуне нажмите кнопку "📋 Извлечь информацию"</li>
+                <li>Или используйте кнопку "📋 Читать информацию из балуна" (если балун открыт)</li>
+                <li>Информация появится в поле выше</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let myMap;
+        let selectedVenue = null;
+        let testCafes = [];
+
+        function initMap() {
+            ymaps.ready(function () {
+                myMap = new ymaps.Map('map', {
+                    center: [55.76, 37.64], // Москва
+                    zoom: 12,
+                    controls: ['zoomControl', 'fullscreenControl']
+                });
+                console.log('Карта инициализирована');
+            });
+        }
+
+        // Функция создания тестовых кафе
+        function createTestCafes() {
+            // Удаляем существующие тестовые кафе
+            testCafes.forEach(function(cafe) {
+                myMap.geoObjects.remove(cafe);
+            });
+            testCafes = [];
+
+            var center = myMap.getCenter();
+            var cafes = [
+                {
+                    name: 'Кафе "Уютное место"',
+                    phone: '+7 (495) 123-45-67',
+                    address: 'ул. Тверская, 15',
+                    lat: center[0] + 0.001,
+                    lng: center[1] + 0.001
+                },
+                {
+                    name: 'Ресторан "Вкусная еда"',
+                    phone: '+7 (495) 234-56-78',
+                    address: 'ул. Арбат, 25',
+                    lat: center[0] - 0.001,
+                    lng: center[1] + 0.002
+                },
+                {
+                    name: 'Кофейня "Аромат"',
+                    phone: '+7 (495) 345-67-89',
+                    address: 'Кутузовский пр-т, 10',
+                    lat: center[0] + 0.002,
+                    lng: center[1] - 0.001
+                }
+            ];
+
+            cafes.forEach(function(cafe) {
+                // Создаем HTML-содержимое для балуна
+                var balloonContent = '<div style="padding: 10px; font-family: Arial, sans-serif;">' +
+                    '<h3 style="margin: 0 0 10px 0; color: #333;">' + cafe.name + '</h3>' +
+                    '<p style="margin: 5px 0; color: #666;">' +
+                    '<strong>📞 Телефон:</strong> <a href="tel:' + cafe.phone + '" style="color: #2196F3;">' + cafe.phone + '</a>' +
+                    '</p>' +
+                    '<p style="margin: 5px 0; color: #666;">' +
+                    '<strong>📍 Адрес:</strong> ' + cafe.address +
+                    '</p>' +
+                    '<button onclick="extractFromBalloon(\'' + cafe.name.replace(/'/g, '\\\'') + '\', \'' + cafe.phone + '\', \'' + cafe.address.replace(/'/g, '\\\'') + '\')" ' +
+                    'style="background: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin-top: 10px;">' +
+                    '📋 Извлечь информацию' +
+                    '</button>' +
+                    '</div>';
+
+                var cafePlacemark = new ymaps.Placemark([cafe.lat, cafe.lng], {
+                    balloonContent: balloonContent
+                }, {
+                    preset: 'islands#blueDotIcon',
+                    iconColor: '#2196F3'
+                });
+
+                cafePlacemark.properties.set('name', cafe.name);
+                cafePlacemark.properties.set('phone', cafe.phone);
+                cafePlacemark.properties.set('address', cafe.address);
+
+                myMap.geoObjects.add(cafePlacemark);
+                testCafes.push(cafePlacemark);
+            });
+
+            alert('Создано ' + cafes.length + ' тестовых кафе! Кликните на синие метки.');
+            console.log('Создано ' + cafes.length + ' тестовых кафе');
+        }
+
+        // Функция извлечения информации из балуна
+        function extractFromBalloon(name, phone, address) {
+            console.log('Извлечение информации из балуна:', name, phone, address);
+
+            var center = myMap.getCenter();
+            selectedVenue = {
+                name: name,
+                phone: phone,
+                address: address,
+                lat: center[0],
+                lng: center[1]
+            };
+
+            document.getElementById('venue-input').value = name + ' | ' + phone + ' | ' + address;
+            
+            if (myMap.balloon) {
+                myMap.balloon.close();
+            }
+            
+            alert('📋 Информация извлечена: ' + name);
+        }
+
+        // Функция чтения информации из любого балуна на карте
+        function readBalloonInfo() {
+            console.log('Попытка чтения информации из активного балуна');
+            
+            if (!myMap.balloon || !myMap.balloon.isOpen()) {
+                alert('Нет открытого балуна для чтения!');
+                return;
+            }
+
+            try {
+                var balloonContent = myMap.balloon.getData().content;
+                console.log('Содержимое балуна:', balloonContent);
+
+                var nameMatch = balloonContent.match(/<h3[^>]*>([^<]+)<\/h3>/);
+                var phoneMatch = balloonContent.match(/Телефон:<\/strong>\s*<a[^>]*>([^<]+)<\/a>/);
+                var addressMatch = balloonContent.match(/Адрес:<\/strong>\s*([^<]+)/);
+
+                var extractedInfo = {
+                    name: nameMatch ? nameMatch[1].trim() : 'Неизвестно',
+                    phone: phoneMatch ? phoneMatch[1].trim() : 'Не указан',
+                    address: addressMatch ? addressMatch[1].trim() : 'Не указан'
+                };
+
+                console.log('Извлеченная информация:', extractedInfo);
+
+                var center = myMap.getCenter();
+                selectedVenue = {
+                    name: extractedInfo.name,
+                    phone: extractedInfo.phone,
+                    address: extractedInfo.address,
+                    lat: center[0],
+                    lng: center[1]
+                };
+
+                document.getElementById('venue-input').value = extractedInfo.name + ' | ' + extractedInfo.phone + ' | ' + extractedInfo.address;
+                
+                alert('📋 Информация извлечена из балуна: ' + extractedInfo.name);
+                
+            } catch (error) {
+                console.error('Ошибка при чтении балуна:', error);
+                alert('Ошибка при чтении информации из балуна');
+            }
+        }
+
+        // Инициализация карты при загрузке страницы
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html> 

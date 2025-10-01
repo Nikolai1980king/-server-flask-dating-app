@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест перенаправления профиля</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        #log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест перенаправления профиля</h1>
+    
+    <div class="test-section">
+        <h2>🔍 Проверка текущего состояния</h2>
+        <button class="button" onclick="checkCurrentState()">Проверить состояние</button>
+        <button class="button" onclick="testRedirect()">Тест перенаправления</button>
+        <div id="current-state"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📱 Тестирование страниц</h2>
+        <button class="button" onclick="testHomePage()">Тест главной страницы</button>
+        <button class="button" onclick="testCreatePage()">Тест страницы создания</button>
+        <button class="button" onclick="testProfilePage()">Тест страницы профиля</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Лог операций</h2>
+        <button class="button" onclick="clearLog()">Очистить лог</button>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'success' ? '#28a745' : 
+                         type === 'error' ? '#dc3545' : 
+                         type === 'warning' ? '#ffc107' : '#17a2b8';
+            
+            logDiv.innerHTML += `<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        function checkCurrentState() {
+            const cookie = getCookie('user_id');
+            const storage = localStorage.getItem('dating_app_user_id');
+            
+            const stateDiv = document.getElementById('current-state');
+            stateDiv.innerHTML = `
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;">
+                    <strong>Текущее состояние:</strong><br>
+                    Cookie: ${cookie || 'не найден'}<br>
+                    localStorage: ${storage || 'не найден'}<br>
+                    Совпадение: ${cookie === storage ? '✅' : '❌'}
+                </div>
+            `;
+            
+            log(`🍪 Cookie: ${cookie || 'не найден'}`, cookie ? 'success' : 'warning');
+            log(`💾 localStorage: ${storage || 'не найден'}`, storage ? 'success' : 'warning');
+        }
+
+        async function testRedirect() {
+            const userId = getCookie('user_id') || localStorage.getItem('dating_app_user_id');
+            
+            if (!userId) {
+                log('❌ Нет User ID для тестирования', 'warning');
+                return;
+            }
+            
+            try {
+                log(`🔍 Проверяем профиль для ID: ${userId}`, 'info');
+                const response = await fetch(`/api/check-profile/${userId}`);
+                const data = await response.json();
+                
+                if (data.success && data.exists) {
+                    log('✅ Профиль найден! Тестируем перенаправление...', 'success');
+                    
+                    // Тестируем перенаправление на главную страницу
+                    log('🔄 Открываем главную страницу в новой вкладке', 'info');
+                    window.open('/', '_blank');
+                    
+                } else {
+                    log('❌ Профиль не найден', 'warning');
+                }
+            } catch (error) {
+                log(`❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+
+        function testHomePage() {
+            log('🔄 Открываем главную страницу', 'info');
+            window.open('/', '_blank');
+        }
+
+        function testCreatePage() {
+            log('🔄 Открываем страницу создания анкеты', 'info');
+            window.open('/create', '_blank');
+        }
+
+        function testProfilePage() {
+            const userId = getCookie('user_id') || localStorage.getItem('dating_app_user_id');
+            if (userId) {
+                log(`🔄 Открываем страницу профиля для ID: ${userId}`, 'info');
+                window.open(`/my_profile`, '_blank');
+            } else {
+                log('❌ Нет User ID для открытия профиля', 'warning');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('📝 Лог очищен', 'info');
+        }
+
+        // Автоматическая проверка при загрузке
+        window.onload = function() {
+            log('🚀 Страница загружена', 'info');
+            checkCurrentState();
+        };
+    </script>
+</body>
+</html> 

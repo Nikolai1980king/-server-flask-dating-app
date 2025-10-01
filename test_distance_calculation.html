@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест расчета расстояния</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .coordinates-display {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .coordinates-display label {
+            color: #333;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .coordinates-display input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+            color: #333;
+            font-family: monospace;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-section">
+        <h1>🧪 Тест расчета расстояния</h1>
+        <p>Этот тест демонстрирует функциональность расчета расстояния между координатами посетителя и заведения.</p>
+        
+        <h2>📍 Поля координат и расстояния</h2>
+        <div class="coordinates-display">
+            <div style="margin-bottom: 10px;">
+                <label>📍 Координаты местоположения посетителя:</label>
+                <input type="text" id="visitor-coordinates-display" placeholder="Выберите местоположение на карте">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>🏪 Координаты выбранного заведения:</label>
+                <input type="text" id="venue-coordinates-display" placeholder="Введите название заведения">
+            </div>
+            <div>
+                <label>📏 Расстояние между посетителем и заведением:</label>
+                <input type="text" id="distance-display" readonly placeholder="Расчет расстояния...">
+            </div>
+        </div>
+
+        <h2>🎯 Тестовые кнопки</h2>
+        <button class="btn" onclick="setTestCoordinates1()">📍 Москва → 🏪 Санкт-Петербург</button>
+        <button class="btn" onclick="setTestCoordinates2()">📍 Москва → 🏪 Красная площадь</button>
+        <button class="btn" onclick="setTestCoordinates3()">📍 Нью-Йорк → 🏪 Лондон</button>
+        <button class="btn" onclick="clearAllCoordinates()">🗑️ Очистить все</button>
+        <button class="btn" onclick="calculateDistance()">📏 Рассчитать расстояние</button>
+
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        function setTestCoordinates1() {
+            document.getElementById('visitor-coordinates-display').value = '55.755826, 37.617300'; // Москва
+            document.getElementById('venue-coordinates-display').value = '59.931058, 30.360909'; // Санкт-Петербург
+            calculateDistance();
+            showResult('✅ Установлены координаты: Москва → Санкт-Петербург', 'success');
+        }
+
+        function setTestCoordinates2() {
+            document.getElementById('visitor-coordinates-display').value = '55.755826, 37.617300'; // Москва
+            document.getElementById('venue-coordinates-display').value = '55.753930, 37.620795'; // Красная площадь
+            calculateDistance();
+            showResult('✅ Установлены координаты: Москва → Красная площадь', 'success');
+        }
+
+        function setTestCoordinates3() {
+            document.getElementById('visitor-coordinates-display').value = '40.712776, -74.005974'; // Нью-Йорк
+            document.getElementById('venue-coordinates-display').value = '51.507351, -0.127758'; // Лондон
+            calculateDistance();
+            showResult('✅ Установлены координаты: Нью-Йорк → Лондон', 'success');
+        }
+
+        function clearAllCoordinates() {
+            document.getElementById('visitor-coordinates-display').value = '';
+            document.getElementById('venue-coordinates-display').value = '';
+            document.getElementById('distance-display').value = '';
+            showResult('🗑️ Все координаты очищены', 'info');
+        }
+
+        function calculateDistance() {
+            const visitorCoordsDisplay = document.getElementById('visitor-coordinates-display');
+            const venueCoordsDisplay = document.getElementById('venue-coordinates-display');
+            const distanceDisplay = document.getElementById('distance-display');
+            
+            if (!visitorCoordsDisplay || !venueCoordsDisplay || !distanceDisplay) {
+                showResult('❌ Элементы не найдены', 'error');
+                return;
+            }
+            
+            const visitorCoords = visitorCoordsDisplay.value.trim();
+            const venueCoords = venueCoordsDisplay.value.trim();
+            
+            if (!visitorCoords || !venueCoords) {
+                distanceDisplay.value = '';
+                showResult('⚠️ Введите координаты посетителя и заведения', 'error');
+                return;
+            }
+            
+            try {
+                // Парсим координаты
+                const [visitorLat, visitorLng] = visitorCoords.split(',').map(coord => parseFloat(coord.trim()));
+                const [venueLat, venueLng] = venueCoords.split(',').map(coord => parseFloat(coord.trim()));
+                
+                if (isNaN(visitorLat) || isNaN(visitorLng) || isNaN(venueLat) || isNaN(venueLng)) {
+                    distanceDisplay.value = 'Ошибка в координатах';
+                    showResult('❌ Ошибка в формате координат', 'error');
+                    return;
+                }
+                
+                // Отправляем запрос на сервер для расчета расстояния
+                fetch('/api/calculate-distance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        visitor_lat: visitorLat,
+                        visitor_lng: visitorLng,
+                        venue_lat: venueLat,
+                        venue_lng: venueLng
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const distance = data.distance;
+                        if (distance < 1000) {
+                            distanceDisplay.value = `${Math.round(distance)} метров`;
+                        } else {
+                            distanceDisplay.value = `${(distance / 1000).toFixed(2)} км`;
+                        }
+                        showResult(`✅ Расстояние рассчитано: ${distance.toFixed(0)} метров`, 'success');
+                    } else {
+                        distanceDisplay.value = 'Ошибка расчета';
+                        showResult(`❌ Ошибка расчета: ${data.error}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    distanceDisplay.value = 'Ошибка сети';
+                    showResult(`❌ Ошибка сети: ${error.message}`, 'error');
+                });
+                
+            } catch (error) {
+                distanceDisplay.value = 'Ошибка в координатах';
+                showResult(`❌ Ошибка парсинга: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(message, type) {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+            
+            // Удаляем старые результаты через 5 секунд
+            setTimeout(() => {
+                if (resultDiv.parentNode) {
+                    resultDiv.parentNode.removeChild(resultDiv);
+                }
+            }, 5000);
+        }
+
+        // Автоматический расчет при изменении координат
+        document.getElementById('visitor-coordinates-display').addEventListener('input', calculateDistance);
+        document.getElementById('venue-coordinates-display').addEventListener('input', calculateDistance);
+    </script>
+</body>
+</html> 

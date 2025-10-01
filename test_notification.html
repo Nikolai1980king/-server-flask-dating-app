@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Тест уведомлений</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .success { background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%); }
+        .error { background: linear-gradient(90deg, #f44336 0%, #e57373 100%); }
+        .info { background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%); }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест уведомлений</h1>
+    
+    <div class="test-section">
+        <h3>📢 Тест уведомлений</h3>
+        <button onclick="testSuccess()">✅ Успех</button>
+        <button onclick="testInfo()">ℹ️ Информация</button>
+        <button onclick="testError()">❌ Ошибка</button>
+    </div>
+
+    <div class="test-section">
+        <h3>📏 Тест расчета расстояния</h3>
+        <button onclick="testDistance()">🧭 Рассчитать расстояние</button>
+    </div>
+
+    <script>
+        // Функция показа уведомлений
+        function showNotification(message, type) {
+            var notification = document.createElement('div');
+            notification.className = 'notification ' + type;
+            notification.innerHTML = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // Тестовые функции
+        function testSuccess() {
+            showNotification('✅ Это уведомление об успехе!', 'success');
+        }
+
+        function testInfo() {
+            showNotification('ℹ️ Это информационное уведомление!', 'info');
+        }
+
+        function testError() {
+            showNotification('❌ Это уведомление об ошибке!', 'error');
+        }
+
+        // Тест расчета расстояния
+        async function testDistance() {
+            try {
+                const response = await fetch('/api/calculate-distance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        lat1: 55.7558,
+                        lon1: 37.6176,
+                        lat2: 55.7517,
+                        lon2: 37.6178
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const distance = data.distance_meters;
+                    if (distance <= 100) {
+                        showNotification(`✅ Расстояние OK: ${distance.toFixed(1)}м (geopy)`, 'success');
+                    } else {
+                        showNotification(`⚠️ Расстояние: ${distance.toFixed(1)}м (geopy)`, 'info');
+                    }
+                } else {
+                    showNotification(`❌ Ошибка: ${data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showNotification(`❌ Ошибка API: ${error.message}`, 'error');
+            }
+        }
+
+        // Автоматический тест при загрузке
+        window.onload = function() {
+            console.log('🚀 Страница загружена, готов к тестированию');
+            showNotification('🧪 Страница загружена! Нажмите кнопки для тестирования', 'info');
+        };
+    </script>
+</body>
+</html> 

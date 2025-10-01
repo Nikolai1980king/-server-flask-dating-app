@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест кнопки "назад к анкете" на удаленном сервере</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .test-button {
+            background: #a709b5;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.2em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .test-button:hover {
+            background: #8a077a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(167, 9, 181, 0.4);
+        }
+        .back-btn {
+            background: #666;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.2);
+            border: 1px solid rgba(33, 150, 243, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Тест кнопки "назад к анкете"</h1>
+        
+        <div class="info">
+            <h3>📋 Инструкции для тестирования:</h3>
+            <ol>
+                <li>Откройте <a href="https://ятута.рф/payment" target="_blank" style="color: #4CAF50;">https://ятута.рф/payment</a></li>
+                <li>Нажмите на кнопку "← Назад к анкете"</li>
+                <li>Проверьте, что происходит переход на страницу создания анкеты</li>
+            </ol>
+        </div>
+        
+        <div class="info">
+            <h3>🔧 Техническая информация:</h3>
+            <ul>
+                <li><strong>Строка в коде:</strong> 6362 в app.py</li>
+                <li><strong>Ожидаемое поведение:</strong> Переход на <code>/create</code></li>
+                <li><strong>Текущий код:</strong> <code>&lt;a href="/create" class="back-btn"&gt;← Назад к анкете&lt;/a&gt;</code></li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <h3>🚨 Если проблема сохраняется:</h3>
+            <p>Возможные причины:</p>
+            <ul>
+                <li>Кэширование браузера - попробуйте Ctrl+F5</li>
+                <li>Сервер не перезапустился - нужно принудительно перезапустить</li>
+                <li>Есть другие экземпляры функции payment() в коде</li>
+                <li>Проблема с nginx или прокси-сервером</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center;">
+            <a href="https://ятута.рф/payment" class="test-button" target="_blank">
+                🧪 Тестировать страницу оплаты
+            </a>
+            <a href="https://ятута.рф/create" class="back-btn" target="_blank">
+                📝 Перейти к созданию анкеты
+            </a>
+        </div>
+    </div>
+</body>
+</html>
+ 

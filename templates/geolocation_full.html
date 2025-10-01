@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }}</title>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 500px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            background-size: 400% 400%;
+            animation: starryNight 15s ease infinite;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        @keyframes starryNight {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: twinkle 4s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .form-container {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        input, textarea, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #333;
+            font-size: 1em;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+        }
+
+        label {
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+
+        .modern-btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .modern-btn:hover {
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px) scale(1.05);
+        }
+        .back-btn {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            box-shadow: 0 4px 14px rgba(108,117,125,0.2);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .back-btn:hover {
+            box-shadow: 0 8px 24px rgba(108,117,125,0.3);
+            transform: translateY(-2px) scale(1.03);
+        }
+        
+        .map-container {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .location-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .location-btn {
+            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        
+        .location-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .success { background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%); }
+        .error { background: linear-gradient(90deg, #f44336 0%, #e57373 100%); }
+        .info { background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%); }
+
+        .cafe-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .cafe-info h4 {
+            color: #fff;
+            margin: 0 0 5px 0;
+            font-size: 1.1em;
+        }
+
+        .cafe-info p {
+            color: #ccc;
+            margin: 2px 0;
+            font-size: 0.9em;
+        }
+    </style>
+    <script>
+    var myMap;
+    var currentLocation = null;
+    var selectedCafe = null;
+    
+    function onCityChange(sel) {
+        var otherInput = document.getElementById('city-other-input');
+        if (sel.value === 'other') {
+            otherInput.style.display = 'block';
+        } else {
+            otherInput.style.display = 'none';
+        }
+    }
+    
+    // Инициализация карты
+    ymaps.ready(function () {
+        // Определяем центр карты
+        var defaultCenter = [55.76, 37.64]; // Москва по умолчанию
+        
+        // Если есть сохраненные координаты, используем их
+        {% if profile and profile.latitude and profile.longitude %}
+        defaultCenter = [{{ profile.latitude }}, {{ profile.longitude }}];
+        {% endif %}
+        
+        myMap = new ymaps.Map('map', {
+            center: defaultCenter,
+            zoom: 13,
+            controls: ['zoomControl', 'fullscreenControl']
+        });
+        
+        // Если есть сохраненные координаты, показываем маркер
+        {% if profile and profile.latitude and profile.longitude %}
+        var savedMarker = new ymaps.Placemark(defaultCenter, {
+            balloonContent: 'Сохраненное местоположение'
+        }, {
+            preset: 'islands#blueDotIcon'
+        });
+        myMap.geoObjects.add(savedMarker);
+        {% endif %}
+        
+        // Попытка получить местоположение пользователя
+        getCurrentLocation();
+        
+        // Обработчик клика по карте для поиска кафе
+        myMap.events.add('click', function(e) {
+            var coords = e.get('coords');
+            console.log('🖱️ Клик по карте:', coords);
+            searchNearbyCafes(coords);
+        });
+        
+        console.log('✅ Карта инициализирована, обработчики добавлены');
+    });
+    
+    // Функция получения местоположения
+    function getCurrentLocation() {
+        const statusDiv = document.getElementById('location-status');
+        const locationBtn = document.getElementById('get-location-btn');
+        
+        if (navigator.geolocation) {
+            statusDiv.textContent = 'Определяем ваше местоположение...';
+            locationBtn.style.display = 'none';
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    // Добавляем метку пользователя на карту
+                    var userPlacemark = new ymaps.Placemark([currentLocation.lat, currentLocation.lng], {
+                        balloonContent: 'Ваше местоположение'
+                    }, {
+                        preset: 'islands#blueDotIcon'
+                    });
+                    
+                    myMap.geoObjects.add(userPlacemark);
+                    myMap.setCenter([currentLocation.lat, currentLocation.lng], 15);
+                    
+                    // Ищем кафе рядом с пользователем
+                    searchNearbyCafes([currentLocation.lat, currentLocation.lng]);
+                    
+                    statusDiv.textContent = 'Местоположение определено!';
+                    locationBtn.style.display = 'inline-block';
+                    locationBtn.textContent = '📍 Обновить местоположение';
+                    showNotification('📍 Местоположение определено!', 'success');
+                },
+                function(error) {
+                    statusDiv.textContent = 'Не удалось определить местоположение';
+                    locationBtn.style.display = 'inline-block';
+                    locationBtn.textContent = '📍 Попробовать снова';
+                    showNotification('❌ Ошибка определения местоположения', 'error');
+                }
+            );
+        } else {
+            statusDiv.textContent = 'Геолокация не поддерживается';
+            locationBtn.style.display = 'inline-block';
+        }
+        
+        locationBtn.onclick = getCurrentLocation;
+    }
+    
+    // Функция поиска кафе рядом с указанной точкой
+    function searchNearbyCafes(coords) {
+        // Очищаем предыдущие маркеры кафе
+        clearCafeMarkers();
+        
+        // Используем Yandex Maps API для поиска организаций
+        ymaps.geocode(coords, {
+            results: 10,
+            kind: 'biz'
+        }).then(function(res) {
+            var cafes = [];
+            
+            res.geoObjects.each(function(geoObject) {
+                var properties = geoObject.properties.get('metaDataProperty');
+                if (properties && properties.GeocoderMetaData) {
+                    var name = properties.GeocoderMetaData.text;
+                    var kind = properties.GeocoderMetaData.kind;
+                    
+                    // Фильтруем только кафе, рестораны и места питания
+                    if (kind === 'biz' && (
+                        name.toLowerCase().includes('кафе') ||
+                        name.toLowerCase().includes('ресторан') ||
+                        name.toLowerCase().includes('кофейня') ||
+                        name.toLowerCase().includes('бар') ||
+                        name.toLowerCase().includes('пиццерия') ||
+                        name.toLowerCase().includes('столовая')
+                    )) {
+                        cafes.push({
+                            name: name,
+                            coords: geoObject.geometry.getCoordinates()
+                        });
+                    }
+                }
+            });
+            
+            // Если не найдено кафе через API, добавляем тестовые
+            if (cafes.length === 0) {
+                cafes = [
+                    {
+                        name: 'Кафе "Уютное"',
+                        coords: [coords[0] + 0.001, coords[1] + 0.001]
+                    },
+                    {
+                        name: 'Ресторан "Вкусно"',
+                        coords: [coords[0] - 0.001, coords[1] + 0.001]
+                    },
+                    {
+                        name: 'Кофейня "Аромат"',
+                        coords: [coords[0] + 0.001, coords[1] - 0.001]
+                    }
+                ];
+            }
+            
+            // Добавляем маркеры кафе на карту
+            cafes.forEach(function(cafe) {
+                var cafePlacemark = new ymaps.Placemark(cafe.coords, {
+                    balloonContent: '<strong>' + cafe.name + '</strong><br>Кликните для выбора'
+                }, {
+                    preset: 'islands#blueDotIcon',
+                    iconColor: '#ff6b6b'
+                });
+                
+                // Добавляем обработчик клика на метку кафе
+                cafePlacemark.events.add('click', function() {
+                    selectCafe(cafe.name, cafe.coords[0], cafe.coords[1]);
+                });
+                
+                myMap.geoObjects.add(cafePlacemark);
+                
+                // Сохраняем маркер для последующего удаления
+                if (!window.cafeMarkers) window.cafeMarkers = [];
+                window.cafeMarkers.push(cafePlacemark);
+            });
+            
+            if (cafes.length > 0) {
+                showNotification('🏪 Найдено ' + cafes.length + ' заведений', 'info');
+            }
+        });
+    }
+    
+    // Функция очистки маркеров кафе
+    function clearCafeMarkers() {
+        if (window.cafeMarkers) {
+            window.cafeMarkers.forEach(function(marker) {
+                myMap.geoObjects.remove(marker);
+            });
+            window.cafeMarkers = [];
+        }
+    }
+    
+    // Функция выбора кафе
+    function selectCafe(name, lat, lng) {
+        console.log('🖱️ Выбрано кафе:', name, 'координаты:', lat, lng);
+        
+        // Заполняем поле названия заведения
+        var venueInput = document.getElementById('venue-input');
+        if (venueInput) {
+            venueInput.value = name;
+            console.log('✅ Поле "Заведение" заполнено:', name);
+            
+            // Добавляем визуальную обратную связь
+            venueInput.style.border = '2px solid #4CAF50';
+            venueInput.style.backgroundColor = '#e8f5e8';
+            setTimeout(() => {
+                venueInput.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+                venueInput.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }, 2000);
+        }
+        
+        // Заполняем скрытые поля координат
+        var latInput = document.getElementById('latitude-input');
+        var lngInput = document.getElementById('longitude-input');
+        
+        if (latInput && lngInput) {
+            latInput.value = lat;
+            lngInput.value = lng;
+            console.log('✅ Координаты сохранены:', lat, lng);
+        }
+        
+        // Сохраняем выбранное кафе
+        selectedCafe = {
+            name: name,
+            lat: lat,
+            lng: lng
+        };
+        
+        // Показываем информацию о выбранном кафе
+        showCafeInfo(name, lat, lng);
+        
+        // Показываем уведомление
+        showNotification('🏪 Выбрано кафе: ' + name, 'success');
+        
+        // Проверяем расстояние если есть местоположение пользователя
+        if (currentLocation) {
+            checkDistance(lat, lng);
+        }
+    }
+    
+    // Функция показа информации о кафе
+    function showCafeInfo(name, lat, lng) {
+        var cafeInfoDiv = document.getElementById('cafe-info');
+        if (!cafeInfoDiv) {
+            cafeInfoDiv = document.createElement('div');
+            cafeInfoDiv.id = 'cafe-info';
+            cafeInfoDiv.className = 'cafe-info';
+            document.getElementById('venue-input').parentNode.insertBefore(cafeInfoDiv, document.getElementById('venue-input').nextSibling);
+        }
+        
+        cafeInfoDiv.innerHTML = `
+            <h4>🏪 Выбранное заведение:</h4>
+            <p><strong>Название:</strong> ${name}</p>
+            <p><strong>Координаты:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+        `;
+    }
+    
+    // Функция проверки расстояния
+    function checkDistance(cafeLat, cafeLon) {
+        if (!currentLocation) {
+            showNotification('❌ Сначала определите ваше местоположение', 'error');
+            return;
+        }
+        
+        // Используем новую функцию с geopy для расчета расстояния
+        calculateDistanceWithGeopy(
+            currentLocation.lat, currentLocation.lng,
+            cafeLat, cafeLon
+        ).then(distance => {
+            if (distance <= 100) {
+                showNotification('✅ Расстояние OK: ' + distance.toFixed(1) + 'м (geopy)', 'success');
+            } else {
+                showNotification('⚠️ Расстояние: ' + distance.toFixed(1) + 'м (geopy)', 'info');
+            }
+        }).catch(error => {
+            console.error('Ошибка расчета расстояния:', error);
+            // Fallback на клиентский расчет
+            const fallbackDistance = calculateDistance(
+                currentLocation.lat, currentLocation.lng,
+                cafeLat, cafeLon
+            );
+            if (fallbackDistance <= 100) {
+                showNotification('✅ Расстояние OK: ' + fallbackDistance.toFixed(1) + 'м (fallback)', 'success');
+            } else {
+                showNotification('⚠️ Расстояние: ' + fallbackDistance.toFixed(1) + 'м (fallback)', 'info');
+            }
+        });
+    }
+    
+    // Функция расчета расстояния с использованием geopy API
+    async function calculateDistanceWithGeopy(lat1, lon1, lat2, lon2) {
+        try {
+            console.log('🔄 Отправляем запрос к API для расчета расстояния...');
+            console.log(`📍 Координаты: (${lat1}, ${lon1}) -> (${lat2}, ${lon2})`);
+            
+            const response = await fetch('/api/calculate-distance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    lat1: lat1,
+                    lon1: lon1,
+                    lat2: lat2,
+                    lon2: lon2
+                })
+            });
+
+            console.log(`📡 Статус ответа API: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log(`📊 Ответ API: ${JSON.stringify(data)}`);
+
+            if (data.success) {
+                console.log(`✅ Расстояние рассчитано: ${data.distance_meters} м`);
+                return data.distance_meters;
+            } else {
+                throw new Error(data.error || 'Ошибка расчета расстояния');
+            }
+        } catch (error) {
+            console.error('Ошибка API расчета расстояния:', error);
+            console.log(`❌ Ошибка API: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // Функция расчета расстояния (fallback для клиентской стороны)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        var R = 6371000; // Радиус Земли в метрах
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+    
+    // Функция показа уведомлений
+    function showNotification(message, type) {
+        var notification = document.createElement('div');
+        notification.className = 'notification ' + type;
+        notification.innerHTML = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+    </script>
+</head>
+<body>
+    <div class="form-container">
+        <h2>{{ title }}</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="text" name="name" placeholder="Ваше имя" value="{{ profile.name if profile else '' }}" required>
+            <input type="number" name="age" placeholder="Ваш возраст" value="{{ profile.age if profile else '' }}" required>
+            <select name="gender" required>
+                <option value="">Выберите пол</option>
+                <option value="male" {% if profile and profile.gender == 'male' %}selected{% endif %}>Мужской</option>
+                <option value="female" {% if profile and profile.gender == 'female' %}selected{% endif %}>Женский</option>
+                <option value="other" {% if profile and profile.gender == 'other' %}selected{% endif %}>Другое</option>
+            </select>
+            <textarea name="hobbies" placeholder="Ваши увлечения" required>{{ profile.hobbies if profile else '' }}</textarea>
+            <textarea name="goal" placeholder="Цель знакомства" required>{{ profile.goal if profile else '' }}</textarea>
+            <label for="city">Город:</label>
+            <select name="city" id="city-select" onchange="onCityChange(this)" required>
+                <option value="">Выберите город</option>
+                <option value="Москва" {% if profile and profile.city == 'Москва' %}selected{% endif %}>Москва</option>
+                <option value="Санкт-Петербург" {% if profile and profile.city == 'Санкт-Петербург' %}selected{% endif %}>Санкт-Петербург</option>
+                <option value="Новосибирск" {% if profile and profile.city == 'Новосибирск' %}selected{% endif %}>Новосибирск</option>
+                <option value="Екатеринбург" {% if profile and profile.city == 'Екатеринбург' %}selected{% endif %}>Екатеринбург</option>
+                <option value="Казань" {% if profile and profile.city == 'Казань' %}selected{% endif %}>Казань</option>
+                <option value="Нижний Новгород" {% if profile and profile.city == 'Нижний Новгород' %}selected{% endif %}>Нижний Новгород</option>
+                <option value="Челябинск" {% if profile and profile.city == 'Челябинск' %}selected{% endif %}>Челябинск</option>
+                <option value="Самара" {% if profile and profile.city == 'Самара' %}selected{% endif %}>Самара</option>
+                <option value="Омск" {% if profile and profile.city == 'Омск' %}selected{% endif %}>Омск</option>
+                <option value="Ростов-на-Дону" {% if profile and profile.city == 'Ростов-на-Дону' %}selected{% endif %}>Ростов-на-Дону</option>
+                <option value="Уфа" {% if profile and profile.city == 'Уфа' %}selected{% endif %}>Уфа</option>
+                <option value="Красноярск" {% if profile and profile.city == 'Красноярск' %}selected{% endif %}>Красноярск</option>
+                <option value="Воронеж" {% if profile and profile.city == 'Воронеж' %}selected{% endif %}>Воронеж</option>
+                <option value="Пермь" {% if profile and profile.city == 'Пермь' %}selected{% endif %}>Пермь</option>
+                <option value="Волгоград" {% if profile and profile.city == 'Волгоград' %}selected{% endif %}>Волгоград</option>
+                <option value="other" {% if profile and profile.city and profile.city not in ['Москва','Санкт-Петербург','Новосибирск','Екатеринбург','Казань','Нижний Новгород','Челябинск','Самара','Омск','Ростов-на-Дону','Уфа','Красноярск','Воронеж','Пермь','Волгоград'] %}selected{% endif %}>Другое</option>
+            </select>
+            <input type="text" name="city_other" id="city-other-input" placeholder="Введите город" 
+                   style="display:{% if profile and profile.city and profile.city not in ['Москва','Санкт-Петербург','Новосибирск','Екатеринбург','Казань','Нижний Новгород','Челябинск','Самара','Омск','Ростов-на-Дону','Уфа','Красноярск','Воронеж','Пермь','Волгоград'] %}block{% else %}none{% endif %};" 
+                   value="{% if profile and profile.city and profile.city not in ['Москва','Санкт-Петербург','Новосибирск','Екатеринбург','Казань','Нижний Новгород','Челябинск','Самара','Омск','Ростов-на-Дону','Уфа','Красноярск','Воронеж','Пермь','Волгоград'] %}{{ profile.city }}{% endif %}">
+            
+            <label for="venue">🏪 Выберите кафе на карте (кликните на значок кафе):</label>
+            <div class="map-container">
+                <div id="map" style="width: 100%; height: 100%;"></div>
+                <div class="location-info">
+                    <div id="location-status">Определяем ваше местоположение...</div>
+                    <button type="button" id="get-location-btn" class="location-btn">📍 Определить местоположение</button>
+                </div>
+            </div>
+            <input type="text" name="venue" id="venue-input" placeholder="Название заведения (заполнится автоматически при выборе кафе на карте)" value="{{ profile.venue if profile else '' }}" required readonly>
+            <input type="hidden" name="latitude" id="latitude-input" value="{{ profile.latitude if profile else '' }}">
+            <input type="hidden" name="longitude" id="longitude-input" value="{{ profile.longitude if profile else '' }}">
+            <input type="file" name="photo" accept="image/*" {% if not profile %}required{% endif %}>
+            <button type="submit" class="modern-btn">{{ submit_text }}</button>
+        </form>
+        <a href="{{ back_url }}" class="back-btn">← {{ back_text }}</a>
+    </div>
+</body>
+</html> 

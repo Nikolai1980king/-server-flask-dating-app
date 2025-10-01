@@ -1,0 +1,31 @@
+# Переменные окружения для продакшена
+# Скопируйте этот файл в .env на сервере и настройте под ваши нужды
+
+# Flask настройки
+FLASK_ENV=production
+FLASK_APP=run_production.py
+SECRET_KEY=your-super-secret-production-key-change-this
+
+# База данных
+DATABASE_URL=sqlite:///dating_app.db
+
+# YooKassa настройки (ПРОДАКШН)
+YOOKASSA_TEST_MODE=False
+YOOKASSA_SHOP_ID=1167146
+YOOKASSA_SECRET_KEY=live_X2q1FnC0N9VBhbl93xfNhgPHc3iBLQWvV1DtAT2mNlk
+YOOKASSA_WEBHOOK_SECRET=real_webhook_secret_2024
+
+# Цена создания профиля
+PROFILE_CREATION_PRICE=10.00
+
+# Webhook URL (замените на ваш реальный домен)
+YOOKASSA_WEBHOOK_URL=https://ятутаю.рф/yookassa/webhook
+
+# Настройки приложения
+MAX_REGISTRATION_DISTANCE=3000
+PROFILE_LIFETIME_HOURS=0.5
+MAX_CONTENT_LENGTH=52428800  # 50MB
+
+# Сервер настройки
+HOST=0.0.0.0
+PORT=5000

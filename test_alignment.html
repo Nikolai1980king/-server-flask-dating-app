@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест выравнивания полей</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        
+        .form-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        input, textarea, select { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 0; 
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1em;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+            box-sizing: border-box;
+        }
+        
+        input::placeholder, textarea::placeholder, select::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+            background: rgba(76, 175, 80, 0.15);
+        }
+        
+        select option {
+            background: rgba(76, 175, 80, 0.9);
+            color: #fff;
+            border: none;
+        }
+        
+        .field-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+
+        
+        .test-info {
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .alignment-guide {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .alignment-line {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.3);
+        }
+        
+        .alignment-line.left {
+            left: 20px;
+        }
+        
+        .alignment-line.right {
+            right: 20px;
+        }
+        
+        .alignment-line.center {
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="alignment-guide">
+        <div class="alignment-line left"></div>
+        <div class="alignment-line right"></div>
+        <div class="alignment-line center"></div>
+    </div>
+    
+    <div class="form-container">
+        <h2>📐 Тест выравнивания полей</h2>
+        
+        <div class="test-info">
+            <h3>🎯 Цель:</h3>
+            <p>Все поля должны иметь одинаковое расстояние слева и справа от краев контейнера.</p>
+            <p>🔴 Красные линии показывают границы контейнера</p>
+            <p>🟢 Зеленая линия показывает центр</p>
+        </div>
+        
+        <form>
+            <div class="field-container">
+                <input type="text" name="name" placeholder="Ваше имя" maxlength="12">
+            </div>
+            
+            <div class="field-container">
+                <input type="number" name="age" placeholder="Ваш возраст">
+            </div>
+            
+            <div class="field-container">
+                <select name="gender">
+                    <option value="">Выберите пол</option>
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
+                    <option value="other">Другое</option>
+                </select>
+            </div>
+            
+            <div class="field-container">
+                <textarea name="hobbies" placeholder="Ваши увлечения" maxlength="70"></textarea>
+            </div>
+            
+            <div class="field-container">
+                <textarea name="goal" placeholder="Цель знакомства" maxlength="70"></textarea>
+            </div>
+            
+            <div class="field-container">
+                <input type="text" name="venue" placeholder="Название заведения (кафе, ресторан и т.д.)">
+            </div>
+            
+            <div class="field-container">
+                <input type="file" name="photo" accept="image/*">
+            </div>
+        </form>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/create" style="color: #4CAF50; text-decoration: none; font-weight: bold;">← Вернуться к созданию анкеты</a>
+        </div>
+    </div>
+    
+    <script>
+        function checkFieldLength(field, maxLength) {
+            // Функциональность ограничений сохранена, но без визуальных счетчиков
+        }
+    </script>
+</body>
+</html> 

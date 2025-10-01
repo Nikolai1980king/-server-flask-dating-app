@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест загрузки фотографий</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .photo-preview {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            margin: 20px auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3em;
+            color: white;
+            overflow: hidden;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .photo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: white;
+            font-size: 1em;
+        }
+        .btn {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>📸 Тест загрузки фотографий</h1>
+        
+        <h2>Предпросмотр фотографии</h2>
+        <div class="photo-preview" id="photoPreview">
+            👤
+        </div>
+        
+        <h2>Загрузка фотографии</h2>
+        <input type="file" id="photoInput" accept="image/*" onchange="previewPhoto()">
+        
+        <p><strong>Поддерживаемые форматы:</strong> PNG, JPG, JPEG, GIF, WebP</p>
+        <p><strong>Максимальный размер:</strong> 50MB</p>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn" onclick="window.location.href='/'">🏠 На главную</button>
+            <button class="btn" onclick="window.location.href='/create'">📝 Создать анкету</button>
+        </div>
+    </div>
+
+    <script>
+        function previewPhoto() {
+            const input = document.getElementById('photoInput');
+            const preview = document.getElementById('photoPreview');
+            
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                
+                // Проверяем размер файла (50MB = 50 * 1024 * 1024 байт)
+                if (file.size > 50 * 1024 * 1024) {
+                    alert('Файл слишком большой! Максимальный размер: 50MB');
+                    input.value = '';
+                    return;
+                }
+                
+                // Проверяем тип файла
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert('Неподдерживаемый формат файла! Используйте PNG, JPG, JPEG, GIF или WebP');
+                    input.value = '';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Предпросмотр">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    </script>
+</body>
+</html> 

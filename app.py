@@ -32,7 +32,8 @@ db = SQLAlchemy(app)
 MAX_REGISTRATION_DISTANCE = 3000  # 3 км = 3000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
-PROFILE_LIFETIME_HOURS = 0.5  # Измените это значение для настройки времени жизни анкет (30 минут)
+PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ОПЛАЧЕННОЙ анкеты (30 минут)
+PENDING_PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ВРЕМЕННОЙ анкеты до оплаты (1 час)
 
 # ============================================================================
 # ЮKASSA КОНФИГУРАЦИЯ - ПРОДАКШН РЕЖИМ
@@ -182,6 +183,23 @@ class Profile(db.Model):
     payment_date = db.Column(db.DateTime, nullable=True)
     # Поле для безопасности - IP-адрес создания профиля
     creation_ip = db.Column(db.String, nullable=True)
+
+
+class PendingProfile(db.Model):
+    """Временная анкета до оплаты"""
+    id = db.Column(db.String, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    age = db.Column(db.Integer, nullable=False)
+    gender = db.Column(db.String, nullable=False)
+    hobbies = db.Column(db.String, nullable=False)
+    goal = db.Column(db.String, nullable=False)
+    city = db.Column(db.String, nullable=True)
+    venue = db.Column(db.String, nullable=True)
+    photo = db.Column(db.String, nullable=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    creation_ip = db.Column(db.String, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class Message(db.Model):
@@ -407,16 +425,41 @@ def process_payment_completion(user_id, payment_id, status):
         payment.status = status
         payment.updated_at = datetime.utcnow()
 
-        # Если платеж успешен, активируем профиль
+        # Если платеж успешен, создаем настоящую анкету из временной
         if status == 'succeeded':
             profile = Profile.query.get(user_id)
-            if profile:
-                profile.is_paid = True
-                profile.payment_date = datetime.utcnow()
-                print(f"✅ Профиль пользователя {user_id} активирован после оплаты")
+            if profile and profile.is_paid:
+                print(f"✅ Профиль {user_id} уже оплачен")
             else:
-                print(f"❌ Профиль пользователя {user_id} не найден")
-                return False
+                # Получаем временную анкету
+                pending = PendingProfile.query.get(user_id)
+                if pending:
+                    # Создаем настоящую анкету из временной
+                    profile = Profile(
+                        id=pending.id,
+                        name=pending.name,
+                        age=pending.age,
+                        gender=pending.gender,
+                        hobbies=pending.hobbies,
+                        goal=pending.goal,
+                        city=pending.city,
+                        venue=pending.venue,
+                        photo=pending.photo,
+                        likes=0,
+                        latitude=pending.latitude,
+                        longitude=pending.longitude,
+                        creation_ip=pending.creation_ip,
+                        is_paid=True,
+                        payment_date=datetime.utcnow(),
+                        created_at=datetime.utcnow()  # Таймер запускается после оплаты!
+                    )
+                    db.session.add(profile)
+                    # Удаляем временную анкету
+                    db.session.delete(pending)
+                    print(f"✅ Профиль пользователя {user_id} создан после оплаты, таймер запущен!")
+                else:
+                    print(f"❌ Временная анкета пользователя {user_id} не найдена")
+                    return False
 
         db.session.commit()
         print(f"✅ Платеж {payment_id} обновлен: {status}")
@@ -1356,14 +1399,16 @@ def create_profile():
     # Автоматически запускаем очистку просроченных анкет при создании профиля
     try:
         cleanup_expired_profiles()
+        cleanup_expired_pending_profiles()  # Очищаем временные анкеты
     except Exception as e:
         print(f"⚠️ Ошибка при автоматической очистке: {e}")
 
     # Получаем user_id из cookie или генерируем новый
     user_id = request.cookies.get('user_id')
 
-    # Проверяем, есть ли уже анкета у пользователя (для GET и POST запросов)
+    # Проверяем, есть ли уже анкета у пользователя
     if user_id:
+        # Проверяем оплаченный профиль
         existing_profile = Profile.query.get(user_id)
         if existing_profile:
             if request.method == 'POST':
@@ -1374,7 +1419,20 @@ def create_profile():
                 }), 400
             else:
                 # Для GET запроса перенаправляем на профиль
-                return redirect(url_for('view_profile', id=user_id))
+                return redirect(url_for('my_profile'))
+        
+        # Проверяем временную анкету (не оплачена)
+        pending_profile = PendingProfile.query.get(user_id)
+        if pending_profile:
+            if request.method == 'POST':
+                return jsonify({
+                    'success': False,
+                    'error': 'Анкета уже создана, ожидает оплаты.',
+                    'has_active_profile': False
+                }), 400
+            else:
+                # Для GET запроса перенаправляем на оплату
+                return redirect(url_for('payment'))
 
     if request.method == 'POST':
         # Если нет user_id, генерируем новый
@@ -1451,7 +1509,8 @@ def create_profile():
                 # Получаем IP-адрес клиента для безопасности
                 client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
 
-                profile = Profile(
+                # Создаем ВРЕМЕННУЮ анкету (до оплаты)
+                pending_profile = PendingProfile(
                     id=user_id,
                     name=name,
                     age=int(request.form['age']),
@@ -1461,12 +1520,11 @@ def create_profile():
                     city=location_name,
                     venue=venue,
                     photo=filename,
-                    likes=0,
                     latitude=float(latitude) if latitude else None,
                     longitude=float(longitude) if longitude else None,
-                    creation_ip=client_ip  # Сохраняем IP-адрес для безопасности
+                    creation_ip=client_ip
                 )
-                db.session.add(profile)
+                db.session.add(pending_profile)
                 db.session.commit()
 
                 # Возвращаем JSON ответ для AJAX запроса
@@ -2778,34 +2836,39 @@ def update_user_settings(user_id, sound_notifications):
         return False
 
 
-def require_profile(view_func):
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        # Автоматически запускаем очистку просроченных анкет при каждом запросе
-        try:
-            cleanup_expired_profiles()
-        except Exception as e:
-            print(f"⚠️ Ошибка при автоматической очистке: {e}")
+def require_profile(check_payment=True):
+    """Декоратор для проверки наличия профиля и опционально оплаты"""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            # Автоматически запускаем очистку просроченных анкет при каждом запросе
+            try:
+                cleanup_expired_profiles()
+                cleanup_expired_pending_profiles()  # Очищаем временные анкеты
+            except Exception as e:
+                print(f"⚠️ Ошибка при автоматической очистке: {e}")
 
-        user_id = request.cookies.get('user_id')
-        if not user_id or Profile.query.get(user_id) is None:
-            return redirect(url_for('create_profile'))
-
-        # Проверяем, оплачен ли профиль
-        profile = Profile.query.get(user_id)
-        if profile and not profile.is_paid:
-            return redirect(url_for('payment'))
-
-        # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
-        # Это предотвращает доступ к чужим анкетам через общие cookies
-        if profile and hasattr(profile, 'creation_ip') and profile.creation_ip:
-            client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-            if profile.creation_ip != client_ip:
+            user_id = request.cookies.get('user_id')
+            if not user_id or Profile.query.get(user_id) is None:
                 return redirect(url_for('create_profile'))
 
-        return view_func(*args, **kwargs)
+            profile = Profile.query.get(user_id)
+            
+            # Проверяем оплату только если требуется
+            if check_payment and profile and not profile.is_paid:
+                return redirect(url_for('payment'))
 
-    return wrapper
+            # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
+            # Это предотвращает доступ к чужим анкетам через общие cookies
+            if profile and hasattr(profile, 'creation_ip') and profile.creation_ip:
+                client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+                if profile.creation_ip != client_ip:
+                    return redirect(url_for('create_profile'))
+
+            return view_func(*args, **kwargs)
+
+        return wrapper
+    return decorator
 
 
 def calculate_distance_between_users(user_profile, other_profile):
@@ -2831,7 +2894,7 @@ def calculate_distance_between_users(user_profile, other_profile):
 
 
 @app.route('/visitors')
-@require_profile
+@require_profile()
 def view_visitors():
     user_id = request.cookies.get('user_id')
     user_profile = Profile.query.get(user_id)
@@ -3166,8 +3229,580 @@ def view_visitors():
                                   get_profile_lifetime_remaining=get_profile_lifetime_remaining, user_id=user_id)
 
 
+@app.route('/edit_pending_profile', methods=['GET', 'POST'])
+def edit_pending_profile():
+    """Редактирование временной анкеты (до оплаты)"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return redirect(url_for('home'))
+    
+    # Проверяем, есть ли уже оплаченный профиль
+    profile = Profile.query.get(user_id)
+    if profile:
+        return redirect(url_for('my_profile'))
+    
+    # Получаем временную анкету
+    pending = PendingProfile.query.get(user_id)
+    if not pending:
+        return redirect(url_for('create_profile'))
+    
+    if request.method == 'POST':
+        pending.name = request.form['name']
+        pending.age = int(request.form['age'])
+        pending.gender = request.form['gender']
+        pending.hobbies = request.form['hobbies']
+        pending.goal = request.form['goal']
+        pending.venue = request.form.get('venue')
+        
+        # Обработка координат
+        latitude = request.form.get('latitude')
+        longitude = request.form.get('longitude')
+        if latitude and longitude:
+            pending.latitude = float(latitude)
+            pending.longitude = float(longitude)
+        
+        # Смена фото
+        photo = request.files.get('photo')
+        if photo and photo.filename:
+            try:
+                if pending.photo:
+                    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], pending.photo))
+            except:
+                pass
+            filename = f"{user_id}_{photo.filename}"
+            photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            photo.save(photo_path)
+            pending.photo = filename
+        
+        db.session.commit()
+        return redirect(url_for('payment'))
+    
+    # Используем полный шаблон со страницы создания анкеты с картой
+    return render_template_string(r'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
+            <title>Редактировать анкету</title>
+            <script src="https://api-maps.yandex.ru/2.1/?apikey=9a3beffb-a8a0-4d55-850f-d258dd28c104&lang=ru_RU" type="text/javascript"></script>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
+                    background-size: 400% 400%;
+                    animation: starryNight 15s ease infinite;
+                    position: relative;
+                    min-height: 100vh;
+                }
+
+                @keyframes starryNight {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+
+                body::before {
+                    content: '';
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-image: 
+                        radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                        radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                        radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                        radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                        radial-gradient(2px 2px at 160px 30px, #ddd, transparent);
+                    background-repeat: repeat;
+                    background-size: 200px 100px;
+                    animation: twinkle 4s ease-in-out infinite alternate;
+                    pointer-events: none;
+                    z-index: 1;
+                }
+
+                @keyframes twinkle {
+                    0% { opacity: 0.3; }
+                    100% { opacity: 1; }
+                }
+
+                .form-container {
+                    position: relative;
+                    z-index: 2;
+                    background: rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(10px);
+                    border-radius: 20px;
+                    padding: 30px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                }
+
+                h2 {
+                    color: #fff;
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                    margin-bottom: 25px;
+                    font-size: 1.8em;
+                }
+
+                input, textarea, select { 
+                    width: 100%; 
+                    padding: 12px; 
+                    margin: 0; 
+                    background: rgba(76, 175, 80, 0.1);
+                    border: 1px solid rgba(76, 175, 80, 0.3);
+                    border-radius: 10px;
+                    color: #fff;
+                    font-size: 1em;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+                    box-sizing: border-box;
+                }
+
+                input::placeholder, textarea::placeholder, select::placeholder {
+                    color: rgba(255, 255, 255, 0.7);
+                    text-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+                }
+
+                input:focus, textarea:focus, select:focus {
+                    outline: none;
+                    border-color: #4CAF50;
+                    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+                    background: rgba(76, 175, 80, 0.15);
+                }
+
+                select option {
+                    background: rgba(76, 175, 80, 0.9);
+                    color: #fff;
+                    border: none;
+                }
+
+                select option:hover {
+                    background: rgba(76, 175, 80, 1);
+                }
+
+                .field-container {
+                    position: relative;
+                    width: 100%;
+                    margin-bottom: 10px;
+                }
+
+                input[type="file"] {
+                    background: rgba(76, 175, 80, 0.1);
+                    border: 1px solid rgba(76, 175, 80, 0.3);
+                    color: #fff;
+                    padding: 12px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                }
+
+                input[type="file"]:focus {
+                    outline: none;
+                    border-color: #4CAF50;
+                    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+                    background: rgba(76, 175, 80, 0.15);
+                }
+
+                input[type="file"]::-webkit-file-upload-button {
+                    background: rgba(76, 175, 80, 0.3);
+                    color: #fff;
+                    border: 1px solid rgba(76, 175, 80, 0.5);
+                    border-radius: 5px;
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                }
+
+                input[type="file"]::-webkit-file-upload-button:hover {
+                    background: rgba(76, 175, 80, 0.5);
+                }
+
+                label {
+                    color: #fff;
+                    font-weight: bold;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+                }
+
+                .modern-btn {
+                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    border-radius: 25px;
+                    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+                    font-size: 1.1em;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-weight: bold;
+                }
+                .modern-btn:hover {
+                    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+                    transform: translateY(-3px) scale(1.05);
+                }
+                .back-btn {
+                    background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 25px;
+                    box-shadow: 0 4px 14px rgba(108,117,125,0.2);
+                    font-size: 1.1em;
+                    cursor: pointer;
+                    transition: box-shadow 0.2s, transform 0.2s;
+                    text-decoration: none;
+                    display: inline-block;
+                    margin-top: 20px;
+                }
+                .back-btn:hover {
+                    box-shadow: 0 8px 24px rgba(108,117,125,0.3);
+                    transform: translateY(-2px) scale(1.03);
+                }
+
+                .map-container {
+                    margin: 20px 0;
+                    border-radius: 15px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                    position: relative;
+                }
+
+                #map {
+                    width: 100%;
+                    height: 300px;
+                    border-radius: 15px;
+                }
+
+                .location-info {
+                    background: rgba(76, 175, 80, 0.1);
+                    border: 1px solid rgba(76, 175, 80, 0.3);
+                    padding: 15px;
+                    border-radius: 10px;
+                    margin: 10px 0;
+                    color: #fff;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+                }
+
+                .location-btn {
+                    background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 20px;
+                    font-size: 1em;
+                    cursor: pointer;
+                    margin: 5px;
+                    transition: all 0.3s ease;
+                }
+                .location-btn:hover {
+                    box-shadow: 0 4px 16px rgba(76,175,80,0.3);
+                    transform: translateY(-2px);
+                }
+
+                .location-return-btn {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: linear-gradient(90deg, #2196F3 0%, #64B5F6 100%);
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 0.9em;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 2px 10px rgba(33, 150, 243, 0.3);
+                    z-index: 1000;
+                    font-weight: bold;
+                }
+
+                .location-return-btn:hover {
+                    box-shadow: 0 4px 16px rgba(33, 150, 243, 0.5);
+                    transform: translateY(-2px) scale(1.05);
+                    background: linear-gradient(90deg, #1976D2 0%, #42A5F5 100%);
+                }
+            </style>
+        </head>
+        <body>
+            <div class="form-container">
+                <h2 style="text-align: center; margin-top: 10px;">Редактировать анкету</h2>
+                <p style="color: #fff; opacity: 0.8; margin-bottom: 20px; text-align: center;">
+                    📍 Ваше местоположение: {{ pending.city or 'Определяется...' }}
+                </p>
+                <div id="location-status" style="background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.3); padding: 15px; border-radius: 10px; margin: 10px 0; color: #fff; text-align: center; display: none; font-size: 0.9em; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                    📍 Определяем ваше местоположение...
+                </div>
+                <form method="post" enctype="multipart/form-data">
+                <div class="field-container">
+                    <input type="text" name="name" value="{{ pending.name }}" placeholder="Ваше имя" required maxlength="12" oninput="checkFieldLength(this, 12)">
+                </div>
+                <div class="field-container">
+                    <input type="number" name="age" value="{{ pending.age }}" placeholder="Ваш возраст" required>
+                </div>
+                <div class="field-container">
+                    <select name="gender" required>
+                        <option value="">Выберите пол</option>
+                        <option value="male" {% if pending.gender == 'male' %}selected{% endif %}>Мужской</option>
+                        <option value="female" {% if pending.gender == 'female' %}selected{% endif %}>Женский</option>
+                        <option value="other" {% if pending.gender == 'other' %}selected{% endif %}>Другое</option>
+                    </select>
+                </div>
+                <div class="field-container">
+                    <textarea name="hobbies" placeholder="Ваши увлечения" required maxlength="70" oninput="checkFieldLength(this, 70)">{{ pending.hobbies }}</textarea>
+                </div>
+                <div class="field-container">
+                    <textarea name="goal" placeholder="Цель знакомства" required maxlength="70" oninput="checkFieldLength(this, 70)">{{ pending.goal }}</textarea>
+                </div>
+
+                    <p style="color: #fff; font-size: 0.9em; margin-bottom: 15px; text-align: center; opacity: 0.8;">
+                        На карте кликните на заведение, чтобы выбрать его
+                    </p>
+                    <div style="text-align: center; margin-bottom: 10px;">
+                        <button type="button" class="location-btn" onclick="getCurrentLocation()" style="background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%); color: white; border: none; padding: 12px 24px; border-radius: 20px; font-size: 1em; cursor: pointer; margin: 5px; transition: all 0.3s ease; box-shadow: 0 4px 16px rgba(76,175,80,0.3);">
+                            📍 Определить мое местоположение
+                        </button>
+                    </div>
+                    <div class="map-container">
+                        <div id="map"></div>
+                        <button type="button" id="return-to-location-btn" class="location-return-btn" onclick="returnToMyLocation()" style="display: block;">
+                            📍 Я тут
+                        </button>
+                    </div>
+
+                <div class="field-container">
+                    <input type="text" name="venue" id="venue-input" value="{{ pending.venue or '' }}" placeholder="Название заведения (кафе, ресторан и т.д.)" required onchange="updateVenueCoordinates()">
+                </div>
+                <input type="hidden" name="latitude" id="latitude-input" value="{{ pending.latitude or '' }}">
+                <input type="hidden" name="longitude" id="longitude-input" value="{{ pending.longitude or '' }}">
+                <input type="hidden" name="venue_lat" id="venue-lat-input">
+                <input type="hidden" name="venue_lng" id="venue-lng-input">
+
+                <!-- Скрытые поля для координат и расстояния -->
+                <input type="hidden" id="visitor-coordinates-display">
+                <input type="hidden" id="venue-coordinates-display">
+                <input type="hidden" id="distance-display">
+
+                <div class="field-container">
+                    <input type="file" name="photo" accept="image/*">
+                    {% if pending.photo %}
+                    <p style="color: #fff; font-size: 0.9em; margin-top: 5px;">Текущее фото: {{ pending.photo }}</p>
+                    {% endif %}
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button type="submit" class="modern-btn">Сохранить изменения</button>
+                </div>
+            </form>
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="/payment" class="back-btn">← Назад к оплате</a>
+            </div>
+            </div>
+
+            <script>
+                function checkFieldLength(field, maxLength) {
+                    // Функциональность ограничений
+                }
+
+                let myMap, myPlacemark;
+                let currentLocation = { lat: {{ pending.latitude or 55.76 }}, lng: {{ pending.longitude or 37.64 }} };
+
+                function initMap() {
+                    ymaps.ready(function () {
+                        myMap = new ymaps.Map('map', {
+                            center: [currentLocation.lat, currentLocation.lng],
+                            zoom: 15,
+                            controls: ['zoomControl', 'fullscreenControl']
+                        });
+
+                        // Устанавливаем метку пользователя
+                        myPlacemark = new ymaps.Placemark([currentLocation.lat, currentLocation.lng], {
+                            balloonContent: 'Ваше местоположение'
+                        }, {
+                            preset: 'islands#redDotIcon'
+                        });
+                        myMap.geoObjects.add(myPlacemark);
+
+                        // Устанавливаем координаты в скрытые поля
+                        document.getElementById('latitude-input').value = currentLocation.lat;
+                        document.getElementById('longitude-input').value = currentLocation.lng;
+                        document.getElementById('visitor-coordinates-display').value = `${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`;
+
+                        // Обработчик открытия балуна
+                        myMap.events.add('balloonopen', function (e) {
+                            setTimeout(function() {
+                                parseBalloonAndFillVenue();
+                            }, 500);
+                        });
+                    });
+                }
+
+                function getCurrentLocation() {
+                    const statusDiv = document.getElementById('location-status');
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '📍 Определяем ваше местоположение...';
+                        statusDiv.style.display = 'block';
+                    }
+
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                var lat = position.coords.latitude;
+                                var lng = position.coords.longitude;
+
+                                if (statusDiv) {
+                                    statusDiv.innerHTML = '✅ Местоположение определено успешно!';
+                                    setTimeout(() => statusDiv.style.display = 'none', 3000);
+                                }
+
+                                setLocation(lat, lng);
+                            },
+                            function(error) {
+                                if (statusDiv) {
+                                    statusDiv.innerHTML = '❌ Ошибка определения местоположения';
+                                    statusDiv.style.background = 'rgba(244, 67, 54, 0.1)';
+                                }
+                                getLocationByIP();
+                            },
+                            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                        );
+                    } else {
+                        setLocation(currentLocation.lat, currentLocation.lng);
+                    }
+                }
+
+                function setLocation(lat, lng) {
+                    currentLocation = {lat: lat, lng: lng};
+                    document.getElementById('latitude-input').value = lat;
+                    document.getElementById('longitude-input').value = lng;
+                    document.getElementById('visitor-coordinates-display').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+                    if (myPlacemark) myMap.geoObjects.remove(myPlacemark);
+                    myPlacemark = new ymaps.Placemark([lat, lng], {
+                        balloonContent: 'Ваше местоположение'
+                    }, {
+                        preset: 'islands#redDotIcon'
+                    });
+                    myMap.geoObjects.add(myPlacemark);
+                    myMap.setCenter([lat, lng], 15);
+                }
+
+                function returnToMyLocation() {
+                    if (currentLocation) {
+                        myMap.setCenter([currentLocation.lat, currentLocation.lng], 15);
+                    } else {
+                        getCurrentLocation();
+                    }
+                }
+
+                function getLocationByIP() {
+                    fetch('https://ipapi.co/json/')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.latitude && data.longitude) {
+                                setLocation(data.latitude, data.longitude);
+                            }
+                        })
+                        .catch(error => console.error('Ошибка IP геолокации:', error));
+                }
+
+                function parseBalloonAndFillVenue() {
+                    const result = extractNameFromBalloon();
+                    if (result && result.name) {
+                        document.getElementById('venue-input').value = result.name;
+                        const mapCenter = myMap.getCenter();
+                        showVenueCoordinates(result.name, mapCenter[0], mapCenter[1]);
+                    }
+                }
+
+                function extractNameFromBalloon() {
+                    let balloonContent = document.querySelector('.ymaps-2-1-79-balloon') || 
+                                        document.querySelector('.ymaps-balloon') ||
+                                        document.querySelector('[class*="balloon"]');
+                    if (!balloonContent) return { name: null };
+
+                    const links = balloonContent.querySelectorAll('a');
+                    for (let link of links) {
+                        const linkText = link.textContent.trim();
+                        if (isValidVenueName(linkText)) {
+                            return { name: linkText };
+                        }
+                    }
+                    return { name: null };
+                }
+
+                function isValidVenueName(name) {
+                    return name && name.length > 2 && name.length < 100 &&
+                        !name.includes('Share') && !name.includes('Поделиться') &&
+                        !name.includes('Телефон') && !name.includes('www.') &&
+                        !name.includes('http') && !name.match(/^\d+$/);
+                }
+
+                function showVenueCoordinates(venueName, lat, lng) {
+                    document.getElementById('venue-coordinates-display').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                    document.getElementById('venue-lat-input').value = lat.toFixed(6);
+                    document.getElementById('venue-lng-input').value = lng.toFixed(6);
+                    calculateDistanceAndUpdateVenueField(venueName);
+                }
+
+                function calculateDistanceAndUpdateVenueField(venueName) {
+                    const visitorCoords = document.getElementById('visitor-coordinates-display').value.trim();
+                    const venueCoords = document.getElementById('venue-coordinates-display').value.trim();
+                    const venueInput = document.getElementById('venue-input');
+
+                    if (!visitorCoords || !venueCoords) {
+                        venueInput.value = venueName;
+                        return;
+                    }
+
+                    const [visitorLat, visitorLng] = visitorCoords.split(',').map(c => parseFloat(c.trim()));
+                    const [venueLat, venueLng] = venueCoords.split(',').map(c => parseFloat(c.trim()));
+
+                    fetch('/api/calculate-distance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            visitor_lat: visitorLat,
+                            visitor_lng: visitorLng,
+                            venue_lat: venueLat,
+                            venue_lng: venueLng
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const distance = data.distance;
+                            const distanceText = distance < 1000 ? `${Math.round(distance)} м` : `${(distance / 1000).toFixed(1)} км`;
+                            venueInput.value = `${venueName} (${distanceText})`;
+                        }
+                    })
+                    .catch(error => console.error('Ошибка расчета расстояния:', error));
+                }
+
+                function updateVenueCoordinates() {
+                    const venueInput = document.getElementById('venue-input');
+                    let venueName = venueInput.value.trim().replace(/\s*\(\d+\.?\d*\s*(м|км)\)$/, '');
+                    if (!venueName) {
+                        document.getElementById('venue-coordinates-display').value = '';
+                        document.getElementById('venue-lat-input').value = '';
+                        document.getElementById('venue-lng-input').value = '';
+                    }
+                }
+
+                window.onload = function() {
+                    initMap();
+                    // Автоматически определяем местоположение
+                    setTimeout(() => getCurrentLocation(), 1000);
+                };
+            </script>
+        </body>
+        </html>
+    ''', pending=pending, get_starry_night_css=get_starry_night_css)
+
+
 @app.route('/toggle_like/<string:profile_id>', methods=['POST'])
-@require_profile
+@require_profile()
 def toggle_like(profile_id):
     user_id = request.cookies.get('user_id')
     if not user_id or Profile.query.get(profile_id) is None or profile_id == user_id:
@@ -3227,7 +3862,7 @@ def toggle_like(profile_id):
 
 
 @app.route('/my_profile')
-@require_profile
+@require_profile()
 def my_profile():
     user_id = request.cookies.get('user_id')
     profile = Profile.query.get(user_id)
@@ -3320,7 +3955,7 @@ def my_profile():
 
 
 @app.route('/edit_profile', methods=['GET', 'POST'])
-@require_profile
+@require_profile(check_payment=False)
 def edit_profile():
     user_id = request.cookies.get('user_id')
     profile = Profile.query.get(user_id)
@@ -4273,7 +4908,7 @@ def edit_profile():
 
 
 @app.route('/my_likes')
-@require_profile
+@require_profile()
 def my_likes():
     user_id = request.cookies.get('user_id')
     # Найти всех, кто меня лайкнул
@@ -4482,7 +5117,7 @@ def my_likes():
 
 
 @app.route('/profile/<string:id>')
-@require_profile
+@require_profile()
 def view_profile(id):
     profile = Profile.query.get(id)
     if not profile:
@@ -4706,7 +5341,7 @@ def view_profile(id):
 
 
 @app.route('/like/<string:id>', methods=['POST'])
-@require_profile
+@require_profile()
 def like_profile(id):
     if Profile.query.get(id) is None:
         return jsonify({'error': 'Анкета не найдена'}), 404
@@ -4729,7 +5364,7 @@ def like_profile(id):
 
 
 @app.route('/delete/<string:id>', methods=['POST'])
-@require_profile
+@require_profile()
 def delete_profile(id):
     profile = Profile.query.get(id)
     if not profile:
@@ -4749,7 +5384,7 @@ def delete_profile(id):
 
 
 @app.route('/my_matches')
-@require_profile
+@require_profile()
 def my_matches():
     user_id = request.cookies.get('user_id')
     # Получаем метчи из базы данных
@@ -4876,7 +5511,7 @@ def my_matches():
 
 
 @app.route('/my_messages')
-@require_profile
+@require_profile()
 def my_messages():
     user_id = request.cookies.get('user_id')
     chat_keys = set()
@@ -5029,7 +5664,7 @@ def my_messages():
 
 
 @app.route('/chat/<string:other_user_id>', methods=['GET', 'POST'])
-@require_profile
+@require_profile()
 def chat(other_user_id):
     user_id = request.cookies.get('user_id')
     # Проверяем метчи в базе данных
@@ -5517,7 +6152,7 @@ def chat(other_user_id):
 
 
 @app.route('/chat_history/<string:other_user_id>')
-@require_profile
+@require_profile()
 def chat_history(other_user_id):
     user_id = request.cookies.get('user_id')
     chat_key = '_'.join(sorted([user_id, other_user_id]))
@@ -6071,7 +6706,7 @@ def terms():
 
 
 @app.route('/api/update_settings', methods=['POST'])
-@require_profile
+@require_profile()
 def api_update_settings():
     """API для обновления настроек пользователя"""
     user_id = request.cookies.get('user_id')
@@ -6090,7 +6725,7 @@ def api_update_settings():
 
 
 @app.route('/api/get_settings')
-@require_profile
+@require_profile()
 def api_get_settings():
     """API для получения настроек пользователя"""
     user_id = request.cookies.get('user_id')
@@ -6099,7 +6734,7 @@ def api_get_settings():
 
 
 @app.route('/settings')
-@require_profile
+@require_profile()
 def settings():
     user_id = request.cookies.get('user_id')
     navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
@@ -6406,6 +7041,61 @@ def cleanup_expired_profiles():
         return 0
 
 
+def cleanup_expired_pending_profiles():
+    """
+    Удаляет временные анкеты (PendingProfile), которые старше PENDING_PROFILE_LIFETIME_HOURS часов
+    """
+    try:
+        from datetime import datetime, timezone, timedelta
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PENDING_PROFILE_LIFETIME_HOURS)
+        
+        # Находим просроченные временные анкеты
+        all_pending = PendingProfile.query.all()
+        expired_pending = []
+        
+        for pending in all_pending:
+            created_at = pending.created_at
+            # Если created_at без timezone, добавляем UTC
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            
+            if created_at < cutoff_time:
+                expired_pending.append(pending)
+        
+        print(f"🔍 Найдено {len(expired_pending)} просроченных временных анкет для удаления")
+        
+        deleted_count = 0
+        for pending in expired_pending:
+            print(f"🗑️ Удаляем временную анкету {pending.id} (создана: {pending.created_at})")
+            
+            # Удаляем фото
+            try:
+                if pending.photo:
+                    photo_path = os.path.join(app.config['UPLOAD_FOLDER'], pending.photo)
+                    if os.path.exists(photo_path):
+                        os.remove(photo_path)
+                        print(f"  🗑️ Фото удалено: {pending.photo}")
+            except Exception as e:
+                print(f"  ⚠️ Ошибка удаления фото: {e}")
+            
+            # Удаляем временную анкету
+            db.session.delete(pending)
+            deleted_count += 1
+        
+        db.session.commit()
+        
+        if deleted_count > 0:
+            print(f"✅ Удалено {deleted_count} просроченных временных анкет")
+        else:
+            print("✅ Просроченных временных анкет не найдено")
+        
+        return deleted_count
+    except Exception as e:
+        print(f"❌ Ошибка при очистке временных анкет: {e}")
+        db.session.rollback()
+        return 0
+
+
 # ============================================================================
 # МАРШРУТЫ ОПЛАТЫ ЮKASSA
 # ============================================================================
@@ -6417,26 +7107,20 @@ def payment():
     if not user_id:
         return redirect(url_for('home'))
 
+    # Проверяем, есть ли уже оплаченный профиль
     profile = Profile.query.get(user_id)
-    if not profile:
-        return redirect(url_for('create_profile'))
-
-    if profile.is_paid:
+    if profile and profile.is_paid:
         return redirect(url_for('my_profile'))
 
-    # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
-    # Это предотвращает доступ к чужим анкетам через общие cookies
-    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-    if hasattr(profile, 'creation_ip') and profile.creation_ip and profile.creation_ip != client_ip:
-        return redirect(url_for('home'))
+    # Проверяем, есть ли временная анкета (до оплаты)
+    pending = PendingProfile.query.get(user_id)
+    if not pending:
+        return redirect(url_for('create_profile'))
 
-    # Если у профиля нет IP, сохраняем текущий IP для безопасности
-    if not hasattr(profile, 'creation_ip') or not profile.creation_ip:
-        try:
-            profile.creation_ip = client_ip
-            db.session.commit()
-        except:
-            pass
+    # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
+    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if pending.creation_ip and pending.creation_ip != client_ip:
+        return redirect(url_for('home'))
 
     return f'''
     <!DOCTYPE html>
@@ -6524,7 +7208,7 @@ def payment():
             </button>
 
             <br>
-            <a href="/create" class="back-btn">← Назад к анкете</a>
+            <a href="/edit_pending_profile" class="back-btn">← Вернуться к анкете</a>
         </div>
 
         <script>
@@ -6644,16 +7328,45 @@ def payment_success():
     user_id = request.args.get('user_id')
 
     if user_id:
-        # Помечаем профиль как оплаченный (для случая, когда платеж уже прошел)
+        # Создаем настоящую анкету из временной после успешной оплаты
         try:
+            # Проверяем, есть ли уже оплаченный профиль
             profile = Profile.query.get(user_id)
-            if profile and not profile.is_paid:
-                profile.is_paid = True
-                profile.payment_date = datetime.utcnow()
-                db.session.commit()
-                print(f"✅ Профиль {user_id} помечен как оплаченный")
+            if profile and profile.is_paid:
+                print(f"✅ Профиль {user_id} уже оплачен")
+            else:
+                # Получаем временную анкету
+                pending = PendingProfile.query.get(user_id)
+                if pending:
+                    # Создаем настоящую анкету из временной
+                    profile = Profile(
+                        id=pending.id,
+                        name=pending.name,
+                        age=pending.age,
+                        gender=pending.gender,
+                        hobbies=pending.hobbies,
+                        goal=pending.goal,
+                        city=pending.city,
+                        venue=pending.venue,
+                        photo=pending.photo,
+                        likes=0,
+                        latitude=pending.latitude,
+                        longitude=pending.longitude,
+                        creation_ip=pending.creation_ip,
+                        is_paid=True,
+                        payment_date=datetime.utcnow(),
+                        created_at=datetime.utcnow()  # Таймер запускается СЕЙЧАС после оплаты!
+                    )
+                    db.session.add(profile)
+                    # Удаляем временную анкету
+                    db.session.delete(pending)
+                    db.session.commit()
+                    print(f"✅ Профиль {user_id} создан после оплаты, таймер запущен!")
+                else:
+                    print(f"⚠️ Временная анкета {user_id} не найдена")
         except Exception as e:
-            print(f"❌ Ошибка обновления профиля: {e}")
+            print(f"❌ Ошибка создания профиля после оплаты: {e}")
+            db.session.rollback()
 
     if payment_id and user_id:
         # Проверяем статус платежа
@@ -6835,9 +7548,12 @@ def periodic_cleanup():
             with app.app_context():
                 print("🔄 Запуск периодической очистки просроченных анкет...")
                 deleted_count = cleanup_expired_profiles()
+                pending_deleted_count = cleanup_expired_pending_profiles()
                 if deleted_count > 0:
-                    print(f"✅ Периодическая очистка: удалено {deleted_count} анкет")
-                else:
+                    print(f"✅ Периодическая очистка: удалено {deleted_count} оплаченных анкет")
+                if pending_deleted_count > 0:
+                    print(f"✅ Периодическая очистка: удалено {pending_deleted_count} временных анкет")
+                if deleted_count == 0 and pending_deleted_count == 0:
                     print("✅ Периодическая очистка: просроченных анкет не найдено")
         except Exception as e:
             print(f"❌ Ошибка в периодической очистке: {e}")
@@ -6870,7 +7586,9 @@ if __name__ == '__main__':
         # Запускаем очистку просроченных анкет при старте сервера
         print("🧹 Запуск автоматической очистки просроченных анкет...")
         deleted_count = cleanup_expired_profiles()
-        print(f"⏰ Время жизни анкеты: {PROFILE_LIFETIME_HOURS} часов")
+        pending_deleted_count = cleanup_expired_pending_profiles()
+        print(f"⏰ Время жизни оплаченной анкеты: {PROFILE_LIFETIME_HOURS} часов")
+        print(f"⏰ Время жизни временной анкеты: {PENDING_PROFILE_LIFETIME_HOURS} часов")
 
         # Запускаем фоновую задачу для периодической очистки
         cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)

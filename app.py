@@ -7259,11 +7259,14 @@ def create_payment():
         if not user_id:
             return jsonify({'success': False, 'error': 'Отсутствует user_id'})
 
-        profile = Profile.query.get(user_id)
-        if not profile:
-            return jsonify({'success': False, 'error': 'Профиль не найден'})
+        # Проверяем наличие временной анкеты (до оплаты)
+        pending_profile = PendingProfile.query.get(user_id)
+        if not pending_profile:
+            return jsonify({'success': False, 'error': 'Временная анкета не найдена'})
 
-        if profile.is_paid:
+        # Проверяем, не оплачен ли уже профиль
+        existing_profile = Profile.query.get(user_id)
+        if existing_profile and existing_profile.is_paid:
             return jsonify({'success': False, 'error': 'Профиль уже оплачен'})
 
         # Создаем платеж через ЮKassa

@@ -261,6 +261,19 @@ def add_notification(user_id, message):
 # ЮKASSA ФУНКЦИИ - ТЕСТОВЫЙ РЕЖИМ
 # ============================================================================
 
+def get_base_url():
+    """Получает базовый URL для текущего запроса"""
+    if request:
+        scheme = 'https' if request.is_secure else 'http'
+        host = request.host
+        return f"{scheme}://{host}"
+    else:
+        # Fallback для случаев когда request недоступен
+        # Можно задать через переменную окружения DEPLOY_DOMAIN
+        import os
+        deploy_domain = os.getenv('DEPLOY_DOMAIN', 'https://your-domain.com')
+        return deploy_domain
+
 def create_yookassa_payment(user_id, amount, description="Создание профиля"):
     """Создает платеж в ЮKassa"""
     try:
@@ -275,7 +288,7 @@ def create_yookassa_payment(user_id, amount, description="Создание пр�
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": f"http://localhost:5000/payment/success?user_id={user_id}"
+                "return_url": f"{get_base_url()}/payment/success?user_id={user_id}"
             },
             "capture": True,
             "description": description,
@@ -321,7 +334,7 @@ def create_yookassa_payment(user_id, amount, description="Создание пр�
         if YOOKASSA_TEST_MODE:
             # Создаем тестовый результат
             test_payment_id = f"test_payment_{uuid.uuid4().hex[:8]}"
-            test_payment_url = f"http://localhost:5000/payment/test-success?payment_id={test_payment_id}"
+            test_payment_url = f"{get_base_url()}/payment/test-success?payment_id={test_payment_id}"
 
             result = {
                 'id': test_payment_id,
@@ -1070,7 +1083,10 @@ def debug_geolocation():
                     const resultDiv = document.getElementById('https-result');
                     const isHTTPS = window.location.protocol === 'https:';
                     const isLocalhost = window.location.hostname === 'localhost' || 
-                                       window.location.hostname === '127.0.0.1';
+                                       window.location.hostname === '127.0.0.1' ||
+                                       window.location.hostname.startsWith('192.168.') ||
+                                       window.location.hostname.startsWith('10.') ||
+                                       window.location.hostname.includes('.local');
 
                     if (isHTTPS || isLocalhost) {
                         resultDiv.innerHTML = '<div class="success">✅ Протокол подходит для геолокации</div>';
@@ -2849,13 +2865,22 @@ def require_profile(check_payment=True):
                 print(f"⚠️ Ошибка при автоматической очистке: {e}")
 
             user_id = request.cookies.get('user_id')
-            if not user_id or Profile.query.get(user_id) is None:
+            print(f"🔍 @require_profile: проверяем пользователя {user_id}")
+            
+            if not user_id:
+                print(f"❌ @require_profile: нет user_id в cookie, перенаправляем на создание")
                 return redirect(url_for('create_profile'))
-
+            
             profile = Profile.query.get(user_id)
+            if profile is None:
+                print(f"❌ @require_profile: профиль {user_id} не найден, перенаправляем на создание")
+                return redirect(url_for('create_profile'))
+            
+            print(f"✅ @require_profile: профиль найден - {profile.name}, оплачен: {profile.is_paid}")
             
             # Проверяем оплату только если требуется
             if check_payment and profile and not profile.is_paid:
+                print(f"💰 @require_profile: профиль не оплачен, перенаправляем на оплату")
                 return redirect(url_for('payment'))
 
             # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
@@ -3864,8 +3889,16 @@ def toggle_like(profile_id):
 @app.route('/my_profile')
 @require_profile()
 def my_profile():
-    user_id = request.cookies.get('user_id')
+    # Получаем user_id из cookie или из URL параметров
+    user_id = request.cookies.get('user_id') or request.args.get('user_id')
+    
+    # Если user_id из URL, устанавливаем его в cookie
+    if request.args.get('user_id') and not request.cookies.get('user_id'):
+        user_id = request.args.get('user_id')
+        print(f"🔄 Устанавливаем user_id из URL в cookie: {user_id}")
+    
     profile = Profile.query.get(user_id)
+    print(f"👤 Загружаем профиль для {user_id}: {profile.name if profile else 'не найден'}")
     navbar = render_navbar(user_id, active='profile', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
@@ -3950,6 +3983,34 @@ def my_profile():
                 <a href="/" class="back-btn">← На главную</a>
             </div>
         </body>
+        <script>
+            // Устанавливаем cookie user_id если он пришел из URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const userIdFromUrl = urlParams.get('user_id');
+            
+            if (userIdFromUrl) {
+                console.log('🆔 User ID из URL параметров:', userIdFromUrl);
+                
+                // Проверяем, есть ли уже cookie
+                const currentUserId = document.cookie.match(/user_id=([^;]+)/);
+                if (!currentUserId || currentUserId[1] !== userIdFromUrl) {
+                    // Устанавливаем cookie
+                    document.cookie = 'user_id=' + userIdFromUrl + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
+                    console.log('🍪 Cookie user_id установлен из URL:', userIdFromUrl);
+                    
+                    // Также сохраняем в localStorage
+                    try {
+                        localStorage.setItem('dating_app_user_id', userIdFromUrl);
+                        sessionStorage.setItem('dating_app_user_id', userIdFromUrl);
+                        console.log('💾 Сохранено в localStorage и sessionStorage');
+                    } catch (e) {
+                        console.warn('⚠️ Не удалось сохранить в localStorage:', e);
+                    }
+                } else {
+                    console.log('✅ Cookie user_id уже установлен правильно');
+                }
+            }
+        </script>
         </html>
     ''', profile=profile, navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css)
 
@@ -7333,16 +7394,25 @@ def payment_success():
     if user_id:
         # Создаем настоящую анкету из временной после успешной оплаты
         try:
+            print(f"🔄 Обрабатываем оплату для пользователя: {user_id}")
+            
             # Проверяем, есть ли уже оплаченный профиль
             profile = Profile.query.get(user_id)
             if profile and profile.is_paid:
-                print(f"✅ Профиль {user_id} уже оплачен")
+                print(f"✅ Профиль {user_id} уже оплачен и существует")
             else:
                 # Получаем временную анкету
                 pending = PendingProfile.query.get(user_id)
                 if pending:
+                    print(f"📝 Найдена временная анкета для {user_id}, создаем постоянную...")
+                    
+                    # Удаляем старый профиль если он есть (но не оплачен)
+                    if profile:
+                        print(f"🗑️ Удаляем старый неоплаченный профиль {user_id}")
+                        db.session.delete(profile)
+                    
                     # Создаем настоящую анкету из временной
-                    profile = Profile(
+                    new_profile = Profile(
                         id=pending.id,
                         name=pending.name,
                         age=pending.age,
@@ -7360,15 +7430,22 @@ def payment_success():
                         payment_date=datetime.utcnow(),
                         created_at=datetime.utcnow()  # Таймер запускается СЕЙЧАС после оплаты!
                     )
-                    db.session.add(profile)
+                    db.session.add(new_profile)
                     # Удаляем временную анкету
                     db.session.delete(pending)
                     db.session.commit()
                     print(f"✅ Профиль {user_id} создан после оплаты, таймер запущен!")
+                    print(f"📊 Данные профиля: {new_profile.name}, {new_profile.age}, {new_profile.gender}")
                 else:
                     print(f"⚠️ Временная анкета {user_id} не найдена")
+                    print(f"🔍 Ищем все временные анкеты...")
+                    all_pending = PendingProfile.query.all()
+                    for p in all_pending:
+                        print(f"   - Временная анкета: {p.id} ({p.name})")
         except Exception as e:
             print(f"❌ Ошибка создания профиля после оплаты: {e}")
+            import traceback
+            traceback.print_exc()
             db.session.rollback()
 
     if payment_id and user_id:
@@ -7433,8 +7510,78 @@ def payment_success():
             <div class="success-icon">✅</div>
             <h1>Оплата успешна!</h1>
             <p>Ваш профиль активирован и готов к использованию</p>
-                <a href="/my_profile" class="success-btn">Перейти к профилю</a>
+            <div style="margin-top: 30px;">
+                <a href="/my_profile" class="success-btn" id="profile-link" style="font-size: 1.3em; padding: 18px 40px;">Перейти к профилю</a>
+            </div>
+            <p id="countdown" style="margin-top: 20px; color: #4CAF50; font-size: 1em;">
+                Автоматический переход через <span id="timer">3</span> секунды...
+            </p>
         </div>
+        
+        <script>
+            // Устанавливаем cookie user_id и обновляем ссылку
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+            
+            if (userId) {
+                console.log('🆔 User ID из URL:', userId);
+                
+                // Сохраняем user_id в cookie
+                document.cookie = 'user_id=' + userId + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
+                console.log('🍪 Cookie установлен:', document.cookie);
+                
+                // Также сохраняем в localStorage для надежности
+                try {
+                    localStorage.setItem('dating_app_user_id', userId);
+                    sessionStorage.setItem('dating_app_user_id', userId);
+                    console.log('💾 Сохранено в localStorage и sessionStorage');
+                } catch (e) {
+                    console.warn('⚠️ Не удалось сохранить в localStorage:', e);
+                }
+                
+                // Обновляем ссылку на профиль с user_id
+                const profileLink = document.getElementById('profile-link');
+                if (profileLink) {
+                    profileLink.href = '/my_profile?user_id=' + userId;
+                    console.log('🔗 Ссылка на профиль обновлена:', profileLink.href);
+                }
+            } else {
+                console.warn('⚠️ User ID не найден в URL');
+            }
+            
+            // Автоматическое перенаправление на профиль через 3 секунды
+            let countdown = 3;
+            const timerElement = document.getElementById('timer');
+            const countdownElement = document.getElementById('countdown');
+            
+            const interval = setInterval(function() {
+                countdown--;
+                if (timerElement) {
+                    timerElement.textContent = countdown;
+                }
+                
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    if (countdownElement) {
+                        countdownElement.innerHTML = 'Переходим к вашему профилю...';
+                    }
+                    // Принудительно перенаправляем на профиль пользователя
+                    const profileLink = document.getElementById('profile-link');
+                    const redirectUrl = profileLink ? profileLink.href : '/my_profile';
+                    console.log('🚀 Автоматическое перенаправление на:', redirectUrl);
+                    window.location.href = redirectUrl;
+                }
+            }, 1000);
+            
+            // Останавливаем автоматическое перенаправление при клике на кнопку
+            document.querySelector('.success-btn').addEventListener('click', function() {
+                clearInterval(interval);
+                if (countdownElement) {
+                    countdownElement.style.display = 'none';
+                }
+                console.log('👆 Клик по кнопке профиля, переход на:', this.href);
+            });
+        </script>
     </body>
     </html>
     '''
@@ -7565,6 +7712,10 @@ def periodic_cleanup():
 @app.route('/test_create_and_pay')
 def test_create_and_pay():
     return send_from_directory('.', 'test_create_and_pay.html')
+
+@app.route('/test_payment_success_fix')
+def test_payment_success_fix():
+    return send_from_directory('.', 'test_payment_success_fix.html')
 
 
 @app.route('/debug_create')

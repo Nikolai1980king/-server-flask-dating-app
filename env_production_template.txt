@@ -1,0 +1,34 @@
+# ============================================================================
+# НАСТРОЙКИ ДЛЯ ПРОДАКШЕН СЕРВЕРА (212.67.11.50)
+# ============================================================================
+
+# Основной домен сайта
+DEPLOY_DOMAIN=https://192.168.255.137
+
+# Настройки Flask
+FLASK_ENV=production
+FLASK_DEBUG=False
+SECRET_KEY=21ad30ec69a221f0d740d8053841611cc02cc890e6d1343d4154768d6cbc0098
+
+# База данных
+DATABASE_URL=postgresql://flaskapp:password@localhost:5432/flaskapp
+
+# Настройки ЮKassa (ЗАМЕНИТЕ НА ВАШИ!)
+YOOKASSA_SHOP_ID=your_shop_id_here
+YOOKASSA_SECRET_KEY=your_secret_key_here
+YOOKASSA_TEST_MODE=False
+
+# Настройки приложения
+MAX_REGISTRATION_DISTANCE=3000
+PROFILE_LIFETIME_HOURS=24
+UPLOAD_FOLDER=/home/flaskapp/app/uploads
+
+# ============================================================================
+# ИНСТРУКЦИЯ ПО НАСТРОЙКЕ ЮKASSA:
+# ============================================================================
+# 1. Зайдите в личный кабинет ЮKassa: https://yookassa.ru/my
+# 2. Получите Shop ID и Secret Key
+# 3. Замените your_shop_id_here на ваш Shop ID
+# 4. Замените your_secret_key_here на ваш Secret Key
+# 5. Установите YOOKASSA_TEST_MODE=False для продакшена
+# ============================================================================

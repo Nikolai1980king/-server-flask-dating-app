@@ -56,3 +56,9 @@ if __name__ == "__main__":
     success = clear_database()
     if not success:
         exit(1)
+
+
+
+
+
+

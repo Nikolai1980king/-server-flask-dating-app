@@ -41,3 +41,5 @@ print(f"""
    🐛 Debug: {FLASK_DEBUG}
    📁 Загрузки: {UPLOAD_FOLDER}
 """)
+
+

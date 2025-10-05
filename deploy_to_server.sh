@@ -77,3 +77,5 @@ echo "   systemctl restart flaskapp"
 echo ""
 echo "4. Проверьте работу:"
 echo "   https://192.168.255.137"
+
+

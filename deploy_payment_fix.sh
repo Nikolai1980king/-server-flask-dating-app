@@ -1,90 +1,70 @@
 #!/bin/bash
 
-# 🚀 Деплой исправления перенаправления после оплаты
-# Использование: ./deploy_payment_fix.sh
+echo "🚀 Деплой исправления перехода после оплаты"
+echo "Сервер: 212.67.11.50"
+echo "=" * 50
 
-set -e
-
-# Цвета для вывода
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-print_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
-}
-
-print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
-
-# Настройки сервера
-SERVER_IP="212.67.11.50"
-SERVER_USER="root"
-SERVER_PATH="/root/flask_server"
-
-print_info "🚀 Деплой исправления перенаправления после оплаты..."
-print_info "Сервер: $SERVER_IP"
-
-# Проверяем, что файл app.py существует
-if [ ! -f "app.py" ]; then
-    print_error "Файл app.py не найден!"
-    exit 1
-fi
-
-print_info "📤 Копируем обновленный app.py на сервер..."
-
-# Копируем обновленный файл на сервер
-scp app.py $SERVER_USER@$SERVER_IP:$SERVER_PATH/
+echo "📤 Копируем исправленный app.py на сервер..."
+scp app.py root@212.67.11.50:/home/flaskapp/app/
 
 if [ $? -eq 0 ]; then
-    print_success "Файл app.py успешно скопирован на сервер"
+    echo "✅ app.py скопирован успешно"
 else
-    print_error "Ошибка при копировании файла"
+    echo "❌ Ошибка копирования app.py"
     exit 1
 fi
 
-print_info "🔄 Перезапускаем приложение на сервере..."
+echo "📤 Копируем объединенный .env файл..."
+scp .env.merged root@212.67.11.50:/home/flaskapp/app/.env
 
-# Подключаемся к серверу и перезапускаем приложение
-ssh $SERVER_USER@$SERVER_IP << 'EOF'
-cd /root/flask_server
+if [ $? -eq 0 ]; then
+    echo "✅ .env файл скопирован успешно"
+else
+    echo "❌ Ошибка копирования .env файла"
+    exit 1
+fi
 
-# Останавливаем старое приложение
-echo "🛑 Останавливаем старое приложение..."
-pkill -f "python.*app.py" 2>/dev/null || true
-supervisorctl stop flaskapp 2>/dev/null || true
-
-# Ждем немного
-sleep 2
-
-# Запускаем новое приложение
-echo "🚀 Запускаем обновленное приложение..."
-supervisorctl start flaskapp
-
-# Проверяем статус
-echo "📊 Проверяем статус приложения..."
-sleep 3
-supervisorctl status flaskapp
-
-echo "✅ Приложение обновлено и запущено!"
+echo "🔄 Подключаемся к серверу для перезапуска..."
+ssh root@212.67.11.50 << 'EOF'
+    echo "📂 Переходим в папку приложения..."
+    cd /home/flaskapp/app
+    
+    echo "⚠️ ВАЖНО: Отредактируйте .env файл с настройками ЮKassa!"
+    echo "nano .env"
+    echo "Замените:"
+    echo "  - YOOKASSA_SHOP_ID=your_shop_id_here"
+    echo "  - YOOKASSA_SECRET_KEY=your_secret_key_here"
+    echo ""
+    echo "DEPLOY_DOMAIN уже настроен: https://192.168.255.137"
+    
+    echo "🔄 Останавливаем приложение..."
+    systemctl stop flaskapp
+    
+    echo "🚀 Запускаем приложение..."
+    systemctl start flaskapp
+    
+    echo "📊 Проверяем статус..."
+    systemctl status flaskapp --no-pager
+    
+    echo "📋 Проверяем логи..."
+    journalctl -u flaskapp -n 5 --no-pager
+    
+    echo "✅ Исправление деплоено!"
 EOF
 
-if [ $? -eq 0 ]; then
-    print_success "🎉 Деплой завершен успешно!"
-    print_info "🌐 Приложение доступно по адресу: http://$SERVER_IP"
-    print_info "🔧 Для проверки логов: ssh $SERVER_USER@$SERVER_IP 'tail -f /var/log/flaskapp/flaskapp.out.log'"
-else
-    print_error "Ошибка при деплое на сервер"
-    exit 1
-fi
+echo ""
+echo "🎉 Деплой исправления завершен!"
+echo ""
+echo "📋 Что исправлено:"
+echo "✅ Переходы после оплаты теперь работают на правильном домене"
+echo "✅ Убраны все ссылки на localhost"
+echo "✅ Автоматическое перенаправление на профиль пользователя"
+echo "✅ Правильная установка cookie для сессий"
+echo ""
+echo "🧪 Для тестирования:"
+echo "1. Откройте: https://192.168.255.137"
+echo "2. Создайте профиль"
+echo "3. Перейдите к оплате"
+echo "4. После оплаты проверьте переход на профиль"
+echo ""
+echo "⚠️ Не забудьте настроить ЮKassa в .env файле на сервере!"

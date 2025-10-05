@@ -29,7 +29,7 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 db = SQLAlchemy(app)
 
 # Максимальное расстояние для регистрации (в метрах) - СТРОКА 29
-MAX_REGISTRATION_DISTANCE = 3000  # 3 км = 3000 метров
+MAX_REGISTRATION_DISTANCE = 10000000  # 10000 км = 1000000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
 PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ОПЛАЧЕННОЙ анкеты (30 минут)
@@ -1241,7 +1241,7 @@ def home():
             <div class="welcome-message">
                 <p class="welcome-text">Хотите найти приятную компанию за чашечкой кофе? ☕</p>
                 <p class="welcome-description">Наше приложение поможет вам познакомиться с интересными людьми в заведениях — для душевных бесед, новых знакомств или просто хорошего времени.</p>
-                <p class="welcome-price">Регистрация — всего 50 рублей, а возможности — бесценны! 😊</p>
+                <p class="welcome-price">Регистрация — всего {{ PROFILE_CREATION_PRICE }} рублей, а возможности — бесценны! 😊</p>
             </div>
             <p style="color: white;">Здесь вы можете найти интересных людей для общения.</p>
             <div id="create-profile-section" style="display: {% if not has_profile %}block{% else %}none{% endif %};">
@@ -1407,7 +1407,7 @@ def home():
         </body>
         </html>
     ''', unread_notifications=unread_notifications, navbar=navbar, has_profile=has_profile,
-                                  get_starry_night_css=get_starry_night_css)
+                                  get_starry_night_css=get_starry_night_css, PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE)
 
 
 @app.route('/create', methods=['GET', 'POST'])
@@ -1562,8 +1562,7 @@ def create_profile():
                 'success': False,
                 'error': f'Ошибка при создании анкеты: {str(e)}'
             }), 500
-    navbar = render_navbar(user_id, active=None, unread_messages=get_unread_messages_count(user_id),
-                           unread_likes=get_unread_likes_count(user_id))
+    # Навигационная панель убрана со страницы создания анкеты
     return render_template_string(r'''
         <!DOCTYPE html>
         <html>
@@ -1817,7 +1816,6 @@ def create_profile():
             </style>
         </head>
         <body>
-            {{ navbar|safe }}
             <div class="form-container">
                 <h2 style="text-align: center; margin-top: 10px;">Создать анкету</h2>
                 <p style="color: #fff; opacity: 0.8; margin-bottom: 20px; text-align: center;">
@@ -2788,7 +2786,7 @@ def create_profile():
             </script>
         </body>
         </html>
-    ''', navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css,
+    ''', get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css,
                                   PROFILE_LIFETIME_HOURS=PROFILE_LIFETIME_HOURS)
 
 

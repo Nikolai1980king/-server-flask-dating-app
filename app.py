@@ -1679,7 +1679,7 @@ def create_profile():
             </form>
             <div style="text-align: center; margin-top: 15px; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; border: 1px solid rgba(76, 175, 80, 0.3);">
                 <p style="color: #4CAF50; font-size: 0.9em; margin: 0; text-shadow: 0 0 5px rgba(76, 175, 80, 0.3);">
-                    ⏰ Анкета удалится через {{ PROFILE_LIFETIME_HOURS|int if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else PROFILE_LIFETIME_HOURS * 60|int }} {{ 'час' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int == 1 else 'часа' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int in [2,3,4] else 'часов' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else 'минут' }}
+                    ⏰ Анкета удалится через {{ PROFILE_LIFETIME_HOURS|int if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else PROFILE_LIFETIME_HOURS * 60|int }} {{ 'час' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int == 1 else 'часа' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int in [2,3,4] else 'часов' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else 'мин' }}
                 </p>
             </div>
             <div style="text-align: center; margin-top: 15px;">

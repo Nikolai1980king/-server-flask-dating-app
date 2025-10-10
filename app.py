@@ -7960,6 +7960,238 @@ def debug_lifetime_settings():
     return html
 
 
+@app.route('/debug/likes-and-matches')
+def debug_likes_and_matches():
+    """Диагностический endpoint для проверки лайков и метчей"""
+    user_id = request.cookies.get('user_id')
+    
+    if not user_id:
+        return "⚠️ Нет user_id в cookie. Сначала создайте профиль."
+    
+    # Получаем профиль текущего пользователя
+    current_profile = Profile.query.get(user_id)
+    if not current_profile:
+        return "⚠️ Профиль не найден"
+    
+    # Получаем все лайки ОТ текущего пользователя
+    my_likes = Like.query.filter_by(user_id=user_id).all()
+    
+    # Получаем все лайки К текущему пользователю
+    likes_to_me = Like.query.filter_by(liked_id=user_id).all()
+    
+    # Получаем все метчи
+    all_matches = Match.query.filter(
+        (Match.user1_id == user_id) | (Match.user2_id == user_id)
+    ).all()
+    
+    # Получаем liked_ids (как на странице visitors)
+    liked_ids = set(l.liked_id for l in my_likes)
+    for match in all_matches:
+        if match.user1_id == user_id:
+            liked_ids.add(match.user2_id)
+        else:
+            liked_ids.add(match.user1_id)
+    
+    # Все профили
+    all_profiles = Profile.query.filter(Profile.id != user_id).all()
+    
+    html = f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>🔍 Диагностика лайков и метчей</title>
+        <style>
+            body {{
+                font-family: monospace;
+                padding: 20px;
+                background: #1a1a1a;
+                color: #00ff00;
+                max-width: 1200px;
+                margin: 0 auto;
+            }}
+            .section {{
+                background: #2a2a2a;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 8px;
+                border: 2px solid #00ff00;
+            }}
+            h1, h2 {{
+                color: #00ff00;
+                text-shadow: 0 0 10px #00ff00;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 10px 0;
+            }}
+            th, td {{
+                padding: 8px;
+                text-align: left;
+                border: 1px solid #00ff00;
+            }}
+            th {{
+                background: #003300;
+            }}
+            .red {{
+                color: #ff0000;
+                font-weight: bold;
+            }}
+            .green {{
+                color: #00ff00;
+            }}
+            .yellow {{
+                color: #ffff00;
+            }}
+            .info-box {{
+                background: #003366;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 10px 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>🔍 ДИАГНОСТИКА ЛАЙКОВ И МЕТЧЕЙ</h1>
+        
+        <div class="section">
+            <h2>👤 Текущий пользователь</h2>
+            <p><strong>ID:</strong> {user_id[:12]}...</p>
+            <p><strong>Имя:</strong> {current_profile.name}</p>
+        </div>
+        
+        <div class="section">
+            <h2>❤️ Мои лайки (я лайкнул)</h2>
+    '''
+    
+    if my_likes:
+        html += '<table><tr><th>ID получателя</th><th>Имя получателя</th><th>Like ID</th></tr>'
+        for like in my_likes:
+            liked_profile = Profile.query.get(like.liked_id)
+            name = liked_profile.name if liked_profile else 'Удален'
+            html += f'<tr><td>{like.liked_id[:12]}...</td><td>{name}</td><td>{like.id}</td></tr>'
+        html += f'</table><p><strong>Всего:</strong> {len(my_likes)}</p>'
+    else:
+        html += '<p class="yellow">Вы еще никого не лайкнули</p>'
+    
+    html += '''
+        </div>
+        
+        <div class="section">
+            <h2>💖 Лайки мне (меня лайкнули)</h2>
+    '''
+    
+    if likes_to_me:
+        html += '<table><tr><th>ID отправителя</th><th>Имя отправителя</th><th>Like ID</th></tr>'
+        for like in likes_to_me:
+            sender_profile = Profile.query.get(like.user_id)
+            name = sender_profile.name if sender_profile else 'Удален'
+            html += f'<tr><td>{like.user_id[:12]}...</td><td>{name}</td><td>{like.id}</td></tr>'
+        html += f'</table><p><strong>Всего:</strong> {len(likes_to_me)}</p>'
+    else:
+        html += '<p class="yellow">Вас еще никто не лайкнул</p>'
+    
+    html += '''
+        </div>
+        
+        <div class="section">
+            <h2>✨ Мои метчи</h2>
+    '''
+    
+    if all_matches:
+        html += '<table><tr><th>ID партнера</th><th>Имя партнера</th><th>Match ID</th></tr>'
+        for match in all_matches:
+            partner_id = match.user2_id if match.user1_id == user_id else match.user1_id
+            partner_profile = Profile.query.get(partner_id)
+            name = partner_profile.name if partner_profile else 'Удален'
+            html += f'<tr><td>{partner_id[:12]}...</td><td>{name}</td><td>{match.id}</td></tr>'
+        html += f'</table><p><strong>Всего:</strong> {len(all_matches)}</p>'
+    else:
+        html += '<p class="yellow">У вас пока нет метчей</p>'
+    
+    html += '''
+        </div>
+        
+        <div class="section">
+            <h2>👥 Все профили и их статус</h2>
+            <div class="info-box">
+                <p><strong>Логика отображения сердечка на странице /visitors:</strong></p>
+                <p>Сердечко красное ❤️ если ID профиля есть в <code>liked_ids</code></p>
+                <p><code>liked_ids</code> содержит: тех, кого я лайкнул + тех, с кем у меня метч</p>
+            </div>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Имя</th>
+                    <th>Я лайкнул?</th>
+                    <th>Есть метч?</th>
+                    <th>В liked_ids?</th>
+                    <th>Сердечко</th>
+                </tr>
+    '''
+    
+    my_likes_ids = [l.liked_id for l in my_likes]
+    matches_ids = [(m.user2_id if m.user1_id == user_id else m.user1_id) for m in all_matches]
+    
+    for profile in all_profiles:
+        i_liked = profile.id in my_likes_ids
+        has_match = profile.id in matches_ids
+        in_liked_ids = profile.id in liked_ids
+        
+        i_liked_class = 'green' if i_liked else 'red'
+        i_liked_icon = '✅' if i_liked else '❌'
+        
+        match_class = 'green' if has_match else 'red'
+        match_icon = '✅' if has_match else '❌'
+        
+        liked_class = 'green' if in_liked_ids else 'red'
+        liked_icon = '✅' if in_liked_ids else '❌'
+        
+        heart = '❤️' if in_liked_ids else '🤍'
+        
+        html += f'''
+                <tr>
+                    <td>{profile.id[:12]}...</td>
+                    <td>{profile.name}</td>
+                    <td class="{i_liked_class}">{i_liked_icon}</td>
+                    <td class="{match_class}">{match_icon}</td>
+                    <td class="{liked_class}">{liked_icon}</td>
+                    <td>{heart}</td>
+                </tr>
+        '''
+    
+    html += '''
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>🔧 Что делать, если видите проблему</h2>
+            <ol>
+                <li>Проверьте таблицу "Мои лайки" - там должны быть только те, кого вы сами лайкнули</li>
+                <li>Если там есть лайк, которого вы не ставили - это БАГ!</li>
+                <li>Проверьте "Все профили" - сердечко должно быть красным только если "В liked_ids?" = ✅</li>
+                <li>Если есть метч, но вы не лайкали - это СТРАННО, проверьте таблицу "Мои лайки"</li>
+            </ol>
+        </div>
+        
+        <div class="section">
+            <p><a href="/visitors" style="color: #00ff00;">← Вернуться к посетителям</a></p>
+            <p><a href="/debug/likes-and-matches" style="color: #00ff00;">🔄 Обновить данные</a></p>
+        </div>
+        
+        <script>
+            // Автообновление каждые 5 секунд
+            setTimeout(() => location.reload(), 5000);
+        </script>
+    </body>
+    </html>
+    '''
+    
+    return html
+
+
 @app.route('/test_create_and_pay')
 def test_create_and_pay():
     return send_from_directory('.', 'test_create_and_pay.html')

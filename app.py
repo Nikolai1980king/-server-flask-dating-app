@@ -33,7 +33,7 @@ MAX_REGISTRATION_DISTANCE = 10000000  # 10000 км = 1000000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
 # ⚠️ ВАЖНО: После изменения этих значений ОБЯЗАТЕЛЬНО ПЕРЕЗАПУСТИТЕ СЕРВЕР!
-PROFILE_LIFETIME_HOURS = 1  # Время жизни ОПЛАЧЕННОЙ анкеты в часах (10 часов)
+PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ОПЛАЧЕННОЙ анкеты в часах (10 часов)
 PENDING_PROFILE_LIFETIME_HOURS = 0.25  # Время жизни ВРЕМЕННОЙ анкеты до оплаты в часах (10 часов)
 
 # ============================================================================
@@ -5214,6 +5214,19 @@ def view_profile(id):
         return "Анкета не найдена", 404
     user_id = request.cookies.get('user_id')
     is_owner = profile.id == user_id
+    
+    # Проверяем, лайкал ли текущий пользователь этот профиль
+    already_liked = False
+    if user_id and not is_owner:
+        # Проверяем в лайках
+        like_exists = Like.query.filter_by(user_id=user_id, liked_id=id).first()
+        # Проверяем в метчах
+        match_exists = Match.query.filter(
+            ((Match.user1_id == user_id) & (Match.user2_id == id)) |
+            ((Match.user1_id == id) & (Match.user2_id == user_id))
+        ).first()
+        already_liked = bool(like_exists or match_exists)
+    
     navbar = render_navbar(user_id, active=None, unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id))
     return render_template_string('''
@@ -5347,10 +5360,16 @@ def view_profile(id):
                 }
 
                 function likeProfile(profileId) {
-                    // Показываем индикатор загрузки
                     const button = event.target;
-                    const originalText = button.textContent;
-                    button.textContent = '⏳ Отправляем...';
+                    
+                    // Если кнопка уже disabled - не делаем ничего
+                    if (button.disabled) {
+                        return;
+                    }
+                    
+                    // Временно делаем кнопку неактивной
+                    const originalContent = button.innerHTML;
+                    button.innerHTML = '⏳';
                     button.disabled = true;
 
                     fetch('/toggle_like/' + profileId, {
@@ -5364,26 +5383,28 @@ def view_profile(id):
                         if (data.liked && !data.already_liked) {
                             // Успешный новый лайк
                             showNotification('❤️ Лайк отправлен!', 'success');
-                            // Скрываем кнопку после успешного лайка
-                            button.textContent = '❤️ Лайкнуто';
-                            button.style.background = '#4CAF50';
+                            button.innerHTML = '❤️';
+                            button.style.background = '#ff6b6b';
+                            button.style.cursor = 'not-allowed';
                             button.disabled = true;
                         } else if (data.already_liked) {
                             // Уже лайкал ранее
                             showNotification('💔 Вы уже лайкнули этого пользователя', 'warning');
-                            button.textContent = '❤️ Лайкнуто';
-                            button.style.background = '#4CAF50';
+                            button.innerHTML = '❤️';
+                            button.style.background = '#ff6b6b';
+                            button.style.cursor = 'not-allowed';
                             button.disabled = true;
                         } else if (data.match_created) {
                             // Создан мэтч!
                             showNotification('✨ У вас мэтч! Теперь вы можете общаться.', 'success');
-                            button.textContent = '✨ Мэтч!';
+                            button.innerHTML = '❤️';
                             button.style.background = '#ff6b6b';
+                            button.style.cursor = 'not-allowed';
                             button.disabled = true;
                         } else {
-                            // Неожиданный ответ
+                            // Неожиданный ответ - восстанавливаем кнопку
                             showNotification('⚠️ Неожиданный ответ сервера', 'warning');
-                            button.textContent = originalText;
+                            button.innerHTML = originalContent;
                             button.disabled = false;
                         }
                     })
@@ -5391,7 +5412,7 @@ def view_profile(id):
                         console.error('Ошибка:', error);
                         showNotification('❌ Ошибка сети', 'error');
                         // Восстанавливаем кнопку при ошибке
-                        button.textContent = originalText;
+                        button.innerHTML = originalContent;
                         button.disabled = false;
                     });
                 }
@@ -5432,7 +5453,14 @@ def view_profile(id):
                 <p><strong>🏪 Заведение:</strong> {{ profile.venue }}</p>
                 {% endif %}
                 {% if not is_owner %}
-                    <button type="button" class="modern-btn" onclick="likeProfile('{{ profile.id }}')">❤️ Лайк</button>
+                    <button type="button" 
+                            id="likeBtn" 
+                            class="modern-btn" 
+                            onclick="likeProfile('{{ profile.id }}')"
+                            {% if already_liked %}disabled{% endif %}
+                            style="font-size: 2em; padding: 10px 20px; {% if already_liked %}background: #ff6b6b; cursor: not-allowed;{% else %}background: #666;{% endif %}">
+                        {% if already_liked %}❤️{% else %}🤍{% endif %}
+                    </button>
                 {% endif %}
                 {% if is_owner %}
                     <form action="/delete/{{ profile.id }}" method="post" id="deleteForm2">
@@ -5443,7 +5471,7 @@ def view_profile(id):
             </div>
         </body>
         </html>
-    ''', profile=profile, is_owner=is_owner, navbar=navbar, get_photo_url=get_photo_url,
+    ''', profile=profile, is_owner=is_owner, already_liked=already_liked, navbar=navbar, get_photo_url=get_photo_url,
                                   get_starry_night_css=get_starry_night_css)
 
 

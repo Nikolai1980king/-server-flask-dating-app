@@ -5353,53 +5353,44 @@ def view_profile(id):
                     button.textContent = '⏳ Отправляем...';
                     button.disabled = true;
 
-                    fetch('/like/' + profileId, {
+                    fetch('/toggle_like/' + profileId, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         }
                     })
-                    .then(response => {
-                        if (response.ok) {
-                            // Успешный лайк
-                            showNotification('❤️ Лайк отправлен!', 'success');
-                            // Перенаправляем на страницу профиля
-                            setTimeout(() => {
-                                window.location.href = '/profile/' + profileId;
-                            }, 1000);
-                        } else {
-                            // Ошибка - пытаемся получить JSON
-                            return response.json().catch(() => response.text());
-                        }
-                    })
+                    .then(response => response.json())
                     .then(data => {
-                        if (data && typeof data === 'object') {
-                            // JSON ответ
-                            if (data.error) {
-                                if (data.error.includes('уже лайкнули')) {
-                                    showNotification('💔 Вы уже лайкнули этого пользователя', 'warning');
-                                } else if (data.error.includes('свою анкету')) {
-                                    showNotification('🤔 Нельзя лайкнуть свою анкету', 'error');
-                                } else {
-                                    showNotification('❌ ' + data.error, 'error');
-                                }
-                            }
-                        } else if (data) {
-                            // Текстовый ответ (для обратной совместимости)
-                            if (data.includes('уже лайкнули')) {
-                                showNotification('💔 Вы уже лайкнули этого пользователя', 'warning');
-                            } else if (data.includes('свою анкету')) {
-                                showNotification('🤔 Нельзя лайкнуть свою анкету', 'error');
-                            } else {
-                                showNotification('❌ Ошибка: ' + data, 'error');
-                            }
+                        if (data.liked && !data.already_liked) {
+                            // Успешный новый лайк
+                            showNotification('❤️ Лайк отправлен!', 'success');
+                            // Скрываем кнопку после успешного лайка
+                            button.textContent = '❤️ Лайкнуто';
+                            button.style.background = '#4CAF50';
+                            button.disabled = true;
+                        } else if (data.already_liked) {
+                            // Уже лайкал ранее
+                            showNotification('💔 Вы уже лайкнули этого пользователя', 'warning');
+                            button.textContent = '❤️ Лайкнуто';
+                            button.style.background = '#4CAF50';
+                            button.disabled = true;
+                        } else if (data.match_created) {
+                            // Создан мэтч!
+                            showNotification('✨ У вас мэтч! Теперь вы можете общаться.', 'success');
+                            button.textContent = '✨ Мэтч!';
+                            button.style.background = '#ff6b6b';
+                            button.disabled = true;
+                        } else {
+                            // Неожиданный ответ
+                            showNotification('⚠️ Неожиданный ответ сервера', 'warning');
+                            button.textContent = originalText;
+                            button.disabled = false;
                         }
                     })
                     .catch(error => {
+                        console.error('Ошибка:', error);
                         showNotification('❌ Ошибка сети', 'error');
-                    })
-                    .finally(() => {
-                        // Восстанавливаем кнопку
+                        // Восстанавливаем кнопку при ошибке
                         button.textContent = originalText;
                         button.disabled = false;
                     });

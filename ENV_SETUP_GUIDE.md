@@ -119,3 +119,4 @@ UPLOAD_FOLDER=/home/flaskapp/app/uploads
 3. Проверьте, что приложение перезапущено после изменений
 
 
+

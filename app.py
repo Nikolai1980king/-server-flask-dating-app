@@ -1,4 +1,5 @@
 # нужно вводить https://192.168.255.137
+# Тестовое изменение для демонстрации коммита
 
 from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
@@ -31,8 +32,9 @@ db = SQLAlchemy(app)
 MAX_REGISTRATION_DISTANCE = 10000000  # 10000 км = 1000000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
-PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ОПЛАЧЕННОЙ анкеты (30 минут)
-PENDING_PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ВРЕМЕННОЙ анкеты до оплаты (1 час)
+# ⚠️ ВАЖНО: После изменения этих значений ОБЯЗАТЕЛЬНО ПЕРЕЗАПУСТИТЕ СЕРВЕР!
+PROFILE_LIFETIME_HOURS = 1  # Время жизни ОПЛАЧЕННОЙ анкеты в часах (10 часов)
+PENDING_PROFILE_LIFETIME_HOURS = 0.25  # Время жизни ВРЕМЕННОЙ анкеты до оплаты в часах (10 часов)
 
 # ============================================================================
 # ЮKASSA КОНФИГУРАЦИЯ - ПРОДАКШН РЕЖИМ
@@ -273,6 +275,7 @@ def get_base_url():
         deploy_domain = os.getenv('DEPLOY_DOMAIN', 'https://your-domain.com')
         return deploy_domain
 
+
 def create_yookassa_payment(user_id, amount, description="Создание профиля"):
     """Создает платеж в ЮKassa"""
     try:
@@ -343,7 +346,7 @@ def create_yookassa_payment(user_id, amount, description="Создание пр�
                 'status': 'pending'
             }
 
-            print(f"Создан тестовый платеж {test_payment_id}")
+            print(f"🧪 ТЕСТОВЫЙ РЕЖИМ: создан фиктивный платеж {test_payment_id}")
         else:
             # Отправляем запрос к ЮKassa
             print(f"🔍 Отправляем запрос к YooKassa API...")
@@ -889,10 +892,223 @@ def api_calculate_distance():
         return jsonify({'error': f'Ошибка расчета расстояния: {str(e)}'}), 500
 
 
+@app.route('/test-balloon-integration')
+def test_balloon_integration():
+    """Тестовая страница для проверки интеграции парсинга балунов"""
+    return render_template_string(open('test_balloon_integration.html').read())
 
 
+@app.route('/test-mobile-profile-restore')
+def test_mobile_profile_restore():
+    """Тестовая страница для проверки восстановления профиля на мобильных устройствах"""
+    return render_template_string(open('test_mobile_profile_restore.html').read())
 
 
+@app.route('/test-mobile-debug')
+def test_mobile_debug():
+    """Простая страница для диагностики проблем с мобильными устройствами"""
+    return render_template_string(open('test_mobile_debug.html').read())
+
+
+@app.route('/test-profile-redirect')
+def test_profile_redirect():
+    """Тестовая страница для проверки перенаправления профиля"""
+    return render_template_string(open('test_profile_redirect.html').read())
+
+
+@app.route('/test-map-load')
+def test_map_load():
+    """Тестовая страница для проверки загрузки карты"""
+    return render_template_string(open('test_map_load.html').read())
+
+
+@app.route('/test-simple-map')
+def test_simple_map():
+    """Простая тестовая страница для проверки карты"""
+    return render_template_string(open('test_simple_map.html').read())
+
+
+@app.route('/clear-cookie')
+def clear_cookie():
+    """Страница для очистки cookie"""
+    return render_template_string(open('clear_cookie.html').read())
+
+
+@app.route('/test-field-limits')
+def test_field_limits():
+    """Тестовая страница для демонстрации ограничений полей"""
+    return render_template_string(open('test_field_limits.html').read())
+
+
+@app.route('/test-alignment')
+def test_alignment():
+    """Тестовая страница для демонстрации выравнивания полей"""
+    return render_template_string(open('test_alignment.html').read())
+
+
+@app.route('/test-chat-debug')
+def test_chat_debug():
+    """Тестовая страница для отладки отправки сообщений"""
+    return render_template_string(open('test_chat_debug.html').read())
+
+
+@app.route('/debug-geolocation')
+def debug_geolocation():
+    """Страница для диагностики проблем с геолокацией"""
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Тест геолокации</title>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+                .success { background-color: #d4edda; border-color: #c3e6cb; }
+                .error { background-color: #f8d7da; border-color: #f5c6cb; }
+                .info { background-color: #d1ecf1; border-color: #bee5eb; }
+                button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+                #results { margin-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <h1>🔍 Диагностика геолокации</h1>
+
+            <div class="test-section info">
+                <h3>📋 Проверка поддержки геолокации</h3>
+                <button onclick="checkGeolocationSupport()">Проверить поддержку</button>
+                <div id="support-result"></div>
+            </div>
+
+            <div class="test-section info">
+                <h3>📍 Тест получения местоположения</h3>
+                <button onclick="getCurrentLocation()">Получить местоположение</button>
+                <div id="location-result"></div>
+            </div>
+
+            <div class="test-section info">
+                <h3>🌐 Проверка HTTPS</h3>
+                <button onclick="checkHTTPS()">Проверить протокол</button>
+                <div id="https-result"></div>
+            </div>
+
+            <div class="test-section info">
+                <h3>🔧 Настройки браузера</h3>
+                <div id="browser-settings">
+                    <p><strong>Проверьте настройки:</strong></p>
+                    <ul>
+                        <li>Разрешен ли доступ к местоположению для этого сайта</li>
+                        <li>Не заблокирована ли геолокация в настройках браузера</li>
+                        <li>Нет ли расширений, блокирующих геолокацию</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="results"></div>
+
+            <script>
+                function log(message, type = 'info') {
+                    const results = document.getElementById('results');
+                    const div = document.createElement('div');
+                    div.className = `test-section ${type}`;
+                    div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+                    results.appendChild(div);
+                }
+
+                function checkGeolocationSupport() {
+                    const resultDiv = document.getElementById('support-result');
+
+                    if (navigator.geolocation) {
+                        resultDiv.innerHTML = '<div class="success">✅ Геолокация поддерживается браузером</div>';
+                        log('Геолокация поддерживается браузером', 'success');
+                    } else {
+                        resultDiv.innerHTML = '<div class="error">❌ Геолокация не поддерживается браузером</div>';
+                        log('Геолокация не поддерживается браузером', 'error');
+                    }
+                }
+
+                function getCurrentLocation() {
+                    const resultDiv = document.getElementById('location-result');
+                    resultDiv.innerHTML = '<div class="info">⏳ Получаем местоположение...</div>';
+
+                    if (!navigator.geolocation) {
+                        resultDiv.innerHTML = '<div class="error">❌ Геолокация не поддерживается</div>';
+                        return;
+                    }
+
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            const coords = position.coords;
+                            const accuracy = coords.accuracy;
+                            const timestamp = new Date(position.timestamp);
+
+                            resultDiv.innerHTML = `
+                                <div class="success">
+                                    ✅ Местоположение получено успешно!<br>
+                                    <strong>Координаты:</strong> ${coords.latitude}, ${coords.longitude}<br>
+                                    <strong>Точность:</strong> ±${accuracy} метров<br>
+                                    <strong>Время:</strong> ${timestamp.toLocaleString()}
+                                </div>
+                            `;
+
+                            log(`Местоположение получено: ${coords.latitude}, ${coords.longitude}`, 'success');
+                        },
+                        function(error) {
+                            let errorMessage = '';
+                            switch(error.code) {
+                                case error.PERMISSION_DENIED:
+                                    errorMessage = '❌ Доступ к местоположению запрещен пользователем';
+                                    break;
+                                case error.POSITION_UNAVAILABLE:
+                                    errorMessage = '❌ Информация о местоположении недоступна';
+                                    break;
+                                case error.TIMEOUT:
+                                    errorMessage = '❌ Превышено время ожидания получения местоположения';
+                                    break;
+                                case error.UNKNOWN_ERROR:
+                                    errorMessage = '❌ Произошла неизвестная ошибка';
+                                    break;
+                            }
+
+                            resultDiv.innerHTML = `<div class="error">${errorMessage}</div>`;
+                            log(`Ошибка геолокации: ${errorMessage}`, 'error');
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 60000
+                        }
+                    );
+                }
+
+                function checkHTTPS() {
+                    const resultDiv = document.getElementById('https-result');
+                    const isHTTPS = window.location.protocol === 'https:';
+                    const isLocalhost = window.location.hostname === 'localhost' || 
+                                       window.location.hostname === '127.0.0.1' ||
+                                       window.location.hostname.startsWith('192.168.') ||
+                                       window.location.hostname.startsWith('10.') ||
+                                       window.location.hostname.includes('.local');
+
+                    if (isHTTPS || isLocalhost) {
+                        resultDiv.innerHTML = '<div class="success">✅ Протокол подходит для геолокации</div>';
+                        log('Протокол подходит для геолокации', 'success');
+                    } else {
+                        resultDiv.innerHTML = '<div class="error">❌ Для геолокации требуется HTTPS</div>';
+                        log('Для геолокации требуется HTTPS', 'error');
+                    }
+                }
+
+                // Автоматические проверки при загрузке
+                window.onload = function() {
+                    log('Страница загружена, начинаем диагностику...', 'info');
+                    checkGeolocationSupport();
+                    checkHTTPS();
+                };
+            </script>
+        </body>
+        </html>
+    ''')
 
 
 @app.route('/')
@@ -1193,7 +1409,8 @@ def home():
         </body>
         </html>
     ''', unread_notifications=unread_notifications, navbar=navbar, has_profile=has_profile,
-                                  get_starry_night_css=get_starry_night_css, PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE)
+                                  get_starry_night_css=get_starry_night_css,
+                                  PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE)
 
 
 @app.route('/create', methods=['GET', 'POST'])
@@ -1222,7 +1439,7 @@ def create_profile():
             else:
                 # Для GET запроса перенаправляем на профиль
                 return redirect(url_for('my_profile'))
-        
+
         # Проверяем временную анкету (не оплачена)
         pending_profile = PendingProfile.query.get(user_id)
         if pending_profile:
@@ -1679,7 +1896,7 @@ def create_profile():
             </form>
             <div style="text-align: center; margin-top: 15px; padding: 10px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; border: 1px solid rgba(76, 175, 80, 0.3);">
                 <p style="color: #4CAF50; font-size: 0.9em; margin: 0; text-shadow: 0 0 5px rgba(76, 175, 80, 0.3);">
-                    ⏰ Анкета удалится через {{ PROFILE_LIFETIME_HOURS|int if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else PROFILE_LIFETIME_HOURS * 60|int }} {{ 'час' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int == 1 else 'часа' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int in [2,3,4] else 'часов' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else 'мин' }}
+                    ⏰ Анкета удалится через {{ PROFILE_LIFETIME_HOURS|int if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else PROFILE_LIFETIME_HOURS * 60|int }} {{ 'час' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int == 1 else 'часа' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS and PROFILE_LIFETIME_HOURS|int in [2,3,4] else 'часов' if PROFILE_LIFETIME_HOURS|int == PROFILE_LIFETIME_HOURS else 'минут' }}
                 </p>
             </div>
             <div style="text-align: center; margin-top: 15px;">
@@ -2638,6 +2855,7 @@ def update_user_settings(user_id, sound_notifications):
 
 def require_profile(check_payment=True):
     """Декоратор для проверки наличия профиля и опционально оплаты"""
+
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(*args, **kwargs):
@@ -2650,18 +2868,18 @@ def require_profile(check_payment=True):
 
             user_id = request.cookies.get('user_id')
             print(f"🔍 @require_profile: проверяем пользователя {user_id}")
-            
+
             if not user_id:
                 print(f"❌ @require_profile: нет user_id в cookie, перенаправляем на создание")
                 return redirect(url_for('create_profile'))
-            
+
             profile = Profile.query.get(user_id)
             if profile is None:
                 print(f"❌ @require_profile: профиль {user_id} не найден, перенаправляем на создание")
                 return redirect(url_for('create_profile'))
-            
+
             print(f"✅ @require_profile: профиль найден - {profile.name}, оплачен: {profile.is_paid}")
-            
+
             # Проверяем оплату только если требуется
             if check_payment and profile and not profile.is_paid:
                 print(f"💰 @require_profile: профиль не оплачен, перенаправляем на оплату")
@@ -2677,6 +2895,7 @@ def require_profile(check_payment=True):
             return view_func(*args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -3044,17 +3263,17 @@ def edit_pending_profile():
     user_id = request.cookies.get('user_id')
     if not user_id:
         return redirect(url_for('home'))
-    
+
     # Проверяем, есть ли уже оплаченный профиль
     profile = Profile.query.get(user_id)
     if profile:
         return redirect(url_for('my_profile'))
-    
+
     # Получаем временную анкету
     pending = PendingProfile.query.get(user_id)
     if not pending:
         return redirect(url_for('create_profile'))
-    
+
     if request.method == 'POST':
         pending.name = request.form['name']
         pending.age = int(request.form['age'])
@@ -3062,14 +3281,14 @@ def edit_pending_profile():
         pending.hobbies = request.form['hobbies']
         pending.goal = request.form['goal']
         pending.venue = request.form.get('venue')
-        
+
         # Обработка координат
         latitude = request.form.get('latitude')
         longitude = request.form.get('longitude')
         if latitude and longitude:
             pending.latitude = float(latitude)
             pending.longitude = float(longitude)
-        
+
         # Смена фото
         photo = request.files.get('photo')
         if photo and photo.filename:
@@ -3082,10 +3301,10 @@ def edit_pending_profile():
             photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             photo.save(photo_path)
             pending.photo = filename
-        
+
         db.session.commit()
         return redirect(url_for('payment'))
-    
+
     # Используем полный шаблон со страницы создания анкеты с картой
     return render_template_string(r'''
         <!DOCTYPE html>
@@ -3675,12 +3894,12 @@ def toggle_like(profile_id):
 def my_profile():
     # Получаем user_id из cookie или из URL параметров
     user_id = request.cookies.get('user_id') or request.args.get('user_id')
-    
+
     # Если user_id из URL, устанавливаем его в cookie
     if request.args.get('user_id') and not request.cookies.get('user_id'):
         user_id = request.args.get('user_id')
         print(f"🔄 Устанавливаем user_id из URL в cookie: {user_id}")
-    
+
     profile = Profile.query.get(user_id)
     print(f"👤 Загружаем профиль для {user_id}: {profile.name if profile else 'не найден'}")
     navbar = render_navbar(user_id, active='profile', unread_messages=get_unread_messages_count(user_id),
@@ -3743,6 +3962,11 @@ def my_profile():
                     box-shadow: 0 8px 24px rgba(108,117,125,0.3);
                     transform: translateY(-2px) scale(1.03);
                 }
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
             </style>
         </head>
         <body>
@@ -3761,8 +3985,8 @@ def my_profile():
                 <form action="/edit_profile" method="get" style="display:inline;">
                     <button type="submit" class="modern-btn" style="background: #4CAF50;">Редактировать</button>
                 </form>
-                <form action="/delete/{{ profile.id }}" method="post" style="display:inline;">
-                    <button type="submit" class="modern-btn" style="background: #b00020;">Удалить анкету</button>
+                <form action="/delete/{{ profile.id }}" method="post" style="display:inline;" id="deleteForm1">
+                    <button type="button" class="modern-btn delete-btn" style="background: #b00020;" onclick="confirmDelete(this, 'deleteForm1')">Удалить анкету</button>
                 </form>
                 <a href="/" class="back-btn">← На главную</a>
             </div>
@@ -3771,17 +3995,17 @@ def my_profile():
             // Устанавливаем cookie user_id если он пришел из URL
             const urlParams = new URLSearchParams(window.location.search);
             const userIdFromUrl = urlParams.get('user_id');
-            
+
             if (userIdFromUrl) {
                 console.log('🆔 User ID из URL параметров:', userIdFromUrl);
-                
+
                 // Проверяем, есть ли уже cookie
                 const currentUserId = document.cookie.match(/user_id=([^;]+)/);
                 if (!currentUserId || currentUserId[1] !== userIdFromUrl) {
                     // Устанавливаем cookie
                     document.cookie = 'user_id=' + userIdFromUrl + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
                     console.log('🍪 Cookie user_id установлен из URL:', userIdFromUrl);
-                    
+
                     // Также сохраняем в localStorage
                     try {
                         localStorage.setItem('dating_app_user_id', userIdFromUrl);
@@ -3792,6 +4016,27 @@ def my_profile():
                     }
                 } else {
                     console.log('✅ Cookie user_id уже установлен правильно');
+                }
+            }
+            
+            // Функция подтверждения удаления анкеты
+            function confirmDelete(button, formId) {
+                if (button.classList.contains('confirm-delete')) {
+                    // Второе нажатие - удаляем
+                    document.getElementById(formId).submit();
+                } else {
+                    // Первое нажатие - меняем кнопку
+                    button.classList.add('confirm-delete');
+                    button.innerHTML = '⚠️ Точно удалить?';
+                    button.style.background = '#d32f2f';
+                    button.style.animation = 'pulse 0.5s ease-in-out';
+                    
+                    // Через 3 секунды возвращаем кнопку в исходное состояние
+                    setTimeout(function() {
+                        button.classList.remove('confirm-delete');
+                        button.innerHTML = 'Удалить анкету';
+                        button.style.background = '#b00020';
+                    }, 3000);
                 }
             }
         </script>
@@ -5029,6 +5274,11 @@ def view_profile(id):
                     box-shadow: 0 8px 24px rgba(108,117,125,0.3);
                     transform: translateY(-2px) scale(1.03);
                 }
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
 
                 /* Стили для уведомлений */
                 .notification {
@@ -5154,6 +5404,27 @@ def view_profile(id):
                         button.disabled = false;
                     });
                 }
+                
+                // Функция подтверждения удаления анкеты
+                function confirmDelete(button, formId) {
+                    if (button.classList.contains('confirm-delete')) {
+                        // Второе нажатие - удаляем
+                        document.getElementById(formId).submit();
+                    } else {
+                        // Первое нажатие - меняем кнопку
+                        button.classList.add('confirm-delete');
+                        button.innerHTML = '⚠️ Точно удалить?';
+                        button.style.background = '#d32f2f';
+                        button.style.animation = 'pulse 0.5s ease-in-out';
+                        
+                        // Через 3 секунды возвращаем кнопку в исходное состояние
+                        setTimeout(function() {
+                            button.classList.remove('confirm-delete');
+                            button.innerHTML = 'Удалить анкету';
+                            button.style.background = '#b00020';
+                        }, 3000);
+                    }
+                }
             </script>
         </head>
         <body>
@@ -5173,8 +5444,8 @@ def view_profile(id):
                     <button type="button" class="modern-btn" onclick="likeProfile('{{ profile.id }}')">❤️ Лайк</button>
                 {% endif %}
                 {% if is_owner %}
-                    <form action="/delete/{{ profile.id }}" method="post">
-                        <button type="submit" class="modern-btn" style="background: #b00020;">Удалить анкету</button>
+                    <form action="/delete/{{ profile.id }}" method="post" id="deleteForm2">
+                        <button type="button" class="modern-btn delete-btn" style="background: #b00020;" onclick="confirmDelete(this, 'deleteForm2')">Удалить анкету</button>
                     </form>
                 {% endif %}
                 <a href="/visitors" class="back-btn">← Назад к посетителям</a>
@@ -6081,6 +6352,74 @@ def get_photo_url(profile):
     return PLACEHOLDER_PHOTO
 
 
+@app.route('/test-geolocation')
+def test_geolocation():
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Тест геолокации</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+                .success { color: green; font-weight: bold; }
+                .error { color: red; font-weight: bold; }
+                button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+            </style>
+        </head>
+        <body>
+            <h1>🔗 Тест геолокации</h1>
+            <p>Эта страница поможет проверить работу геолокации</p>
+
+            <button onclick="testGeolocation()">📍 Тест геолокации</button>
+            <div id="result"></div>
+
+            <script>
+                function testGeolocation() {
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.innerHTML = '<p>Проверяем геолокацию...</p>';
+
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            function(position) {
+                                resultDiv.innerHTML = `
+                                    <p class="success">✅ Геолокация работает!</p>
+                                    <p>Координаты: ${position.coords.latitude}, ${position.coords.longitude}</p>
+                                    <p>Точность: ±${position.coords.accuracy} метров</p>
+                                `;
+                            },
+                            function(error) {
+                                let errorMessage = '';
+                                switch(error.code) {
+                                    case error.PERMISSION_DENIED:
+                                        errorMessage = '❌ Доступ к местоположению запрещен';
+                                        break;
+                                    case error.POSITION_UNAVAILABLE:
+                                        errorMessage = '❌ Информация о местоположении недоступна';
+                                        break;
+                                    case error.TIMEOUT:
+                                        errorMessage = '❌ Превышено время ожидания';
+                                        break;
+                                    default:
+                                        errorMessage = '❌ Ошибка: ' + error.message;
+                                }
+                                resultDiv.innerHTML = `<p class="error">${errorMessage}</p>`;
+                            },
+                            {
+                                enableHighAccuracy: false,
+                                timeout: 10000,
+                                maximumAge: 60000
+                            }
+                        );
+                    } else {
+                        resultDiv.innerHTML = '<p class="error">❌ Геолокация не поддерживается</p>';
+                    }
+                }
+            </script>
+        </body>
+        </html>
+    ''')
 
 
 @app.route('/api/check-profile/<string:user_id>', methods=['GET'])
@@ -6738,21 +7077,34 @@ def cleanup_expired_profiles():
     try:
         from datetime import timedelta
         from datetime import datetime, timezone, timedelta
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PROFILE_LIFETIME_HOURS)
+        
+        current_time = datetime.now(timezone.utc)
+        cutoff_time = current_time - timedelta(hours=PROFILE_LIFETIME_HOURS)
+        
+        print(f"⏰ ДИАГНОСТИКА УДАЛЕНИЯ АНКЕТ:")
+        print(f"   - Используется время жизни: {PROFILE_LIFETIME_HOURS} часов")
+        print(f"   - Текущее время UTC: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"   - Граница удаления (cutoff): {cutoff_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"   - Анкеты, созданные ДО {cutoff_time.strftime('%Y-%m-%d %H:%M:%S')} будут удалены")
 
         # Находим просроченные анкеты
         # Получаем все анкеты и фильтруем вручную для корректной работы с timezone
         all_profiles = Profile.query.all()
         expired_profiles = []
 
+        print(f"🔍 Проверяем {len(all_profiles)} анкет(ы):")
         for profile in all_profiles:
             created_at = profile.created_at
             # Если created_at без timezone, добавляем UTC
             if created_at.tzinfo is None:
                 created_at = created_at.replace(tzinfo=timezone.utc)
 
+            age_hours = (current_time - created_at).total_seconds() / 3600
             if created_at < cutoff_time:
                 expired_profiles.append(profile)
+                print(f"   ❌ {profile.name} ({profile.id[:8]}...): создана {created_at.strftime('%Y-%m-%d %H:%M:%S')}, возраст {age_hours:.2f}ч - УДАЛИТЬ")
+            else:
+                print(f"   ✅ {profile.name} ({profile.id[:8]}...): создана {created_at.strftime('%Y-%m-%d %H:%M:%S')}, возраст {age_hours:.2f}ч - ОК")
 
         print(f"🔍 Найдено {len(expired_profiles)} просроченных анкет для удаления")
 
@@ -6825,26 +7177,26 @@ def cleanup_expired_pending_profiles():
     try:
         from datetime import datetime, timezone, timedelta
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PENDING_PROFILE_LIFETIME_HOURS)
-        
+
         # Находим просроченные временные анкеты
         all_pending = PendingProfile.query.all()
         expired_pending = []
-        
+
         for pending in all_pending:
             created_at = pending.created_at
             # Если created_at без timezone, добавляем UTC
             if created_at.tzinfo is None:
                 created_at = created_at.replace(tzinfo=timezone.utc)
-            
+
             if created_at < cutoff_time:
                 expired_pending.append(pending)
-        
+
         print(f"🔍 Найдено {len(expired_pending)} просроченных временных анкет для удаления")
-        
+
         deleted_count = 0
         for pending in expired_pending:
             print(f"🗑️ Удаляем временную анкету {pending.id} (создана: {pending.created_at})")
-            
+
             # Удаляем фото
             try:
                 if pending.photo:
@@ -6854,18 +7206,18 @@ def cleanup_expired_pending_profiles():
                         print(f"  🗑️ Фото удалено: {pending.photo}")
             except Exception as e:
                 print(f"  ⚠️ Ошибка удаления фото: {e}")
-            
+
             # Удаляем временную анкету
             db.session.delete(pending)
             deleted_count += 1
-        
+
         db.session.commit()
-        
+
         if deleted_count > 0:
             print(f"✅ Удалено {deleted_count} просроченных временных анкет")
         else:
             print("✅ Просроченных временных анкет не найдено")
-        
+
         return deleted_count
     except Exception as e:
         print(f"❌ Ошибка при очистке временных анкет: {e}")
@@ -7111,7 +7463,7 @@ def payment_success():
         # Создаем настоящую анкету из временной после успешной оплаты
         try:
             print(f"🔄 Обрабатываем оплату для пользователя: {user_id}")
-            
+
             # Проверяем, есть ли уже оплаченный профиль
             profile = Profile.query.get(user_id)
             if profile and profile.is_paid:
@@ -7121,12 +7473,12 @@ def payment_success():
                 pending = PendingProfile.query.get(user_id)
                 if pending:
                     print(f"📝 Найдена временная анкета для {user_id}, создаем постоянную...")
-                    
+
                     # Удаляем старый профиль если он есть (но не оплачен)
                     if profile:
                         print(f"🗑️ Удаляем старый неоплаченный профиль {user_id}")
                         db.session.delete(profile)
-                    
+
                     # Создаем настоящую анкету из временной
                     new_profile = Profile(
                         id=pending.id,
@@ -7233,19 +7585,19 @@ def payment_success():
                 Автоматический переход через <span id="timer">3</span> секунды...
             </p>
         </div>
-        
+
         <script>
             // Устанавливаем cookie user_id и обновляем ссылку
             const urlParams = new URLSearchParams(window.location.search);
             const userId = urlParams.get('user_id');
-            
+
             if (userId) {
                 console.log('🆔 User ID из URL:', userId);
-                
+
                 // Сохраняем user_id в cookie
                 document.cookie = 'user_id=' + userId + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
                 console.log('🍪 Cookie установлен:', document.cookie);
-                
+
                 // Также сохраняем в localStorage для надежности
                 try {
                     localStorage.setItem('dating_app_user_id', userId);
@@ -7254,7 +7606,7 @@ def payment_success():
                 } catch (e) {
                     console.warn('⚠️ Не удалось сохранить в localStorage:', e);
                 }
-                
+
                 // Обновляем ссылку на профиль с user_id
                 const profileLink = document.getElementById('profile-link');
                 if (profileLink) {
@@ -7264,18 +7616,18 @@ def payment_success():
             } else {
                 console.warn('⚠️ User ID не найден в URL');
             }
-            
+
             // Автоматическое перенаправление на профиль через 3 секунды
             let countdown = 3;
             const timerElement = document.getElementById('timer');
             const countdownElement = document.getElementById('countdown');
-            
+
             const interval = setInterval(function() {
                 countdown--;
                 if (timerElement) {
                     timerElement.textContent = countdown;
                 }
-                
+
                 if (countdown <= 0) {
                     clearInterval(interval);
                     if (countdownElement) {
@@ -7288,7 +7640,7 @@ def payment_success():
                     window.location.href = redirectUrl;
                 }
             }, 1000);
-            
+
             // Останавливаем автоматическое перенаправление при клике на кнопку
             document.querySelector('.success-btn').addEventListener('click', function() {
                 clearInterval(interval);
@@ -7413,6 +7765,8 @@ def periodic_cleanup():
             time.sleep(5 * 60)  # Ждем 5 минут
             with app.app_context():
                 print("🔄 Запуск периодической очистки просроченных анкет...")
+                print(f"⏰ Используемое время жизни ОПЛАЧЕННОЙ анкеты: {PROFILE_LIFETIME_HOURS} часов")
+                print(f"⏰ Используемое время жизни ВРЕМЕННОЙ анкеты: {PENDING_PROFILE_LIFETIME_HOURS} часов")
                 deleted_count = cleanup_expired_profiles()
                 pending_deleted_count = cleanup_expired_pending_profiles()
                 if deleted_count > 0:
@@ -7425,9 +7779,191 @@ def periodic_cleanup():
             print(f"❌ Ошибка в периодической очистке: {e}")
 
 
+@app.route('/debug/lifetime-settings')
+def debug_lifetime_settings():
+    """Диагностический endpoint для проверки настроек времени жизни анкет"""
+    from datetime import datetime, timezone
+    
+    # Получаем все анкеты
+    all_profiles = Profile.query.all()
+    all_pending = PendingProfile.query.all()
+    
+    current_time = datetime.now(timezone.utc)
+    cutoff_time_profile = current_time - timedelta(hours=PROFILE_LIFETIME_HOURS)
+    cutoff_time_pending = current_time - timedelta(hours=PENDING_PROFILE_LIFETIME_HOURS)
+    
+    # Информация по каждой анкете
+    profiles_info = []
+    for p in all_profiles:
+        created_at = p.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        age_hours = (current_time - created_at).total_seconds() / 3600
+        remaining_hours = PROFILE_LIFETIME_HOURS - age_hours
+        
+        profiles_info.append({
+            'id': p.id[:12] + '...',
+            'name': p.name,
+            'created_at': created_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+            'age_hours': f"{age_hours:.2f}",
+            'remaining_hours': f"{remaining_hours:.2f}",
+            'will_expire': created_at < cutoff_time_profile,
+            'is_paid': p.is_paid
+        })
+    
+    pending_info = []
+    for p in all_pending:
+        created_at = p.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        age_hours = (current_time - created_at).total_seconds() / 3600
+        remaining_hours = PENDING_PROFILE_LIFETIME_HOURS - age_hours
+        
+        pending_info.append({
+            'id': p.id[:12] + '...',
+            'name': p.name,
+            'created_at': created_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+            'age_hours': f"{age_hours:.2f}",
+            'remaining_hours': f"{remaining_hours:.2f}",
+            'will_expire': created_at < cutoff_time_pending
+        })
+    
+    # Генерируем HTML для таблицы оплаченных анкет
+    profiles_table_html = ''
+    if profiles_info:
+        profiles_table_html = '<table><tr><th>ID</th><th>Имя</th><th>Создана</th><th>Возраст (ч)</th><th>Осталось (ч)</th><th>Оплачена</th><th>Статус</th></tr>'
+        for p in profiles_info:
+            expire_class = 'expire' if p['will_expire'] else 'ok'
+            status_text = 'БУДЕТ УДАЛЕНА' if p['will_expire'] else 'АКТИВНА'
+            paid_icon = '✅' if p['is_paid'] else '❌'
+            profiles_table_html += f'<tr><td>{p["id"]}</td><td>{p["name"]}</td><td>{p["created_at"]}</td><td>{p["age_hours"]}</td><td class="{expire_class}">{p["remaining_hours"]}</td><td>{paid_icon}</td><td class="{expire_class}">{status_text}</td></tr>'
+        profiles_table_html += '</table>'
+    else:
+        profiles_table_html = '<p>Нет оплаченных анкет</p>'
+    
+    # Генерируем HTML для таблицы временных анкет
+    pending_table_html = ''
+    if pending_info:
+        pending_table_html = '<table><tr><th>ID</th><th>Имя</th><th>Создана</th><th>Возраст (ч)</th><th>Осталось (ч)</th><th>Статус</th></tr>'
+        for p in pending_info:
+            expire_class = 'expire' if p['will_expire'] else 'ok'
+            status_text = 'БУДЕТ УДАЛЕНА' if p['will_expire'] else 'АКТИВНА'
+            pending_table_html += f'<tr><td>{p["id"]}</td><td>{p["name"]}</td><td>{p["created_at"]}</td><td>{p["age_hours"]}</td><td class="{expire_class}">{p["remaining_hours"]}</td><td class="{expire_class}">{status_text}</td></tr>'
+        pending_table_html += '</table>'
+    else:
+        pending_table_html = '<p>Нет временных анкет</p>'
+    
+    warning_html = '<div class="warning">⚠️ ВНИМАНИЕ: Комментарии в коде не соответствуют значениям! Проверьте строки 35-36 в app.py</div>' if PROFILE_LIFETIME_HOURS == 10 else ''
+    
+    html = f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>🔧 Диагностика времени жизни анкет</title>
+        <style>
+            body {{
+                font-family: monospace;
+                padding: 20px;
+                background: #1a1a1a;
+                color: #00ff00;
+            }}
+            .section {{
+                background: #2a2a2a;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 8px;
+                border: 2px solid #00ff00;
+            }}
+            h1, h2 {{
+                color: #00ff00;
+                text-shadow: 0 0 10px #00ff00;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 10px 0;
+            }}
+            th, td {{
+                padding: 8px;
+                text-align: left;
+                border: 1px solid #00ff00;
+            }}
+            th {{
+                background: #003300;
+            }}
+            .expire {{
+                color: #ff0000;
+                font-weight: bold;
+            }}
+            .ok {{
+                color: #00ff00;
+            }}
+            .warning {{
+                background: #ff9800;
+                color: #000;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 10px 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>🔧 ДИАГНОСТИКА ВРЕМЕНИ ЖИЗНИ АНКЕТ</h1>
+        
+        <div class="section">
+            <h2>⚙️ Текущие настройки</h2>
+            <p><strong>Время жизни ОПЛАЧЕННОЙ анкеты:</strong> {PROFILE_LIFETIME_HOURS} часов</p>
+            <p><strong>Время жизни ВРЕМЕННОЙ анкеты:</strong> {PENDING_PROFILE_LIFETIME_HOURS} часов</p>
+            <p><strong>Текущее время UTC:</strong> {current_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>Граница удаления оплаченных:</strong> {cutoff_time_profile.strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>Граница удаления временных:</strong> {cutoff_time_pending.strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+        
+        {warning_html}
+        
+        <div class="section">
+            <h2>📋 Оплаченные анкеты ({len(profiles_info)})</h2>
+            {profiles_table_html}
+        </div>
+        
+        <div class="section">
+            <h2>⏳ Временные анкеты ({len(pending_info)})</h2>
+            {pending_table_html}
+        </div>
+        
+        <div class="section">
+            <h2>📝 Инструкции</h2>
+            <ol>
+                <li>Чтобы изменить время жизни анкеты, отредактируйте строки 36-37 в app.py</li>
+                <li><strong>ОБЯЗАТЕЛЬНО ПЕРЕЗАПУСТИТЕ СЕРВЕР</strong> после изменения</li>
+                <li>Проверьте, что значения PROFILE_LIFETIME_HOURS и комментарии совпадают</li>
+                <li>Обновите эту страницу, чтобы увидеть новые значения</li>
+                <li>Периодическая очистка запускается каждые 5 минут</li>
+            </ol>
+        </div>
+        
+        <div class="section">
+            <p><a href="/" style="color: #00ff00;">← Вернуться на главную</a></p>
+            <p><a href="/debug/lifetime-settings" style="color: #00ff00;">🔄 Обновить данные</a></p>
+        </div>
+        
+        <script>
+            // Автообновление каждые 10 секунд
+            setTimeout(() => location.reload(), 10000);
+        </script>
+    </body>
+    </html>
+    '''
+    
+    return html
+
+
 @app.route('/test_create_and_pay')
 def test_create_and_pay():
     return send_from_directory('.', 'test_create_and_pay.html')
+
 
 @app.route('/test_payment_success_fix')
 def test_payment_success_fix():

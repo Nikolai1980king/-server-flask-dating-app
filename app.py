@@ -33,7 +33,7 @@ MAX_REGISTRATION_DISTANCE = 10000000  # 10000 км = 1000000 метров
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
 # ⚠️ ВАЖНО: После изменения этих значений ОБЯЗАТЕЛЬНО ПЕРЕЗАПУСТИТЕ СЕРВЕР!
-PROFILE_LIFETIME_HOURS = 0.5  # Время жизни ОПЛАЧЕННОЙ анкеты в часах (10 часов)
+PROFILE_LIFETIME_HOURS = 24  # Время жизни ОПЛАЧЕННОЙ анкеты в часах (10 часов)
 PENDING_PROFILE_LIFETIME_HOURS = 0.25  # Время жизни ВРЕМЕННОЙ анкеты до оплаты в часах (10 часов)
 
 # ============================================================================
@@ -52,6 +52,9 @@ YOOKASSA_WEBHOOK_SECRET = "real_webhook_secret_2024"  # Реальный webhook
 
 # Цена создания профиля в рублях
 PROFILE_CREATION_PRICE = 10.00
+
+# Цена функции "Удивить" (один раз навсегда)
+SURPRISE_FEATURE_PRICE = 10.00
 
 # URL для webhook'ов (замените на ваш реальный домен)
 YOOKASSA_WEBHOOK_URL = "https://yourdomain.com/yookassa/webhook"  # ЗАМЕНИТЕ НА ВАШ ДОМЕН!
@@ -182,6 +185,9 @@ class Profile(db.Model):
     # Поля для оплаты
     is_paid = db.Column(db.Boolean, default=False)
     payment_date = db.Column(db.DateTime, nullable=True)
+    # Поле для оплаты функции "Удивить"
+    surprise_feature_paid = db.Column(db.Boolean, default=False)
+    surprise_feature_payment_date = db.Column(db.DateTime, nullable=True)
     # Поле для безопасности - IP-адрес создания профиля
     creation_ip = db.Column(db.String, nullable=True)
 
@@ -242,12 +248,103 @@ class Payment(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class SentJoke(db.Model):
+    """Модель для хранения отправленных анекдотов (для отслеживания повторов)"""
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.String, nullable=False)  # Кто отправил
+    receiver_id = db.Column(db.String, nullable=False)  # Кто получил
+    joke_id = db.Column(db.Integer, nullable=False)  # ID анекдота из списка
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('sender_id', 'receiver_id', 'joke_id', name='unique_sent_joke'),)
+
+
+class SentPuzzle(db.Model):
+    """Модель для хранения отправленных головоломок (для отслеживания повторов)"""
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.String, nullable=False)  # Кто отправил
+    receiver_id = db.Column(db.String, nullable=False)  # Кто получил
+    puzzle_id = db.Column(db.Integer, nullable=False)  # ID головоломки из списка
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('sender_id', 'receiver_id', 'puzzle_id', name='unique_sent_puzzle'),)
+
+
+class ChatPermission(db.Model):
+    """Модель для отслеживания разрешений на общение после отправки сюрприза"""
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.String, nullable=False)  # Кто отправил сюрприз
+    receiver_id = db.Column(db.String, nullable=False)  # Кто получил сюрприз
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('sender_id', 'receiver_id', name='unique_chat_permission'),)
+
+
 # Удаляю in-memory структуру сообщений:
 # messages = defaultdict(list)
 notifications = defaultdict(list)
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
+
+# ============================================================================
+# КОЛЛЕКЦИЯ АНЕКДОТОВ ПРО РЕСТОРАНЫ И КАФЕ
+# ============================================================================
+RESTAURANT_JOKES = [
+    "Официант спрашивает посетителя:\n— Вам понравился наш фирменный суп?\n— Да, очень! Особенно когда закончился.",
+    "В ресторане:\n— Официант, у вас есть лягушачьи лапки?\n— Нет, я просто так хромаю!",
+    "Клиент в ресторане:\n— Официант, в моем супе муха!\n— Не волнуйтесь, она не съест много.",
+    "— Официант, эта курица очень жесткая!\n— Странно, еще вчера она была такой нежной и пушистой.",
+    "В ресторане посетитель долго изучает меню и говорит:\n— А можно мне все без лука?\n— Конечно! Что будете заказывать?\n— Вот этот лук.",
+    "— Официант, что это за странный запах?\n— Это наше фирменное блюдо!\n— А что вы туда добавляете?\n— Фирму!",
+    "Посетитель ресторана жалуется:\n— В вашем кофе плавает муха!\n— Так это же кофе по-вьетнамски — с тараканом бы было дороже!",
+    "— Официант, это кофе или чай?\n— А какая разница?\n— Если это кофе, принесите мне чай. Если чай — принесите кофе.",
+    "В ресторане:\n— У вас есть винная карта?\n— Да, конечно!\n— Отлично, тогда сыграем в дурака?",
+    "Повар говорит официанту:\n— Если клиенты будут жаловаться на мой борщ, скажи, что это томатный суп!\n— А если на томатный суп?\n— Скажи, что это борщ!",
+    "— Официант, принесите мне что-нибудь холодненькое!\n— Может быть, счет?",
+    "Официант приносит заказ и говорит:\n— Будьте осторожны, тарелка горячая!\nКлиент трогает тарелку:\n— Да вполне терпимо.\n— Я же предупредил, что буду осторожен!",
+    "— Официант, в моем супе волос!\n— Господи, а я целый час на кухне искал!",
+    "В ресторане:\n— Это заведение работает круглосуточно?\n— Да!\n— Отлично, тогда приду завтра.",
+    "Клиент спрашивает:\n— Официант, у вас есть блюда из курицы?\n— Конечно! У нас курица во всех видах!\n— Хорошо, тогда дайте мне ее в живом.",
+    "— Сколько у вас стоит кофе?\n— 500 рублей.\n— А у соседей 100!\n— Так идите к соседям!\n— У них закончился.\n— Когда у нас закончится, тоже будет по 100!",
+    "Официант приносит счет.\nКлиент:\n— Молодой человек, я попросил принести ЧЕК, а не ШОК!",
+    "— Официант, а это мясо свежее?\n— Абсолютно! Еще вчера бегало по полю!\n— По какому?\n— По минному.",
+    "Посетитель:\n— В вашем ресторане вчера у меня украли пальто.\n— Очень сожалеем! Вот ваш столик.\n— Это не мой столик.\n— Значит, и пальто не ваше.",
+    "— Официант, это мясо индюка?\n— Да.\n— А почему на вкус как курица?\n— Мы не спрашивали индюка, кем он хочет быть!",
+    "В кафе:\n— У вас есть Wi-Fi?\n— Есть.\n— А пароль?\n— Купитечтонибудь, слитно и маленькими буквами.",
+    "Клиент в ресторане:\n— Официант, это морская или речная рыба?\n— Не знаю, она мне ничего не сказала.",
+    "— Официант, принесите мне комплимент от шефа!\n— Пожалуйста! Шеф-повар сказал, что вы очень красивая.\n— Это все?\n— Он еще добавил, что вы похожи на его бывшую жену.",
+    "В ресторане посетитель кричит:\n— Официант, у меня в супе таракан!\n— Тихо! А то все захотят!",
+    "— Официант, это диетическое меню?\n— Да.\n— Странно, почему оно такое тяжелое?\n— Это чтобы сжечь калории, пока читаете!",
+]
+
+# ============================================================================
+# КОЛЛЕКЦИЯ ГОЛОВОЛОМОК И ЗАДАЧ НА ЛОГИКУ (по типу Перельмана)
+# ============================================================================
+LOGIC_PUZZLES = [
+    "📊 У отца шесть сыновей. Каждый сын имеет сестру.\n\nСколько всего детей у этого отца?",
+    "🔢 Двое играли в шахматы 4 часа.\n\nСколько времени играл каждый?",
+    "🕐 На столе лежат две монеты, в сумме они дают 3 рубля. Одна из них не 1 рубль.\n\nКакие это монеты?",
+    "🚗 Человек ехал в город. По дороге он встретил 3 машины.\n\nСколько машин ехало в город?",
+    "📐 У треугольника может быть два тупых угла?",
+    "🏠 В одноэтажном доме все желтое: стены, двери, мебель.\n\nКакого цвета лестница?",
+    "⚖️ На одной чаше весов кирпич, на другой - полкирпича и гиря 1 кг. Весы в равновесии.\n\nСколько весит кирпич?",
+    "🔄 Позавчера Пете было 17 лет. В следующем году ему будет 20 лет.\n\nКак такое возможно?",
+    "🚶 Мужчина шел под дождем. У него не было ни зонта, ни шляпы. Ни один волос на его голове не промок.\n\nПочему?",
+    "🍎 В корзине 5 яблок. Как разделить их между 5 людьми так, чтобы одно яблоко осталось в корзине?",
+    "⏱️ Что происходит с яйцом, которое падает в Красное море?",
+    "🔢 Два отца и два сына съели на завтрак 3 яйца, причем каждому досталось по целому яйцу.\n\nКак это возможно?",
+    "📏 Может ли дождь идти два дня подряд?",
+    "🎯 В комнате горело 50 свечей, 20 из них задули.\n\nСколько свечей останется?",
+    "🚂 Электричка едет на восток со скоростью 80 км/ч. Ветер дует с запада на восток со скоростью 20 км/ч.\n\nВ какую сторону летит дым?",
+    "💰 У Марины было целое яблоко, две половинки и четыре четвертинки.\n\nСколько яблок было у Марины?",
+    "🎨 Назовите пять дней недели, не называя их по названиям и числам.",
+    "🔍 Что можно держать, не трогая руками?",
+    "📖 Вы входите в темную комнату, где есть свеча, лампа и камин. У вас одна спичка.\n\nЧто вы зажжете первым?",
+    "🌊 Что может путешествовать по всему миру, оставаясь в углу?",
+    "🏃 Вы участвуете в забеге и обогнали бегуна, который бежал вторым.\n\nНа каком месте вы теперь?",
+    "🪙 В кошельке лежит 50 копеек двумя монетами. Одна из них не 10 копеек.\n\nКакие это монеты?",
+    "🎂 У Ани день рождения. Ей исполнилось 10 лет, но она отпраздновала только 3 дня рождения в жизни.\n\nКак такое возможно?",
+    "🔐 Что имеет голову, но не имеет мозгов?",
+    "📦 В одной коробке лежит 10 кг песка, в другой - 10 кг пуха.\n\nКакая коробка тяжелее?",
+]
 
 
 def add_notification(user_id, message):
@@ -276,11 +373,14 @@ def get_base_url():
         return deploy_domain
 
 
-def create_yookassa_payment(user_id, amount, description="Создание профиля"):
+def create_yookassa_payment(user_id, amount, description="Создание профиля", payment_type="profile"):
     """Создает платеж в ЮKassa"""
     try:
         import base64
         import json
+
+        # Формируем URL возврата в зависимости от типа платежа
+        return_url = f"{get_base_url()}/payment/success?user_id={user_id}&type={payment_type}"
 
         # Подготавливаем данные для создания платежа
         payment_data = {
@@ -290,7 +390,7 @@ def create_yookassa_payment(user_id, amount, description="Создание пр�
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": f"{get_base_url()}/payment/success?user_id={user_id}"
+                "return_url": return_url
             },
             "capture": True,
             "description": description,
@@ -890,6 +990,239 @@ def api_calculate_distance():
         return jsonify({'error': 'Некорректные координаты'}), 400
     except Exception as e:
         return jsonify({'error': f'Ошибка расчета расстояния: {str(e)}'}), 500
+
+
+@app.route('/api/send-surprise', methods=['POST'])
+def api_send_surprise():
+    """API для отправки сюрпризов (десерт, шампанское, анекдот) посетителям"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    data = request.get_json()
+    receiver_id = data.get('receiver_id')
+    surprise_type = data.get('type')  # 'dessert', 'champagne', 'joke'
+
+    if not receiver_id or not surprise_type:
+        return jsonify({"error": "Не все параметры предоставлены"}), 400
+
+    # Проверяем существование получателя
+    receiver_profile = Profile.query.get(receiver_id)
+    if not receiver_profile:
+        return jsonify({"error": "Получатель не найден"}), 404
+
+    # Проверяем существование отправителя
+    sender_profile = Profile.query.get(user_id)
+    if not sender_profile:
+        return jsonify({"error": "Отправитель не найден"}), 404
+
+    # НОВАЯ ЛОГИКА: Проверяем, оплачена ли функция "Удивить"
+    if not sender_profile.surprise_feature_paid:
+        return jsonify({
+            "error": "Функция не оплачена",
+            "payment_required": True,
+            "price": SURPRISE_FEATURE_PRICE
+        }), 402  # 402 Payment Required
+
+    try:
+        # Формируем chat_key для отправки сообщения
+        chat_key = '_'.join(sorted([user_id, receiver_id]))
+
+        # Определяем текст и тип сообщения в зависимости от типа сюрприза
+        if surprise_type == 'dessert':
+            message_text = "🍰 SURPRISE_DESSERT"  # Специальный маркер для фронтенда
+            
+        elif surprise_type == 'champagne':
+            message_text = "🍾 SURPRISE_CHAMPAGNE"  # Специальный маркер для фронтенда
+            
+        elif surprise_type == 'puzzle':
+            # Получаем список уже отправленных головоломок этому получателю
+            sent_puzzles = SentPuzzle.query.filter_by(
+                sender_id=user_id, 
+                receiver_id=receiver_id
+            ).all()
+            sent_puzzle_ids = [sp.puzzle_id for sp in sent_puzzles]
+            
+            # Находим доступные головоломки (не отправленные ранее)
+            available_puzzle_ids = [i for i in range(len(LOGIC_PUZZLES)) if i not in sent_puzzle_ids]
+            
+            if not available_puzzle_ids:
+                return jsonify({
+                    "error": "Все головоломки уже отправлены этому пользователю",
+                    "all_puzzles_sent": True
+                }), 400
+            
+            # Выбираем случайную головоломку из доступных
+            import random
+            selected_puzzle_id = random.choice(available_puzzle_ids)
+            selected_puzzle = LOGIC_PUZZLES[selected_puzzle_id]
+            
+            # Сохраняем информацию об отправленной головоломке
+            new_sent_puzzle = SentPuzzle(
+                sender_id=user_id,
+                receiver_id=receiver_id,
+                puzzle_id=selected_puzzle_id
+            )
+            db.session.add(new_sent_puzzle)
+            
+            message_text = f"🧠 SURPRISE_PUZZLE\n\n{selected_puzzle}"
+            
+        elif surprise_type == 'joke':
+            # Получаем список уже отправленных анекдотов этому получателю
+            sent_jokes = SentJoke.query.filter_by(
+                sender_id=user_id, 
+                receiver_id=receiver_id
+            ).all()
+            sent_joke_ids = [sj.joke_id for sj in sent_jokes]
+            
+            # Находим доступные анекдоты (не отправленные ранее)
+            available_joke_ids = [i for i in range(len(RESTAURANT_JOKES)) if i not in sent_joke_ids]
+            
+            if not available_joke_ids:
+                return jsonify({
+                    "error": "Все анекдоты уже отправлены этому пользователю",
+                    "all_jokes_sent": True
+                }), 400
+            
+            # Выбираем случайный анекдот из доступных
+            import random
+            selected_joke_id = random.choice(available_joke_ids)
+            selected_joke = RESTAURANT_JOKES[selected_joke_id]
+            
+            # Сохраняем информацию об отправленном анекдоте
+            new_sent_joke = SentJoke(
+                sender_id=user_id,
+                receiver_id=receiver_id,
+                joke_id=selected_joke_id
+            )
+            db.session.add(new_sent_joke)
+            
+            message_text = f"😄 SURPRISE_JOKE\n\n{selected_joke}"
+        else:
+            return jsonify({"error": "Неверный тип сюрприза"}), 400
+
+        # Сохраняем сообщение в базу данных
+        new_message = Message(
+            chat_key=chat_key,
+            sender=user_id,
+            text=message_text
+        )
+        db.session.add(new_message)
+        
+        # Создаем разрешение на общение (если еще не существует)
+        existing_permission = ChatPermission.query.filter_by(
+            sender_id=user_id,
+            receiver_id=receiver_id
+        ).first()
+        
+        if not existing_permission:
+            chat_permission = ChatPermission(
+                sender_id=user_id,
+                receiver_id=receiver_id
+            )
+            db.session.add(chat_permission)
+            print(f"✅ Создано разрешение на общение: {user_id} → {receiver_id}")
+        
+        db.session.commit()
+
+        # Отправляем сообщение через Socket.IO
+        socketio.emit('message', {
+            'text': message_text,
+            'sender': user_id
+        }, room=chat_key)
+
+        return jsonify({
+            "success": True,
+            "type": surprise_type,
+            "message": "Сюрприз успешно отправлен!",
+            "chat_enabled": True  # Теперь можно писать сообщения
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Ошибка при отправке сюрприза: {str(e)}"}), 500
+
+
+@app.route('/api/pay-surprise-feature', methods=['POST'])
+def api_pay_surprise_feature():
+    """API для оплаты функции 'Удивить'"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    try:
+        # Проверяем профиль
+        profile = Profile.query.get(user_id)
+        if not profile:
+            return jsonify({"error": "Профиль не найден"}), 404
+
+        # Проверяем, не оплачено ли уже
+        if profile.surprise_feature_paid:
+            return jsonify({
+                "success": True,
+                "already_paid": True,
+                "message": "Функция уже оплачена"
+            })
+
+        # Сохраняем информацию о типе платежа и текущем получателе
+        # Это нужно для возврата на правильную страницу после оплаты
+        
+        # Создаем платеж через ЮKassa
+        payment_result = create_yookassa_payment(
+            user_id=user_id,
+            amount=SURPRISE_FEATURE_PRICE,
+            description="Функция 'Удивить' - отправка сюрпризов",
+            payment_type="surprise"  # Указываем тип платежа
+        )
+
+        if payment_result and 'payment_url' in payment_result:
+            # Сохраняем информацию о платеже
+            payment = Payment(
+                user_id=user_id,
+                amount=SURPRISE_FEATURE_PRICE,
+                status='pending',
+                description="Функция 'Удивить'",
+                yookassa_payment_id=payment_result.get('payment_id'),
+                yookassa_payment_url=payment_result.get('payment_url')
+            )
+            db.session.add(payment)
+            db.session.commit()
+
+            return jsonify({
+                "success": True,
+                "payment_url": payment_result['payment_url'],
+                "payment_id": payment_result.get('payment_id'),
+                "amount": SURPRISE_FEATURE_PRICE
+            })
+        else:
+            return jsonify({"error": "Не удалось создать платеж"}), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Ошибка при создании платежа: {str(e)}"}), 500
+
+
+@app.route('/api/check-surprise-feature-status')
+def api_check_surprise_feature_status():
+    """Проверка статуса оплаты функции 'Удивить'"""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
+    try:
+        profile = Profile.query.get(user_id)
+        if not profile:
+            return jsonify({"error": "Профиль не найден"}), 404
+
+        return jsonify({
+            "success": True,
+            "paid": profile.surprise_feature_paid,
+            "payment_date": profile.surprise_feature_payment_date.isoformat() if profile.surprise_feature_payment_date else None,
+            "price": SURPRISE_FEATURE_PRICE
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Ошибка: {str(e)}"}), 500
 
 
 @app.route('/test-balloon-integration')
@@ -2957,11 +3290,15 @@ def view_visitors():
         (Match.user1_id == user_id) | (Match.user2_id == user_id)
     ).all()
 
+    # Создаем список ID пользователей, с которыми есть матч
+    matched_ids = set()
     for match in matches:
         if match.user1_id == user_id:
             liked_ids.add(match.user2_id)
+            matched_ids.add(match.user2_id)
         else:
             liked_ids.add(match.user1_id)
+            matched_ids.add(match.user1_id)
     navbar = render_navbar(user_id, active='visitors', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
@@ -3082,6 +3419,196 @@ def view_visitors():
                     box-shadow: 0 4px 16px rgba(255,107,107,0.15);
                     transform: translateY(-2px) scale(1.03);
                 }
+                
+                /* Кнопка "Удивить" */
+                .surprise-btn {
+                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    border: none;
+                    border-radius: 50%;
+                    width: 45px;
+                    height: 45px;
+                    cursor: pointer;
+                    outline: none;
+                    font-size: 1.5em;
+                    position: absolute;
+                    bottom: 15px;
+                    right: 18px;
+                    z-index: 2;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                }
+                .surprise-btn:hover {
+                    transform: scale(1.1) rotate(15deg);
+                    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+                }
+                .surprise-btn:active {
+                    transform: scale(0.95);
+                }
+                
+                /* Модальное окно */
+                .modal {
+                    display: none;
+                    position: fixed;
+                    z-index: 1000;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: rgba(0, 0, 0, 0.7);
+                    animation: fadeIn 0.3s ease;
+                }
+                .modal.show {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .modal-content {
+                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                    padding: 30px;
+                    border-radius: 20px;
+                    max-width: 400px;
+                    width: 90%;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+                    border: 2px solid rgba(255, 255, 255, 0.2);
+                    animation: slideUp 0.3s ease;
+                    position: relative;
+                }
+                @keyframes slideUp {
+                    from { 
+                        transform: translateY(50px);
+                        opacity: 0;
+                    }
+                    to { 
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                }
+                .modal-close {
+                    position: absolute;
+                    top: 15px;
+                    right: 15px;
+                    font-size: 1.5em;
+                    cursor: pointer;
+                    color: #fff;
+                    transition: all 0.2s;
+                }
+                .modal-close:hover {
+                    color: #ff6b6b;
+                    transform: rotate(90deg);
+                }
+                .modal-title {
+                    color: #fff;
+                    font-size: 1.5em;
+                    margin-bottom: 20px;
+                    text-align: center;
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                }
+                .surprise-options {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                }
+                .surprise-option {
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 2px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 15px;
+                    padding: 20px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                }
+                .surprise-option:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                    border-color: #667eea;
+                    transform: translateY(-3px);
+                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+                }
+                .surprise-icon {
+                    font-size: 3em;
+                }
+                .surprise-text {
+                    color: #fff;
+                    font-size: 1.1em;
+                    flex: 1;
+                }
+                .surprise-text h3 {
+                    margin: 0 0 5px 0;
+                    color: #fff;
+                }
+                .surprise-text p {
+                    margin: 0;
+                    font-size: 0.9em;
+                    opacity: 0.8;
+                    color: #ccc;
+                }
+                
+                /* Анимация шампанского с вылетающей пробкой */
+                .champagne-animation {
+                    position: relative;
+                    width: 100%;
+                    height: 200px;
+                    display: flex;
+                    justify-content: center;
+                    align-items: flex-end;
+                }
+                .champagne-bottle {
+                    font-size: 5em;
+                    position: relative;
+                }
+                .champagne-cork {
+                    position: absolute;
+                    font-size: 0.3em;
+                    top: -10px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+                .champagne-cork.pop {
+                    animation: corkPop 1s ease-out forwards;
+                }
+                @keyframes corkPop {
+                    0% {
+                        transform: translateX(-50%) translateY(0) rotate(0deg);
+                        opacity: 1;
+                    }
+                    50% {
+                        transform: translateX(-50%) translateY(-100px) rotate(360deg);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: translateX(-50%) translateY(-150px) rotate(720deg);
+                        opacity: 0;
+                    }
+                }
+                .champagne-sparkles {
+                    position: absolute;
+                    top: 0;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    font-size: 0.5em;
+                }
+                .champagne-sparkles.show {
+                    animation: sparkles 1s ease-out forwards;
+                }
+                @keyframes sparkles {
+                    0% {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(0) scale(0.5);
+                    }
+                    50% {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(-50px) scale(1.2);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-80px) scale(0.8);
+                    }
+                }
             </style>
             <script>
                 // Функция воспроизведения звука колокольчика
@@ -3171,6 +3698,218 @@ def view_visitors():
                 function goToProfile(profileId) {
                     window.location.href = '/profile/' + profileId;
                 }
+
+                // ============================================================================
+                // ФУНКЦИИ ДЛЯ РАБОТЫ С СЮРПРИЗАМИ
+                // ============================================================================
+
+                // Переменные для модального окна
+                let currentReceiverId = null;
+                let currentReceiverName = null;
+
+                // Открыть модальное окно выбора сюрприза
+                function openSurpriseModal(profileId, profileName) {
+                    event.stopPropagation(); // Предотвращаем переход на профиль
+                    currentReceiverId = profileId;
+                    currentReceiverName = profileName;
+                    
+                    // Проверяем статус оплаты функции
+                    fetch('/api/check-surprise-feature-status')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.paid) {
+                                // Функция оплачена - показываем выбор сюрпризов
+                                const modal = document.getElementById('surpriseModal');
+                                modal.classList.add('show');
+                                console.log('Открыто модальное окно для:', profileName, profileId);
+                            } else {
+                                // Функция не оплачена - показываем окно оплаты
+                                const paymentModal = document.getElementById('paymentModal');
+                                paymentModal.classList.add('show');
+                                console.log('Требуется оплата функции');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Ошибка проверки статуса:', error);
+                            showNotification('Ошибка при проверке статуса оплаты', 'error');
+                        });
+                }
+
+                // Закрыть модальное окно
+                function closeSurpriseModal() {
+                    const modal = document.getElementById('surpriseModal');
+                    modal.classList.remove('show');
+                    currentReceiverId = null;
+                    currentReceiverName = null;
+                }
+
+                // Закрыть модальное окно оплаты
+                function closePaymentModal() {
+                    const modal = document.getElementById('paymentModal');
+                    modal.classList.remove('show');
+                }
+
+                // Перейти к оплате
+                function proceedToPayment() {
+                    fetch('/api/pay-surprise-feature', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.payment_url) {
+                            // Перенаправляем на страницу оплаты ЮKassa
+                            window.location.href = data.payment_url;
+                        } else if (data.already_paid) {
+                            showNotification('Функция уже оплачена!', 'success');
+                            closePaymentModal();
+                            // Обновляем страницу
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            showNotification(data.error || 'Ошибка при создании платежа', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        showNotification('Ошибка при создании платежа', 'error');
+                    });
+                }
+
+                // Закрытие модального окна при клике вне его
+                window.onclick = function(event) {
+                    const surpriseModal = document.getElementById('surpriseModal');
+                    const paymentModal = document.getElementById('paymentModal');
+                    if (event.target == surpriseModal) {
+                        closeSurpriseModal();
+                    }
+                    if (event.target == paymentModal) {
+                        closePaymentModal();
+                    }
+                }
+
+                // Отправить сюрприз
+                function sendSurprise(type) {
+                    if (!currentReceiverId) {
+                        console.error('Не выбран получатель сюрприза');
+                        return;
+                    }
+
+                    console.log('Отправка сюрприза:', type, 'для:', currentReceiverName);
+
+                    // Показываем анимацию для шампанского
+                    if (type === 'champagne') {
+                        showChampagneAnimation();
+                    }
+
+                    // Отправляем запрос на сервер
+                    fetch('/api/send-surprise', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            receiver_id: currentReceiverId,
+                            type: type
+                        })
+                    })
+                    .then(response => {
+                        // Проверяем статус ответа
+                        if (response.status === 402) {
+                            // 402 Payment Required - функция не оплачена
+                            closeSurpriseModal();
+                            const paymentModal = document.getElementById('paymentModal');
+                            paymentModal.classList.add('show');
+                            showNotification('Требуется оплата функции "Удивить"', 'info');
+                            return null;
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data) return; // Если требуется оплата, data будет null
+                        
+                        if (data.success) {
+                            let message = '';
+                            if (type === 'dessert') {
+                                message = `🍰 Десерт отправлен ${currentReceiverName}!`;
+                            } else if (type === 'champagne') {
+                                message = `🍾 Шампанское отправлено ${currentReceiverName}!`;
+                            } else if (type === 'joke') {
+                                message = `😄 Анекдот отправлен ${currentReceiverName}!`;
+                            } else if (type === 'puzzle') {
+                                message = `🧠 Головоломка отправлена ${currentReceiverName}!`;
+                            }
+                            
+                            if (data.chat_enabled) {
+                                message += ' Теперь вы можете писать сообщения!';
+                            }
+                            
+                            showNotification(message, 'success');
+                            closeSurpriseModal();
+                        } else {
+                            if (data.all_jokes_sent) {
+                                showNotification(`Все анекдоты уже отправлены ${currentReceiverName}`, 'info');
+                            } else if (data.all_puzzles_sent) {
+                                showNotification(`Все головоломки уже отправлены ${currentReceiverName}`, 'info');
+                            } else if (data.payment_required) {
+                                // Показываем окно оплаты
+                                closeSurpriseModal();
+                                const paymentModal = document.getElementById('paymentModal');
+                                paymentModal.classList.add('show');
+                            } else {
+                                showNotification(data.error || 'Ошибка при отправке сюрприза', 'error');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        showNotification('Ошибка при отправке сюрприза', 'error');
+                    });
+                }
+
+                // Показать анимацию вылета пробки шампанского
+                function showChampagneAnimation() {
+                    // Создаем контейнер для анимации
+                    const animContainer = document.createElement('div');
+                    animContainer.className = 'champagne-animation';
+                    animContainer.style.position = 'fixed';
+                    animContainer.style.top = '50%';
+                    animContainer.style.left = '50%';
+                    animContainer.style.transform = 'translate(-50%, -50%)';
+                    animContainer.style.zIndex = '2000';
+
+                    // Бутылка
+                    const bottle = document.createElement('div');
+                    bottle.className = 'champagne-bottle';
+                    bottle.innerHTML = '🍾';
+
+                    // Пробка
+                    const cork = document.createElement('div');
+                    cork.className = 'champagne-cork';
+                    cork.innerHTML = '🟤';
+
+                    // Искры/брызги
+                    const sparkles = document.createElement('div');
+                    sparkles.className = 'champagne-sparkles';
+                    sparkles.innerHTML = '✨💫✨';
+
+                    bottle.appendChild(cork);
+                    bottle.appendChild(sparkles);
+                    animContainer.appendChild(bottle);
+                    document.body.appendChild(animContainer);
+
+                    // Запускаем анимацию
+                    setTimeout(() => {
+                        cork.classList.add('pop');
+                        sparkles.classList.add('show');
+                    }, 100);
+
+                    // Удаляем анимацию после завершения
+                    setTimeout(() => {
+                        document.body.removeChild(animContainer);
+                    }, 1500);
+                }
             </script>
         </head>
         <body>
@@ -3213,13 +3952,107 @@ def view_visitors():
                         <button class="like-btn" title="Лайк" onclick="toggleLike('{{ profile.id }}', this.querySelector('span'))">
                             <span class="like-heart{% if profile.id in liked_ids %} liked{% endif %}">&#10084;</span>
                         </button>
+                        <!-- Кнопка "Удивить" видна ВСЕМ посетителям -->
+                        <button class="surprise-btn" title="Удивить" onclick="openSurpriseModal('{{ profile.id }}', '{{ profile.name }}')">
+                            ✨
+                        </button>
                     </div>
                 {% endfor %}
             {% else %}
                 <p>Пока нет других посетителей.</p>
             {% endif %}
 
+            <!-- Модальное окно для выбора сюрприза -->
+            <div id="surpriseModal" class="modal">
+                <div class="modal-content">
+                    <span class="modal-close" onclick="closeSurpriseModal()">×</span>
+                    <h2 class="modal-title">Удивить собеседника</h2>
+                    <div class="surprise-options">
+                        <div class="surprise-option" onclick="sendSurprise('dessert')">
+                            <div class="surprise-icon">🍰</div>
+                            <div class="surprise-text">
+                                <h3>Подарить десерт</h3>
+                                <p>Отправить изображение вкусного десерта</p>
+                            </div>
+                        </div>
+                        <div class="surprise-option" onclick="sendSurprise('champagne')">
+                            <div class="surprise-icon">🍾</div>
+                            <div class="surprise-text">
+                                <h3>Шампанское</h3>
+                                <p>Отправить анимацию с вылетающей пробкой</p>
+                            </div>
+                        </div>
+                        <div class="surprise-option" onclick="sendSurprise('joke')">
+                            <div class="surprise-icon">😄</div>
+                            <div class="surprise-text">
+                                <h3>Рассмешить</h3>
+                                <p>Отправить смешной анекдот про ресторан</p>
+                            </div>
+                        </div>
+                        <div class="surprise-option" onclick="sendSurprise('puzzle')">
+                            <div class="surprise-icon">🧠</div>
+                            <div class="surprise-text">
+                                <h3>Напрягись</h3>
+                                <p>Отправить головоломку или задачку на логику</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модальное окно оплаты функции "Удивить" -->
+            <div id="paymentModal" class="modal">
+                <div class="modal-content">
+                    <span class="modal-close" onclick="closePaymentModal()">×</span>
+                    <h2 class="modal-title">💳 Оплата функции "Удивить"</h2>
+                    <div style="padding: 20px; text-align: center;">
+                        <div style="font-size: 4em; margin-bottom: 20px;">✨</div>
+                        <p style="color: #fff; font-size: 1.1em; margin-bottom: 15px;">
+                            Функция "Удивить" позволяет отправлять сюрпризы любым посетителям!
+                        </p>
+                        <div style="background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 20px; margin: 20px 0;">
+                            <p style="color: #4CAF50; font-size: 1.8em; font-weight: bold; margin: 0;">
+                                {{ SURPRISE_FEATURE_PRICE|int }} ₽
+                            </p>
+                            <p style="color: #ccc; font-size: 0.9em; margin: 10px 0 0 0;">
+                                Один раз навсегда
+                            </p>
+                        </div>
+                        <p style="color: #fff; font-size: 0.95em; margin-bottom: 25px;">
+                            ✅ Отправляйте десерты, шампанское и анекдоты<br>
+                            ✅ Начинайте общение без мэтча<br>
+                            ✅ Безлимитное использование
+                        </p>
+                        <button onclick="proceedToPayment()" style="
+                            background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%);
+                            color: white;
+                            border: none;
+                            padding: 15px 40px;
+                            border-radius: 25px;
+                            font-size: 1.2em;
+                            cursor: pointer;
+                            font-weight: bold;
+                            box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4);
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.transform='translateY(-3px) scale(1.05)'" onmouseout="this.style.transform=''">
+                            💳 Оплатить
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <script>
+            // Проверяем параметр surprise_paid в URL
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('surprise_paid') === '1') {
+                // Функция только что оплачена - показываем уведомление
+                setTimeout(() => {
+                    showNotification('✨ Функция "Удивить" активирована! Теперь вы можете отправлять сюрпризы всем посетителям!', 'success');
+                    // Убираем параметр из URL
+                    window.history.replaceState({}, document.title, '/visitors');
+                }, 500);
+            }
+
             // Обновление таймера жизни анкеты в реальном времени
             function updateLifetimeTimer() {
                 const timerElement = document.getElementById('lifetime-timer');
@@ -3252,9 +4085,10 @@ def view_visitors():
             </script>
         </body>
         </html>
-    ''', other_profiles=other_profiles, liked_ids=liked_ids, navbar=navbar, get_photo_url=get_photo_url,
+    ''', other_profiles=other_profiles, liked_ids=liked_ids, matched_ids=matched_ids, navbar=navbar, get_photo_url=get_photo_url,
                                   get_starry_night_css=get_starry_night_css,
-                                  get_profile_lifetime_remaining=get_profile_lifetime_remaining, user_id=user_id)
+                                  get_profile_lifetime_remaining=get_profile_lifetime_remaining, user_id=user_id,
+                                  SURPRISE_FEATURE_PRICE=SURPRISE_FEATURE_PRICE)
 
 
 @app.route('/edit_pending_profile', methods=['GET', 'POST'])
@@ -5672,6 +6506,16 @@ def my_messages():
         else:
             chat_partners.add(match.user1_id)
 
+    # Добавляем пользователей, которым мы отправили сюрпризы (есть ChatPermission)
+    chat_permissions = ChatPermission.query.filter_by(sender_id=user_id).all()
+    for permission in chat_permissions:
+        chat_partners.add(permission.receiver_id)
+    
+    # Добавляем пользователей, которые отправили нам сюрпризы
+    received_permissions = ChatPermission.query.filter_by(receiver_id=user_id).all()
+    for permission in received_permissions:
+        chat_partners.add(permission.sender_id)
+
     chat_profiles = [p for p in Profile.query.all() if p.id in chat_partners]
     # Считаем непрочитанные сообщения по каждому собеседнику
     unread_by_partner = {}
@@ -5808,8 +6652,15 @@ def chat(other_user_id):
         ((Match.user1_id == other_user_id) & (Match.user2_id == user_id))
     ).first()
 
-    if not match_exists:
-        return "Чат доступен только для мэтчей", 403
+    # Проверяем разрешение на общение после отправки сюрприза
+    chat_permission_exists = ChatPermission.query.filter(
+        ((ChatPermission.sender_id == user_id) & (ChatPermission.receiver_id == other_user_id)) |
+        ((ChatPermission.sender_id == other_user_id) & (ChatPermission.receiver_id == user_id))
+    ).first()
+
+    # Доступ разрешен, если есть мэтч ИЛИ есть разрешение на общение
+    if not match_exists and not chat_permission_exists:
+        return "Чат доступен только для мэтчей или после отправки сюрприза", 403
     other_profile = Profile.query.get(other_user_id)
     if not other_profile:
         return "Пользователь не найден", 404
@@ -5977,14 +6828,7 @@ def chat(other_user_id):
                 </div>
             </div>
             <div id="messages">
-                {% for m in messages_db %}
-                    <div class="message {{ 'my-message' if m.sender == user_id else 'their-message' }}">
-                        {{ m.text }}
-                        <div style="font-size: 0.8em; color: #666; margin-top: 5px; text-align: right;">
-                            {{ m.timestamp.strftime('%H:%M') }}
-                        </div>
-                    </div>
-                {% endfor %}
+                <!-- Сообщения будут загружены через JavaScript для правильной обработки сюрпризов -->
             </div>
             <div class="typing-indicator" id="typing-indicator">
                 <span>{{ other_profile.name }} печатает</span><span class="typing-dots">...</span>
@@ -5997,8 +6841,8 @@ def chat(other_user_id):
                 const user_id = "{{ user_id }}";
                 const chat_key = "{{ chat_key }}";
                 const other_user_id = "{{ other_profile.id }}";
-                let lastMessageCount = {{ messages_db|length }};
-                let lastMessageTimestamp = "{{ messages_db[-1].timestamp.isoformat() if messages_db else '' }}";
+                let lastMessageCount = 0;  // Будет обновлено после загрузки истории
+                let lastMessageTimestamp = "";
 
                 // Инициализация Socket.IO
                 const socket = io();
@@ -6074,18 +6918,282 @@ def chat(other_user_id):
 
                 // Функция добавления сообщения
                 function addMessage(msg, sender, timestamp = null) {
-                    // Проверяем, нет ли уже такого сообщения на странице
-                    const messages = document.querySelectorAll('.message');
-                    const lastMessage = messages[messages.length - 1];
-
-                    if (lastMessage && lastMessage.textContent.trim() === msg.trim()) {
-                        // Сообщение уже есть, не добавляем дубликат
-                        return;
+                    // Проверяем дубликаты по timestamp (более надежно)
+                    if (timestamp) {
+                        const existingMessages = document.querySelectorAll('.message');
+                        for (let existingMsg of existingMessages) {
+                            const existingTimestamp = existingMsg.getAttribute('data-timestamp');
+                            if (existingTimestamp === timestamp) {
+                                // Сообщение с таким timestamp уже есть
+                                return;
+                            }
+                        }
                     }
 
                     const div = document.createElement('div');
                     div.className = 'message ' + (sender === user_id ? 'my-message' : 'their-message');
-                    div.textContent = msg;
+                    
+                    // Сохраняем timestamp как атрибут для проверки дубликатов
+                    if (timestamp) {
+                        div.setAttribute('data-timestamp', timestamp);
+                    }
+                    
+                    // ============================================================================
+                    // ОБРАБОТКА СПЕЦИАЛЬНЫХ СЮРПРИЗОВ
+                    // ============================================================================
+                    
+                    // Обработка десерта
+                    if (msg.includes('SURPRISE_DESSERT')) {
+                        div.innerHTML = `
+                            <div style="text-align: center; padding: 20px;">
+                                <div style="font-size: 1.2em; color: #fff; margin-bottom: 15px; font-weight: bold;">
+                                    🎁 Вам отправили сюрприз!
+                                </div>
+                                <div style="
+                                    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffecd2 100%);
+                                    border-radius: 20px;
+                                    padding: 30px;
+                                    box-shadow: 0 10px 40px rgba(255, 154, 158, 0.5);
+                                    animation: dessertPulse 2s ease-in-out infinite;
+                                ">
+                                    <div style="font-size: 8em; line-height: 1; margin-bottom: 15px;">🍰</div>
+                                    <div style="font-size: 1.5em; color: #d63384; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);">
+                                        Вкусный десерт для вас!
+                                    </div>
+                                    <div style="font-size: 1.1em; color: #666; margin-top: 15px; font-weight: 600;">
+                                        Напишите за какой столик принести
+                                    </div>
+                                </div>
+                            </div>
+                            <style>
+                                @keyframes dessertPulse {
+                                    0%, 100% { transform: scale(1); box-shadow: 0 10px 40px rgba(255, 154, 158, 0.5); }
+                                    50% { transform: scale(1.05); box-shadow: 0 15px 50px rgba(255, 154, 158, 0.8); }
+                                }
+                            </style>
+                        `;
+                    }
+                    // Обработка шампанского
+                    else if (msg.includes('SURPRISE_CHAMPAGNE')) {
+                        div.innerHTML = `
+                            <div style="text-align: center; padding: 20px;">
+                                <div style="font-size: 1.2em; color: #fff; margin-bottom: 15px; font-weight: bold;">
+                                    🎁 Вам отправили сюрприз!
+                                </div>
+                                <div style="
+                                    background: linear-gradient(135deg, #fff9e6 0%, #ffe5b4 30%, #ffd700 60%, #ffcc00 100%);
+                                    border-radius: 20px;
+                                    padding: 35px;
+                                    box-shadow: 0 15px 50px rgba(255, 215, 0, 0.6);
+                                    animation: champagneBubbles 3s ease-in-out infinite;
+                                    position: relative;
+                                    overflow: hidden;
+                                ">
+                                    <div style="font-size: 10em; line-height: 1; margin-bottom: 15px; filter: drop-shadow(0 8px 15px rgba(255,215,0,0.5));">🍾</div>
+                                    <div style="font-size: 1.8em; color: #996515; font-weight: bold; text-shadow: 3px 3px 6px rgba(255,255,255,0.5);">
+                                        Шампанское!
+                                    </div>
+                                    <div style="font-size: 1.2em; color: #b8860b; margin-top: 12px; font-weight: 600;">
+                                        За ваше знакомство! 🥂✨
+                                    </div>
+                                    <div style="font-size: 1.1em; color: #996515; margin-top: 15px; font-weight: 600;">
+                                        Напишите за какой столик принести
+                                    </div>
+                                    <div style="position: absolute; top: 10px; left: 10px; font-size: 2em; animation: sparkle1 2s ease-in-out infinite;">✨</div>
+                                    <div style="position: absolute; top: 20px; right: 20px; font-size: 1.5em; animation: sparkle2 2.5s ease-in-out infinite;">💫</div>
+                                    <div style="position: absolute; bottom: 15px; left: 20px; font-size: 1.8em; animation: sparkle3 3s ease-in-out infinite;">⭐</div>
+                                    <div style="position: absolute; bottom: 20px; right: 15px; font-size: 2em; animation: sparkle1 2.2s ease-in-out infinite;">✨</div>
+                                </div>
+                            </div>
+                            <style>
+                                @keyframes champagneBubbles {
+                                    0%, 100% { 
+                                        transform: scale(1); 
+                                        box-shadow: 0 15px 50px rgba(255, 215, 0, 0.6);
+                                    }
+                                    50% { 
+                                        transform: scale(1.03); 
+                                        box-shadow: 0 20px 60px rgba(255, 215, 0, 0.9), 0 0 30px rgba(255, 255, 255, 0.5);
+                                    }
+                                }
+                                @keyframes sparkle1 {
+                                    0%, 100% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
+                                    50% { opacity: 1; transform: scale(1.2) rotate(180deg); }
+                                }
+                                @keyframes sparkle2 {
+                                    0%, 100% { opacity: 0.4; transform: translateY(0) scale(0.9); }
+                                    50% { opacity: 1; transform: translateY(-10px) scale(1.1); }
+                                }
+                                @keyframes sparkle3 {
+                                    0%, 100% { opacity: 0.5; transform: rotate(0deg) scale(1); }
+                                    50% { opacity: 1; transform: rotate(360deg) scale(1.3); }
+                                }
+                            </style>
+                        `;
+                    }
+                    // Обработка анекдота
+                    else if (msg.includes('SURPRISE_JOKE')) {
+                        const jokeText = msg.replace('😄 SURPRISE_JOKE', '').trim();
+                        div.innerHTML = `
+                            <div style="text-align: center; padding: 20px;">
+                                <div style="font-size: 1.3em; color: #fff; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5);">
+                                    🎁 Вам отправили сюрприз!
+                                </div>
+                                <div style="
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 35%, #f093fb 70%, #f5576c 100%);
+                                    border-radius: 25px;
+                                    padding: 35px 30px;
+                                    box-shadow: 0 15px 50px rgba(102, 126, 234, 0.6);
+                                    animation: jokePulse 4s ease-in-out infinite;
+                                    position: relative;
+                                    overflow: hidden;
+                                ">
+                                    <div style="position: absolute; top: -50px; left: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%); border-radius: 50%; animation: shimmer1 3s ease-in-out infinite;"></div>
+                                    <div style="position: absolute; bottom: -30px; right: -30px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); border-radius: 50%; animation: shimmer2 4s ease-in-out infinite;"></div>
+                                    
+                                    <div style="font-size: 5em; margin-bottom: 20px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3)); animation: laughBounce 2s ease-in-out infinite;">😄</div>
+                                    <div style="font-size: 1.5em; color: #fff; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3);">
+                                        Держите анекдот!
+                                    </div>
+                                    <div style="
+                                        background: rgba(255, 255, 255, 0.95);
+                                        border-radius: 15px;
+                                        padding: 25px;
+                                        font-size: 1.15em;
+                                        color: #333;
+                                        line-height: 1.7;
+                                        white-space: pre-line;
+                                        text-align: left;
+                                        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                                        font-weight: 500;
+                                        position: relative;
+                                        z-index: 1;
+                                    ">
+                                        ${jokeText}
+                                    </div>
+                                    <div style="font-size: 3em; margin-top: 20px; animation: laughRotate 3s ease-in-out infinite;">🤣</div>
+                                </div>
+                            </div>
+                            <style>
+                                @keyframes jokePulse {
+                                    0%, 100% { 
+                                        transform: scale(1); 
+                                        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.6);
+                                    }
+                                    50% { 
+                                        transform: scale(1.02); 
+                                        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.9), 0 0 40px rgba(245, 87, 108, 0.5);
+                                    }
+                                }
+                                @keyframes laughBounce {
+                                    0%, 100% { transform: translateY(0) scale(1); }
+                                    25% { transform: translateY(-10px) scale(1.1); }
+                                    75% { transform: translateY(-5px) scale(1.05); }
+                                }
+                                @keyframes laughRotate {
+                                    0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.8; }
+                                    25% { transform: rotate(-15deg) scale(1.2); opacity: 1; }
+                                    75% { transform: rotate(15deg) scale(1.2); opacity: 1; }
+                                }
+                                @keyframes shimmer1 {
+                                    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+                                    50% { transform: translate(20px, 20px) scale(1.2); opacity: 0.6; }
+                                }
+                                @keyframes shimmer2 {
+                                    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.2; }
+                                    50% { transform: translate(-15px, -15px) scale(1.3); opacity: 0.5; }
+                                }
+                            </style>
+                        `;
+                    }
+                    // Обработка головоломки
+                    else if (msg.includes('SURPRISE_PUZZLE')) {
+                        const puzzleText = msg.replace('🧠 SURPRISE_PUZZLE', '').trim();
+                        div.innerHTML = `
+                            <div style="text-align: center; padding: 20px;">
+                                <div style="font-size: 1.3em; color: #fff; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5);">
+                                    🎁 Вам отправили сюрприз!
+                                </div>
+                                <div style="
+                                    background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 35%, #9d50bb 70%, #6e48aa 100%);
+                                    border-radius: 25px;
+                                    padding: 35px 30px;
+                                    box-shadow: 0 15px 50px rgba(0, 210, 255, 0.6);
+                                    animation: puzzleGlow 4s ease-in-out infinite;
+                                    position: relative;
+                                    overflow: hidden;
+                                ">
+                                    <div style="position: absolute; top: 10px; left: 10px; font-size: 2em; animation: puzzleRotate1 3s linear infinite;">🧩</div>
+                                    <div style="position: absolute; top: 10px; right: 10px; font-size: 2em; animation: puzzleRotate2 4s linear infinite;">🎲</div>
+                                    <div style="position: absolute; bottom: 10px; left: 15px; font-size: 1.8em; animation: puzzleFloat 3s ease-in-out infinite;">💭</div>
+                                    <div style="position: absolute; bottom: 10px; right: 15px; font-size: 2em; animation: puzzleRotate1 3.5s linear infinite;">🧩</div>
+                                    
+                                    <div style="font-size: 5em; margin-bottom: 20px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3)); animation: brainPulse 2s ease-in-out infinite;">🧠</div>
+                                    <div style="font-size: 1.6em; color: #fff; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3);">
+                                        Напрягись! 💪
+                                    </div>
+                                    <div style="
+                                        background: rgba(255, 255, 255, 0.95);
+                                        border-radius: 15px;
+                                        padding: 25px;
+                                        font-size: 1.15em;
+                                        color: #333;
+                                        line-height: 1.7;
+                                        white-space: pre-line;
+                                        text-align: left;
+                                        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                                        font-weight: 500;
+                                        position: relative;
+                                        z-index: 1;
+                                        border: 3px solid rgba(58, 123, 213, 0.3);
+                                    ">
+                                        ${puzzleText}
+                                    </div>
+                                    <div style="font-size: 2.5em; margin-top: 20px; animation: thinkingRotate 4s ease-in-out infinite;">🤔</div>
+                                </div>
+                            </div>
+                            <style>
+                                @keyframes puzzleGlow {
+                                    0%, 100% { 
+                                        transform: scale(1); 
+                                        box-shadow: 0 15px 50px rgba(0, 210, 255, 0.6);
+                                    }
+                                    50% { 
+                                        transform: scale(1.02); 
+                                        box-shadow: 0 20px 60px rgba(0, 210, 255, 0.9), 0 0 40px rgba(157, 80, 187, 0.5);
+                                    }
+                                }
+                                @keyframes brainPulse {
+                                    0%, 100% { transform: scale(1) rotate(0deg); }
+                                    25% { transform: scale(1.1) rotate(-5deg); }
+                                    50% { transform: scale(1.15) rotate(0deg); }
+                                    75% { transform: scale(1.1) rotate(5deg); }
+                                }
+                                @keyframes puzzleRotate1 {
+                                    0% { transform: rotate(0deg); }
+                                    100% { transform: rotate(360deg); }
+                                }
+                                @keyframes puzzleRotate2 {
+                                    0% { transform: rotate(360deg); }
+                                    100% { transform: rotate(0deg); }
+                                }
+                                @keyframes puzzleFloat {
+                                    0%, 100% { transform: translateY(0); opacity: 0.6; }
+                                    50% { transform: translateY(-15px); opacity: 1; }
+                                }
+                                @keyframes thinkingRotate {
+                                    0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.7; }
+                                    25% { transform: rotate(-20deg) scale(1.2); opacity: 1; }
+                                    50% { transform: rotate(0deg) scale(1.3); opacity: 1; }
+                                    75% { transform: rotate(20deg) scale(1.2); opacity: 1; }
+                                }
+                            </style>
+                        `;
+                    }
+                    // Обычное текстовое сообщение
+                    else {
+                        div.textContent = msg;
+                    }
 
                     // Добавляем время, если оно есть
                     if (timestamp) {
@@ -6249,6 +7357,29 @@ def chat(other_user_id):
                         }
                     }
                 });
+
+                // Загружаем ВСЕ сообщения при открытии страницы через JavaScript
+                // Это нужно для правильной обработки маркеров сюрпризов
+                function loadInitialMessages() {
+                    fetch(`/chat_history/${other_user_id}`)
+                        .then(response => response.json())
+                        .then(messages => {
+                            console.log(`📥 Загружено сообщений: ${messages.length}`);
+                            messages.forEach(msg => {
+                                addMessage(msg.text, msg.sender, msg.timestamp);
+                            });
+                            lastMessageCount = messages.length;
+                            if (messages.length > 0) {
+                                lastMessageTimestamp = messages[messages.length - 1].timestamp;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Ошибка при загрузке истории:', error);
+                        });
+                }
+
+                // Загружаем историю при открытии страницы
+                loadInitialMessages();
 
                 // Запускаем периодическую проверку новых сообщений каждые 3 секунды
                 setInterval(checkNewMessages, 3000);
@@ -7477,7 +8608,74 @@ def payment_success():
     """Страница успешной оплаты"""
     payment_id = request.args.get('payment_id')
     user_id = request.args.get('user_id')
+    payment_type = request.args.get('type', 'profile')  # profile или surprise
 
+    # ===================================================================
+    # ОБРАБОТКА ОПЛАТЫ ФУНКЦИИ "УДИВИТЬ"
+    # ===================================================================
+    if payment_type == 'surprise':
+        try:
+            print(f"💰 Обрабатываем оплату функции 'Удивить' для пользователя: {user_id}")
+            
+            profile = Profile.query.get(user_id)
+            if profile:
+                profile.surprise_feature_paid = True
+                profile.surprise_feature_payment_date = datetime.utcnow()
+                db.session.commit()
+                print(f"✅ Функция 'Удивить' активирована для {user_id}")
+                
+                # Перенаправляем на страницу visitors
+                return '''
+                <!DOCTYPE html>
+                <html lang="ru">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Оплата успешна</title>
+                    <style>
+                        ''' + get_starry_night_css() + '''
+                        body {
+                            text-align: center;
+                            padding: 20px;
+                            font-family: Arial, sans-serif;
+                        }
+                        .success-container {
+                            max-width: 500px;
+                            margin: 100px auto;
+                            background: rgba(255, 255, 255, 0.95);
+                            padding: 40px;
+                            border-radius: 20px;
+                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                        }
+                        .success-icon { font-size: 5em; margin-bottom: 20px; }
+                        h1 { color: #4CAF50; margin-bottom: 15px; }
+                        p { color: #666; font-size: 1.1em; margin-bottom: 30px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="success-container">
+                        <div class="success-icon">✨</div>
+                        <h1>Оплата успешна!</h1>
+                        <p>Функция "Удивить" активирована!<br>Теперь вы можете отправлять сюрпризы любым посетителям.</p>
+                        <p style="color: #999; font-size: 0.9em;">Перенаправление на страницу посетителей...</p>
+                    </div>
+                    <script>
+                        setTimeout(function() {
+                            window.location.href = '/visitors?surprise_paid=1';
+                        }, 2000);
+                    </script>
+                </body>
+                </html>
+                '''
+            else:
+                print(f"❌ Профиль {user_id} не найден")
+        except Exception as e:
+            print(f"❌ Ошибка активации функции 'Удивить': {e}")
+            db.session.rollback()
+
+    # ===================================================================
+    # ОБРАБОТКА ОПЛАТЫ ПРОФИЛЯ (существующая логика)
+    # ===================================================================
     if user_id:
         # Создаем настоящую анкету из временной после успешной оплаты
         try:

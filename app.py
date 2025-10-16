@@ -359,7 +359,7 @@ def qr_image(user_id):
         # Генерируем QR-код локально
         qr = qrcode.QRCode(
             version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,  # Высокая коррекция для логотипа
             box_size=10,
             border=4,
         )
@@ -368,6 +368,9 @@ def qr_image(user_id):
         
         # Создаем изображение
         img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Добавляем логотип в центр
+        img = add_logo_to_qr(img)
         
         # Конвертируем в PNG
         img_buffer = io.BytesIO()
@@ -385,6 +388,64 @@ def qr_image(user_id):
         # Возвращаем простой QR-код в случае ошибки
         qr_url = get_user_qr_url(user_id)
         return generate_simple_qr(qr_url)
+
+
+def add_logo_to_qr(qr_img):
+    """Добавляет логотип 'ятута.рф' в центр QR-кода"""
+    try:
+        # Получаем размеры QR-кода
+        qr_width, qr_height = qr_img.size
+        
+        # Создаем логотип
+        logo_size = min(qr_width, qr_height) // 4  # Логотип занимает 1/4 от размера QR-кода
+        logo_img = Image.new('RGB', (logo_size, logo_size), 'white')
+        
+        # Создаем простой логотип с рамкой
+        from PIL import ImageDraw
+        
+        draw = ImageDraw.Draw(logo_img)
+        
+        # Рисуем рамку
+        draw.rectangle([2, 2, logo_size-2, logo_size-2], outline='black', width=2)
+        
+        # Создаем логотип с геометрическим дизайном
+        # Рисуем центральный квадрат
+        center_size = logo_size // 3
+        center_x = (logo_size - center_size) // 2
+        center_y = (logo_size - center_size) // 2
+        
+        # Основной квадрат
+        draw.rectangle([center_x, center_y, center_x + center_size, center_y + center_size], 
+                      fill='black', outline='black')
+        
+        # Добавляем внутренний квадрат
+        inner_size = center_size // 2
+        inner_x = center_x + (center_size - inner_size) // 2
+        inner_y = center_y + (center_size - inner_size) // 2
+        
+        draw.rectangle([inner_x, inner_y, inner_x + inner_size, inner_y + inner_size], 
+                      fill='white', outline='black')
+        
+        # Добавляем точки в углах для узнаваемости
+        dot_size = 4
+        # Верхний левый угол
+        draw.ellipse([center_x + 2, center_y + 2, center_x + 2 + dot_size, center_y + 2 + dot_size], fill='black')
+        # Нижний правый угол
+        draw.ellipse([center_x + center_size - dot_size - 2, center_y + center_size - dot_size - 2, 
+                     center_x + center_size - 2, center_y + center_size - 2], fill='black')
+        
+        # Вычисляем позицию для вставки логотипа (центр QR-кода)
+        logo_x = (qr_width - logo_size) // 2
+        logo_y = (qr_height - logo_size) // 2
+        
+        # Вставляем логотип в QR-код
+        qr_img.paste(logo_img, (logo_x, logo_y))
+        
+        return qr_img
+        
+    except Exception as e:
+        print(f"Ошибка добавления логотипа: {e}")
+        return qr_img  # Возвращаем оригинальный QR-код без логотипа
 
 
 def generate_simple_qr(url):

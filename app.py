@@ -435,8 +435,8 @@ def add_text_below_qr(qr_img):
             text_width = len(text) * 16  # Увеличиваем для большего шрифта
             text_height_actual = 28
         
-        # Центрируем текст и поднимаем от края
-        text_x = (qr_width - text_width) // 2
+        # Смещаем текст вправо и поднимаем от края
+        text_x = (qr_width - text_width) // 2 + 20  # Смещаем на 20px вправо
         text_y = (text_height - text_height_actual) // 2 - 5  # Поднимаем на 5px от центра
         
         # Рисуем текст

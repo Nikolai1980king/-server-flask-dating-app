@@ -340,8 +340,10 @@ def get_user_qr_url(user_id):
 
 def generate_qr_code_server_side(user_id):
     """Генерирует QR-код на сервере через наш endpoint"""
+    import time
     base_url = request.url_root.rstrip('/')
-    return f"{base_url}/qr-image/{user_id}"
+    timestamp = int(time.time())  # Добавляем timestamp для принудительного обновления
+    return f"{base_url}/qr-image/{user_id}?v={timestamp}"
 
 
 @app.route('/qr-image/<string:user_id>')
@@ -380,7 +382,7 @@ def qr_image(user_id):
         # Возвращаем изображение
         return make_response(img_buffer.getvalue(), 200, {
             'Content-Type': 'image/png',
-            'Cache-Control': 'public, max-age=3600'  # Кешируем на час
+            'Cache-Control': 'no-cache, no-store, must-revalidate'  # Отключаем кеширование
         })
             
     except Exception as e:
@@ -438,6 +440,8 @@ def add_text_below_qr(qr_img):
         # Смещаем текст вправо и поднимаем от края
         text_x = (qr_width - text_width) // 2 + 20  # Смещаем на 20px вправо
         text_y = (text_height - text_height_actual) // 2 - 5  # Поднимаем на 5px от центра
+        
+        print(f"🔧 Отладка: text_x={text_x}, text_y={text_y}, text_width={text_width}")
         
         # Рисуем текст
         try:

@@ -274,12 +274,57 @@ class ChatPermission(db.Model):
     sender_id = db.Column(db.String, nullable=False)  # Кто отправил сюрприз
     receiver_id = db.Column(db.String, nullable=False)  # Кто получил сюрприз
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    __table_args__ = (db.UniqueConstraint('sender_id', 'receiver_id', name='unique_chat_permission'),)
+
+
+class QRLoginToken(db.Model):
+    """Модель для QR-код авторизации"""
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String, unique=True, nullable=False)  # Уникальный токен
+    user_id = db.Column(db.String, nullable=False)  # ID пользователя
+    expires_at = db.Column(db.DateTime, nullable=False)  # Время истечения
+    used = db.Column(db.Boolean, default=False)  # Использован ли токен
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # Удаляю in-memory структуру сообщений:
 # messages = defaultdict(list)
 notifications = defaultdict(list)
+
+
+# ============================================================================
+# QR-КОД АВТОРИЗАЦИЯ ДЛЯ ЯТУТА.РФ
+# ============================================================================
+
+def generate_qr_login_token(user_id):
+    """Генерирует токен для QR-код входа"""
+    token = str(uuid.uuid4())
+    expires_at = datetime.utcnow() + timedelta(minutes=10)  # Токен действует 10 минут
+    
+    # Удаляем старые токены этого пользователя
+    QRLoginToken.query.filter_by(user_id=user_id).delete()
+    
+    # Создаем новый токен
+    qr_token = QRLoginToken(
+        token=token,
+        user_id=user_id,
+        expires_at=expires_at
+    )
+    db.session.add(qr_token)
+    db.session.commit()
+    
+    return token
+
+
+def cleanup_expired_qr_tokens():
+    """Очищает просроченные QR-токены"""
+    current_time = datetime.utcnow()
+    expired_tokens = QRLoginToken.query.filter(QRLoginToken.expires_at < current_time).all()
+    
+    for token in expired_tokens:
+        db.session.delete(token)
+    
+    db.session.commit()
+    return len(expired_tokens)
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
@@ -695,6 +740,7 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             <span id="msg-badge" style="display:{% if unread_messages > 0 %}inline{% else %}none{% endif %};position:absolute;top:-8px;right:-8px;background:#ff6b6b;color:#fff;border-radius:50%;padding:2px 7px;font-size:0.8em;">{{ unread_messages if unread_messages > 0 else '' }}</span>
         </a>
         <a href="/settings" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='settings' else ''}}" title="Настройки">⚙️</a>
+        <a href="/qr-login-generator" style="font-size:2em;margin:0 10px;{{'font-weight:bold;color:#ff6b6b;' if active=='qr' else ''}}" title="QR-код вход">📱</a>
     </nav>
     <div style="height:48px"></div>
     <style>
@@ -7788,6 +7834,135 @@ def api_cleanup_profiles():
         }), 500
 
 
+# ============================================================================
+# QR-КОД АВТОРИЗАЦИЯ API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/generate-qr-login', methods=['POST'])
+@require_profile()
+def api_generate_qr_login():
+    """API для генерации QR-код токена для входа"""
+    try:
+        user_id = request.cookies.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Пользователь не авторизован'}), 401
+        
+        # Очищаем просроченные токены
+        cleanup_expired_qr_tokens()
+        
+        # Генерируем новый токен
+        token = generate_qr_login_token(user_id)
+        
+        # Создаем URL для QR-кода
+        qr_url = f"https://ятута.рф/qr-login/{token}"
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'qr_url': qr_url,
+            'expires_in_minutes': 10
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/qr-login/<string:token>')
+def qr_login_page(token):
+    """Страница автоматического входа по QR-коду"""
+    try:
+        # Ищем токен в базе данных
+        qr_token = QRLoginToken.query.filter_by(token=token, used=False).first()
+        
+        if not qr_token:
+            return render_template_string('''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QR-код вход - ятута.рф</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+                    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto;">
+                        <h2 style="color: #e74c3c;">❌ Ошибка входа</h2>
+                        <p>QR-код недействителен или истек</p>
+                        <a href="/" style="background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">На главную</a>
+                    </div>
+                </body>
+                </html>
+            ''')
+        
+        # Проверяем, не истек ли токен
+        if datetime.utcnow() > qr_token.expires_at:
+            return render_template_string('''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QR-код вход - ятута.рф</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+                    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto;">
+                        <h2 style="color: #e74c3c;">⏰ Время истекло</h2>
+                        <p>QR-код действителен только 10 минут</p>
+                        <a href="/" style="background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">На главную</a>
+                    </div>
+                </body>
+                </html>
+            ''')
+        
+        # Получаем профиль пользователя
+        profile = Profile.query.get(qr_token.user_id)
+        if not profile:
+            return render_template_string('''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QR-код вход - ятута.рф</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+                    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto;">
+                        <h2 style="color: #e74c3c;">❌ Профиль не найден</h2>
+                        <p>Анкета пользователя не найдена</p>
+                        <a href="/" style="background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">На главную</a>
+                    </div>
+                </body>
+                </html>
+            ''')
+        
+        # Отмечаем токен как использованный
+        qr_token.used = True
+        db.session.commit()
+        
+        # Устанавливаем cookie и перенаправляем
+        response = make_response(redirect(url_for('my_profile')))
+        response.set_cookie('user_id', profile.id, max_age=365*24*60*60)  # Cookie на год
+        
+        return response
+        
+    except Exception as e:
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>QR-код вход - ятута.рф</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+                <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto;">
+                    <h2 style="color: #e74c3c;">❌ Ошибка сервера</h2>
+                    <p>Произошла ошибка при входе</p>
+                    <a href="/" style="background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">На главную</a>
+                </div>
+            </body>
+            </html>
+        ''')
+
+
 @app.route('/terms')
 def terms():
     return render_template_string('''
@@ -8379,6 +8554,240 @@ def cleanup_expired_pending_profiles():
         print(f"❌ Ошибка при очистке временных анкет: {e}")
         db.session.rollback()
         return 0
+
+
+# ============================================================================
+# QR-КОД СТРАНИЦА ДЛЯ ВХОДА
+# ============================================================================
+
+@app.route('/qr-login-generator')
+@require_profile()
+def qr_login_generator():
+    """Страница для генерации QR-кода для входа с другого устройства"""
+    user_id = request.cookies.get('user_id')
+    profile = Profile.query.get(user_id)
+    
+    navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
+                           unread_likes=get_unread_likes_count(user_id),
+                           unread_matches=get_unread_matches_count(user_id))
+    
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
+            <title>QR-код вход - ятута.рф</title>
+            <style>
+                ''' + get_starry_night_css() + '''
+                body { max-width: 500px; margin: 0 auto; padding: 20px; }
+                h1 { 
+                    color: #fff; 
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                    margin-bottom: 25px;
+                    font-size: 1.8em;
+                    text-align: center;
+                }
+                .qr-container {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 15px;
+                    padding: 30px;
+                    text-align: center;
+                    margin: 20px 0;
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                }
+                .qr-code {
+                    width: 200px;
+                    height: 200px;
+                    margin: 20px auto;
+                    background: white;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 2em;
+                }
+                .qr-url {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 10px;
+                    padding: 15px;
+                    margin: 20px 0;
+                    word-break: break-all;
+                    font-family: monospace;
+                    font-size: 0.9em;
+                    color: #fff;
+                }
+                .generate-btn {
+                    background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 25px;
+                    padding: 15px 30px;
+                    font-size: 1.1em;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    margin: 10px;
+                }
+                .generate-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+                }
+                .info-text {
+                    color: #fff;
+                    text-align: center;
+                    margin: 20px 0;
+                    line-height: 1.6;
+                }
+                .timer {
+                    color: #f39c12;
+                    font-weight: bold;
+                    font-size: 1.2em;
+                    margin: 10px 0;
+                }
+                .instructions {
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin: 20px 0;
+                    color: #fff;
+                }
+                .instructions h3 {
+                    color: #3498db;
+                    margin-top: 0;
+                }
+                .instructions ol {
+                    text-align: left;
+                    padding-left: 20px;
+                }
+                .instructions li {
+                    margin: 10px 0;
+                }
+            </style>
+            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+        </head>
+        <body>
+            {{ navbar|safe }}
+            <h1>📱 QR-код для входа</h1>
+            
+            <div class="instructions">
+                <h3>Как войти с другого устройства:</h3>
+                <ol>
+                    <li>Нажмите "Сгенерировать QR-код"</li>
+                    <li>Отсканируйте QR-код камерой телефона</li>
+                    <li>Или откройте ссылку на другом устройстве</li>
+                    <li>QR-код действителен 10 минут</li>
+                </ol>
+            </div>
+            
+            <div class="qr-container" id="qrContainer" style="display: none;">
+                <div class="qr-code" id="qrCode"></div>
+                <div class="qr-url" id="qrUrl"></div>
+                <div class="timer" id="timer">⏰ Осталось: <span id="timeLeft">10:00</span></div>
+            </div>
+            
+            <div style="text-align: center;">
+                <button class="generate-btn" onclick="generateQR()">🔗 Сгенерировать QR-код</button>
+                <button class="generate-btn" onclick="refreshQR()" style="background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);">🔄 Обновить</button>
+            </div>
+            
+            <div class="info-text">
+                <p>💡 <strong>Совет:</strong> QR-код позволяет войти в ваш профиль с любого устройства без повторной регистрации!</p>
+            </div>
+
+            <script>
+                let currentToken = null;
+                let countdownInterval = null;
+                
+                function generateQR() {
+                    fetch('/api/generate-qr-login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            currentToken = data.token;
+                            const qrUrl = data.qr_url;
+                            
+                            // Показываем контейнер
+                            document.getElementById('qrContainer').style.display = 'block';
+                            
+                            // Генерируем QR-код
+                            const qrCodeElement = document.getElementById('qrCode');
+                            qrCodeElement.innerHTML = '';
+                            
+                            QRCode.toCanvas(qrCodeElement, qrUrl, {
+                                width: 200,
+                                height: 200,
+                                color: {
+                                    dark: '#000000',
+                                    light: '#FFFFFF'
+                                }
+                            }, function (error) {
+                                if (error) {
+                                    console.error('Ошибка генерации QR-кода:', error);
+                                    qrCodeElement.innerHTML = '❌ Ошибка QR-кода';
+                                } else {
+                                    console.log('✅ QR-код сгенерирован');
+                                }
+                            });
+                            
+                            // Показываем URL
+                            document.getElementById('qrUrl').textContent = qrUrl;
+                            
+                            // Запускаем таймер
+                            startCountdown(10 * 60); // 10 минут
+                            
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        alert('Ошибка при генерации QR-кода');
+                    });
+                }
+                
+                function refreshQR() {
+                    if (currentToken) {
+                        generateQR();
+                    }
+                }
+                
+                function startCountdown(seconds) {
+                    if (countdownInterval) {
+                        clearInterval(countdownInterval);
+                    }
+                    
+                    countdownInterval = setInterval(() => {
+                        const minutes = Math.floor(seconds / 60);
+                        const secs = seconds % 60;
+                        const timeString = `${minutes}:${secs.toString().padStart(2, '0')}`;
+                        
+                        document.getElementById('timeLeft').textContent = timeString;
+                        
+                        if (seconds <= 0) {
+                            clearInterval(countdownInterval);
+                            document.getElementById('qrContainer').style.display = 'none';
+                            document.getElementById('timeLeft').textContent = 'Истекло';
+                        }
+                        
+                        seconds--;
+                    }, 1000);
+                }
+                
+                // Автоматически генерируем QR-код при загрузке страницы
+                document.addEventListener('DOMContentLoaded', function() {
+                    generateQR();
+                });
+            </script>
+        </body>
+        </html>
+    ''')
 
 
 # ============================================================================
@@ -9436,6 +9845,12 @@ def debug_likes_and_matches():
 @app.route('/test_create_and_pay')
 def test_create_and_pay():
     return send_from_directory('.', 'test_create_and_pay.html')
+
+
+@app.route('/test_qr_login')
+def test_qr_login():
+    """Тестовая страница для QR-код авторизации"""
+    return send_from_directory('.', 'test_qr_login.html')
 
 
 @app.route('/test_payment_success_fix')

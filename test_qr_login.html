@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест QR-код авторизации - ятута.рф</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-section h3 {
+            color: #3498db;
+            margin-top: 0;
+        }
+        .test-btn {
+            background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { color: #2ecc71; }
+        .error { color: #e74c3c; }
+        .info { color: #f39c12; }
+        .qr-display {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .qr-code {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .instructions ol {
+            text-align: left;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 10px 0;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Тест QR-код авторизации</h1>
+        
+        <div class="instructions">
+            <h3>🔧 Как тестировать:</h3>
+            <ol>
+                <li>Сначала создайте анкету в приложении</li>
+                <li>Нажмите "Тест генерации QR-кода"</li>
+                <li>Скопируйте ссылку и откройте в другом браузере</li>
+                <li>Проверьте, что произошел автоматический вход</li>
+            </ol>
+        </div>
+        
+        <div class="test-section">
+            <h3>1. Тест генерации QR-кода</h3>
+            <button class="test-btn" onclick="testGenerateQR()">🔗 Генерировать QR-код</button>
+            <button class="test-btn" onclick="clearResults()">🗑️ Очистить</button>
+            <div id="qrResult" class="result" style="display: none;"></div>
+            <div id="qrDisplay" class="qr-display" style="display: none;">
+                <div class="qr-code" id="qrCode"></div>
+                <div id="qrUrl"></div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. Тест проверки токена</h3>
+            <input type="text" id="tokenInput" placeholder="Введите токен для проверки" style="width: 300px; padding: 10px; border-radius: 5px; border: none; margin: 10px;">
+            <button class="test-btn" onclick="testCheckToken()">🔍 Проверить токен</button>
+            <div id="tokenResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. Информация о системе</h3>
+            <button class="test-btn" onclick="showSystemInfo()">ℹ️ Показать информацию</button>
+            <div id="systemInfo" class="result" style="display: none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. Ссылки для тестирования</h3>
+            <p><a href="/qr-login-generator" style="color: #3498db;">📱 Страница генерации QR-кода</a></p>
+            <p><a href="/" style="color: #3498db;">🏠 Главная страница</a></p>
+            <p><a href="/visitors" style="color: #3498db;">👥 Посетители</a></p>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+        
+        function clearResults() {
+            document.getElementById('qrResult').style.display = 'none';
+            document.getElementById('qrDisplay').style.display = 'none';
+            document.getElementById('tokenResult').style.display = 'none';
+            document.getElementById('systemInfo').style.display = 'none';
+        }
+        
+        function testGenerateQR() {
+            showResult('qrResult', '🔄 Генерируем QR-код...', 'info');
+            
+            fetch('/api/generate-qr-login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult('qrResult', `✅ QR-код сгенерирован!\nТокен: ${data.token}\nURL: ${data.qr_url}\nДействителен: ${data.expires_in_minutes} минут`, 'success');
+                    
+                    // Показываем QR-код
+                    document.getElementById('qrDisplay').style.display = 'block';
+                    document.getElementById('qrUrl').textContent = data.qr_url;
+                    
+                    // Генерируем QR-код
+                    const qrCodeElement = document.getElementById('qrCode');
+                    qrCodeElement.innerHTML = '';
+                    
+                    QRCode.toCanvas(qrCodeElement, data.qr_url, {
+                        width: 200,
+                        height: 200,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    }, function (error) {
+                        if (error) {
+                            console.error('Ошибка генерации QR-кода:', error);
+                            qrCodeElement.innerHTML = '❌ Ошибка QR-кода';
+                        } else {
+                            console.log('✅ QR-код сгенерирован');
+                        }
+                    });
+                    
+                } else {
+                    showResult('qrResult', `❌ Ошибка: ${data.error || 'Неизвестная ошибка'}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                showResult('qrResult', `❌ Ошибка сети: ${error.message}`, 'error');
+            });
+        }
+        
+        function testCheckToken() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (!token) {
+                showResult('tokenResult', '❌ Введите токен для проверки', 'error');
+                return;
+            }
+            
+            showResult('tokenResult', '🔄 Проверяем токен...', 'info');
+            
+            // Проверяем токен, открывая ссылку
+            const testUrl = `/qr-login/${token}`;
+            showResult('tokenResult', `🔗 Тестовая ссылка: ${window.location.origin}${testUrl}\n\nОткройте эту ссылку в новом окне для проверки`, 'info');
+            
+            // Открываем в новом окне
+            window.open(testUrl, '_blank');
+        }
+        
+        function showSystemInfo() {
+            const info = `📱 QR-код авторизация для ятута.рф
+
+🔧 Функции:
+• Генерация QR-кода для входа
+• Автоматический вход по QR-коду
+• Токены действуют 10 минут
+• Защита от повторного использования
+
+🌐 API Endpoints:
+• POST /api/generate-qr-login - генерация токена
+• GET /qr-login/<token> - автоматический вход
+• GET /qr-login-generator - страница генерации
+
+🛡️ Безопасность:
+• Токены одноразовые
+• Автоматическое истечение
+• Привязка к пользователю
+• Очистка просроченных токенов
+
+📊 База данных:
+• Таблица: qr_login_token
+• Поля: token, user_id, expires_at, used
+• Автоматическая очистка`;
+
+            showResult('systemInfo', info, 'info');
+        }
+        
+        // Автоматически показываем информацию при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            showSystemInfo();
+        });
+    </script>
+</body>
+</html>

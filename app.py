@@ -396,8 +396,9 @@ def add_logo_to_qr(qr_img):
         # Получаем размеры QR-кода
         qr_width, qr_height = qr_img.size
         
-        # Создаем логотип
-        logo_size = min(qr_width, qr_height) // 4  # Логотип занимает 1/4 от размера QR-кода
+        # Создаем логотип (увеличиваем размер)
+        logo_size = min(qr_width, qr_height) // 3  # Логотип занимает 1/3 от размера QR-кода
+        
         logo_img = Image.new('RGB', (logo_size, logo_size), 'white')
         
         # Создаем простой логотип с рамкой
@@ -405,12 +406,12 @@ def add_logo_to_qr(qr_img):
         
         draw = ImageDraw.Draw(logo_img)
         
-        # Рисуем рамку
-        draw.rectangle([2, 2, logo_size-2, logo_size-2], outline='black', width=2)
+        # Рисуем толстую рамку
+        draw.rectangle([3, 3, logo_size-3, logo_size-3], outline='black', width=3)
         
         # Создаем логотип с геометрическим дизайном
-        # Рисуем центральный квадрат
-        center_size = logo_size // 3
+        # Рисуем центральный квадрат (больше)
+        center_size = logo_size // 2  # Увеличиваем размер
         center_x = (logo_size - center_size) // 2
         center_y = (logo_size - center_size) // 2
         
@@ -426,13 +427,44 @@ def add_logo_to_qr(qr_img):
         draw.rectangle([inner_x, inner_y, inner_x + inner_size, inner_y + inner_size], 
                       fill='white', outline='black')
         
-        # Добавляем точки в углах для узнаваемости
-        dot_size = 4
+        # Добавляем точки в углах для узнаваемости (больше)
+        dot_size = 6
         # Верхний левый угол
-        draw.ellipse([center_x + 2, center_y + 2, center_x + 2 + dot_size, center_y + 2 + dot_size], fill='black')
+        draw.ellipse([center_x + 3, center_y + 3, center_x + 3 + dot_size, center_y + 3 + dot_size], fill='black')
         # Нижний правый угол
-        draw.ellipse([center_x + center_size - dot_size - 2, center_y + center_size - dot_size - 2, 
-                     center_x + center_size - 2, center_y + center_size - 2], fill='black')
+        draw.ellipse([center_x + center_size - dot_size - 3, center_y + center_size - dot_size - 3, 
+                     center_x + center_size - 3, center_y + center_size - 3], fill='black')
+        
+        # Добавляем текст "ятута.рф" простыми символами
+        try:
+            from PIL import ImageFont
+            
+            # Рисуем простой текст
+            text = "ятута.рф"
+            font_size = max(8, logo_size // 8)
+            
+            # Пытаемся использовать системный шрифт
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=font_size)
+            except:
+                font = ImageFont.load_default()
+            
+            # Получаем размеры текста
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            # Центрируем текст
+            text_x = (logo_size - text_width) // 2
+            text_y = (logo_size - text_height) // 2
+            
+            # Рисуем текст
+            draw.text((text_x, text_y), text, fill='black', font=font)
+            
+        except Exception as e:
+            print(f"Ошибка добавления текста: {e}")
+            # Рисуем простой квадрат как fallback
+            draw.rectangle([logo_size//4, logo_size//4, 3*logo_size//4, 3*logo_size//4], fill='black')
         
         # Вычисляем позицию для вставки логотипа (центр QR-кода)
         logo_x = (qr_width - logo_size) // 2
@@ -9990,6 +10022,37 @@ def test_create_and_pay():
 def test_qr_login():
     """Тестовая страница для QR-код авторизации"""
     return send_from_directory('.', 'test_qr_login.html')
+
+
+@app.route('/test_qr_logo')
+def test_qr_logo():
+    """Тестовая страница для проверки логотипа в QR-коде"""
+    try:
+        # Создаем тестовый QR-код с логотипом
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data('https://ятута.рф/qr-login/test-user')
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color='black', back_color='white')
+        img = add_logo_to_qr(img)
+        
+        # Сохраняем в буфер
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        return make_response(img_buffer.getvalue(), 200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-cache'
+        })
+        
+    except Exception as e:
+        return f"Ошибка: {e}", 500
 
 
 @app.route('/test_payment_success_fix')

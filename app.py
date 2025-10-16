@@ -418,6 +418,10 @@ def add_text_below_qr(qr_img):
         text = "ятута.рф"
         font_size = 28  # Увеличиваем размер шрифта
         
+        # Добавляем подсказку о браузере
+        browser_hint = "Откройте в Chrome"
+        hint_font_size = 12
+        
         # Пытаемся использовать системный шрифт
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=font_size)
@@ -438,17 +442,29 @@ def add_text_below_qr(qr_img):
             text_height_actual = 28
         
         # Смещаем текст вправо и поднимаем от края
-        text_x = (qr_width - text_width) // 2 + 20  # Смещаем на 20px вправо
-        text_y = (text_height - text_height_actual) // 2 - 5  # Поднимаем на 5px от центра
+        text_x = (qr_width - text_width) // 2   # Смещаем на 0px вправо
+        text_y = (text_height - text_height_actual) // 2 - 20  # Поднимаем на 20px от центра
         
         print(f"🔧 Отладка: text_x={text_x}, text_y={text_y}, text_width={text_width}")
         
-        # Рисуем текст
+        # Рисуем основной текст
         try:
             draw.text((text_x, text_y), text, fill='black', font=font)
         except:
             # Если не получается с кириллицей, рисуем простой текст
             draw.text((text_x, text_y), "ятута.рф", fill='black', font=font)
+        
+        # Рисуем подсказку о браузере
+        try:
+            hint_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size=hint_font_size)
+        except:
+            hint_font = ImageFont.load_default()
+        
+        # Позиция подсказки (под основным текстом)
+        hint_y = text_y + 35
+        hint_x = (qr_width - len(browser_hint) * 6) // 2  # Примерное центрирование
+        
+        draw.text((hint_x, hint_y), browser_hint, fill='gray', font=hint_font)
         
         # Вставляем область с текстом в нижнюю часть
         new_img.paste(text_area, (0, qr_height))

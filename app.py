@@ -398,8 +398,8 @@ def add_text_below_qr(qr_img):
         # Получаем размеры QR-кода
         qr_width, qr_height = qr_img.size
         
-        # Размер текста
-        text_height = 40  # Высота области для текста
+        # Размер текста (увеличиваем высоту)
+        text_height = 60  # Увеличиваем высоту области для текста
         new_height = qr_height + text_height
         
         # Создаем новое изображение с дополнительным местом для текста
@@ -414,7 +414,7 @@ def add_text_below_qr(qr_img):
         
         # Текст
         text = "ятута.рф"
-        font_size = 20
+        font_size = 28  # Увеличиваем размер шрифта
         
         # Пытаемся использовать системный шрифт
         try:
@@ -432,12 +432,12 @@ def add_text_below_qr(qr_img):
             text_height_actual = bbox[3] - bbox[1]
         except:
             # Fallback для проблем с кодировкой
-            text_width = len(text) * 12
-            text_height_actual = 20
+            text_width = len(text) * 16  # Увеличиваем для большего шрифта
+            text_height_actual = 28
         
-        # Центрируем текст
+        # Центрируем текст и поднимаем от края
         text_x = (qr_width - text_width) // 2
-        text_y = (text_height - text_height_actual) // 2
+        text_y = (text_height - text_height_actual) // 2 - 5  # Поднимаем на 5px от центра
         
         # Рисуем текст
         try:

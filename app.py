@@ -369,8 +369,8 @@ def qr_image(user_id):
         # Создаем изображение
         img = qr.make_image(fill_color="black", back_color="white")
         
-        # Добавляем логотип в центр
-        img = add_logo_to_qr(img)
+        # Добавляем текст снизу
+        img = add_text_below_qr(img)
         
         # Конвертируем в PNG
         img_buffer = io.BytesIO()
@@ -390,94 +390,70 @@ def qr_image(user_id):
         return generate_simple_qr(qr_url)
 
 
-def add_logo_to_qr(qr_img):
-    """Добавляет логотип 'ятута.рф' в центр QR-кода"""
+def add_text_below_qr(qr_img):
+    """Добавляет текст 'ятута.рф' снизу QR-кода на белом фоне"""
     try:
+        from PIL import ImageDraw, ImageFont
+        
         # Получаем размеры QR-кода
         qr_width, qr_height = qr_img.size
         
-        # Создаем логотип (увеличиваем размер)
-        logo_size = min(qr_width, qr_height) // 3  # Логотип занимает 1/3 от размера QR-кода
+        # Размер текста
+        text_height = 40  # Высота области для текста
+        new_height = qr_height + text_height
         
-        logo_img = Image.new('RGB', (logo_size, logo_size), 'white')
+        # Создаем новое изображение с дополнительным местом для текста
+        new_img = Image.new('RGB', (qr_width, new_height), 'white')
         
-        # Создаем простой логотип с рамкой
-        from PIL import ImageDraw
+        # Копируем QR-код в верхнюю часть
+        new_img.paste(qr_img, (0, 0))
         
-        draw = ImageDraw.Draw(logo_img)
+        # Создаем область для текста
+        text_area = Image.new('RGB', (qr_width, text_height), 'white')
+        draw = ImageDraw.Draw(text_area)
         
-        # Рисуем толстую рамку
-        draw.rectangle([3, 3, logo_size-3, logo_size-3], outline='black', width=3)
+        # Текст
+        text = "ятута.рф"
+        font_size = 20
         
-        # Создаем логотип с геометрическим дизайном
-        # Рисуем центральный квадрат (больше)
-        center_size = logo_size // 2  # Увеличиваем размер
-        center_x = (logo_size - center_size) // 2
-        center_y = (logo_size - center_size) // 2
-        
-        # Основной квадрат
-        draw.rectangle([center_x, center_y, center_x + center_size, center_y + center_size], 
-                      fill='black', outline='black')
-        
-        # Добавляем внутренний квадрат
-        inner_size = center_size // 2
-        inner_x = center_x + (center_size - inner_size) // 2
-        inner_y = center_y + (center_size - inner_size) // 2
-        
-        draw.rectangle([inner_x, inner_y, inner_x + inner_size, inner_y + inner_size], 
-                      fill='white', outline='black')
-        
-        # Добавляем точки в углах для узнаваемости (больше)
-        dot_size = 6
-        # Верхний левый угол
-        draw.ellipse([center_x + 3, center_y + 3, center_x + 3 + dot_size, center_y + 3 + dot_size], fill='black')
-        # Нижний правый угол
-        draw.ellipse([center_x + center_size - dot_size - 3, center_y + center_size - dot_size - 3, 
-                     center_x + center_size - 3, center_y + center_size - 3], fill='black')
-        
-        # Добавляем текст "ятута.рф" простыми символами
+        # Пытаемся использовать системный шрифт
         try:
-            from PIL import ImageFont
-            
-            # Рисуем простой текст
-            text = "ятута.рф"
-            font_size = max(8, logo_size // 8)
-            
-            # Пытаемся использовать системный шрифт
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=font_size)
+        except:
             try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=font_size)
+                font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", size=font_size)
             except:
                 font = ImageFont.load_default()
-            
-            # Получаем размеры текста
+        
+        # Получаем размеры текста
+        try:
             bbox = draw.textbbox((0, 0), text, font=font)
             text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-            
-            # Центрируем текст
-            text_x = (logo_size - text_width) // 2
-            text_y = (logo_size - text_height) // 2
-            
-            # Рисуем текст
+            text_height_actual = bbox[3] - bbox[1]
+        except:
+            # Fallback для проблем с кодировкой
+            text_width = len(text) * 12
+            text_height_actual = 20
+        
+        # Центрируем текст
+        text_x = (qr_width - text_width) // 2
+        text_y = (text_height - text_height_actual) // 2
+        
+        # Рисуем текст
+        try:
             draw.text((text_x, text_y), text, fill='black', font=font)
-            
-        except Exception as e:
-            print(f"Ошибка добавления текста: {e}")
-            # Рисуем простой квадрат как fallback
-            draw.rectangle([logo_size//4, logo_size//4, 3*logo_size//4, 3*logo_size//4], fill='black')
+        except:
+            # Если не получается с кириллицей, рисуем простой текст
+            draw.text((text_x, text_y), "ятута.рф", fill='black', font=font)
         
-        # Вычисляем позицию для вставки логотипа (центр QR-кода)
-        logo_x = (qr_width - logo_size) // 2
-        logo_y = (qr_height - logo_size) // 2
+        # Вставляем область с текстом в нижнюю часть
+        new_img.paste(text_area, (0, qr_height))
         
-        # Вставляем логотип в QR-код
-        qr_img.paste(logo_img, (logo_x, logo_y))
-        
-        return qr_img
+        return new_img
         
     except Exception as e:
-        print(f"Ошибка добавления логотипа: {e}")
-        return qr_img  # Возвращаем оригинальный QR-код без логотипа
+        print(f"Ошибка добавления текста: {e}")
+        return qr_img  # Возвращаем оригинальный QR-код без текста
 
 
 def generate_simple_qr(url):
@@ -10039,7 +10015,7 @@ def test_qr_logo():
         qr.make(fit=True)
         
         img = qr.make_image(fill_color='black', back_color='white')
-        img = add_logo_to_qr(img)
+        img = add_text_below_qr(img)
         
         # Сохраняем в буфер
         img_buffer = io.BytesIO()

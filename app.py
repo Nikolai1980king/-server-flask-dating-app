@@ -16,7 +16,7 @@ import time
 
 app = Flask(__name__)
 app.secret_key = 'super-secret-key'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
 
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -3679,22 +3679,22 @@ def view_visitors():
                         .then(r => r.json())
                         .then(data => {
                             if (data.match_created) {
-                                btn.classList.add('liked'); // Оставляем красным при метче
+                                btn.classList.add('liked');
                                 showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
                                 setTimeout(() => location.reload(), 2000);
                             } else if (data.liked) {
                                 btn.classList.add('liked');
                                 if (data.already_liked) {
                                     // Уже лайкал - ничего не показываем
-                            } else {
+                                } else {
                                     showNotification('❤️ Лайк отправлен!', 'success');
                                 }
                             } else {
-                                // Убираем лайк (отмена лайка) - этого больше не должно происходить
                                 btn.classList.remove('liked');
                             }
                         });
                 }
+
                 function goToProfile(profileId) {
                     window.location.href = '/profile/' + profileId;
                 }
@@ -4682,8 +4682,12 @@ def toggle_like(profile_id):
     mutual_like = Like.query.filter(and_(Like.user_id == profile_id, Like.liked_id == user_id)).first()
 
     if mutual_like:
-        # Взаимный лайк - создаем метч и удаляем лайк
-        db.session.delete(mutual_like)
+        # Взаимный лайк - создаем метч и удаляем ОБА лайка
+        db.session.delete(mutual_like)  # Удаляем лайк от целевого пользователя
+        
+        # Добавляем лайк от текущего пользователя
+        new_like = Like(user_id=user_id, liked_id=profile_id)
+        db.session.add(new_like)
         db.session.commit()
 
         # Создаем метч в базе данных
@@ -4707,7 +4711,7 @@ def toggle_like(profile_id):
             add_notification(profile_id, f"✨ У вас мэтч с {user_profile.name}! Теперь вы можете общаться.")
 
         likes_count = Like.query.filter_by(liked_id=profile_id).count()
-        return jsonify({'liked': False, 'already_liked': False, 'likes_count': likes_count, 'match_created': True})
+        return jsonify({'liked': True, 'already_liked': False, 'likes_count': likes_count, 'match_created': True})
 
     # Обычный лайк
     db.session.add(Like(user_id=user_id, liked_id=profile_id))
@@ -5987,22 +5991,22 @@ def my_likes():
                         .then(r => r.json())
                         .then(data => {
                             if (data.match_created) {
-                                btn.classList.add('liked'); // Оставляем красным при метче
+                                btn.classList.add('liked');
                                 showNotification('✨ У вас мэтч! Теперь вы можете общаться!', 'success');
                                 setTimeout(() => location.reload(), 2000);
                             } else if (data.liked) {
                                 btn.classList.add('liked');
                                 if (data.already_liked) {
                                     // Уже лайкал - ничего не показываем
-                            } else {
+                                } else {
                                     showNotification('❤️ Лайк отправлен!', 'success');
                                 }
                             } else {
-                                // Убираем лайк (отмена лайка) - этого больше не должно происходить
                                 btn.classList.remove('liked');
                             }
                         });
                 }
+
                 function goToProfile(profileId) {
                     window.location.href = '/profile/' + profileId;
                 }
@@ -6844,9 +6848,11 @@ def chat(other_user_id):
                 let lastMessageCount = 0;  // Будет обновлено после загрузки истории
                 let lastMessageTimestamp = "";
 
-                // Инициализация Socket.IO
-                const socket = io();
-                socket.emit('join', {room: chat_key});
+                // Socket.IO отключен для продакшн сервера (проблемы с конфигурацией)
+                const socket = null;
+                const socketConnected = false;
+                
+                console.log('⚠️ Socket.IO отключен, используется только AJAX');
 
                 // Переменные для звука
                 let chatAudioContext = null;
@@ -6918,13 +6924,26 @@ def chat(other_user_id):
 
                 // Функция добавления сообщения
                 function addMessage(msg, sender, timestamp = null) {
-                    // Проверяем дубликаты по timestamp (более надежно)
+                    // Проверяем дубликаты по содержимому и отправителю
+                    const existingMessages = document.querySelectorAll('.message');
+                    for (let existingMsg of existingMessages) {
+                        const existingText = existingMsg.textContent.trim();
+                        const existingSender = existingMsg.classList.contains('my-message') ? user_id : 'other';
+                        const currentSender = sender === user_id ? user_id : 'other';
+                        
+                        // Если сообщение с таким же текстом и отправителем уже есть
+                        if (existingText === msg.trim() && existingSender === currentSender) {
+                            console.log('⚠️ Дубликат сообщения обнаружен, пропускаем:', msg);
+                            return;
+                        }
+                    }
+                    
+                    // Дополнительная проверка по timestamp если есть
                     if (timestamp) {
-                        const existingMessages = document.querySelectorAll('.message');
                         for (let existingMsg of existingMessages) {
                             const existingTimestamp = existingMsg.getAttribute('data-timestamp');
                             if (existingTimestamp === timestamp) {
-                                // Сообщение с таким timestamp уже есть
+                                console.log('⚠️ Дубликат по timestamp обнаружен, пропускаем:', msg);
                                 return;
                             }
                         }
@@ -6945,30 +6964,32 @@ def chat(other_user_id):
                     // Обработка десерта
                     if (msg.includes('SURPRISE_DESSERT')) {
                         div.innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <div style="font-size: 1.2em; color: #fff; margin-bottom: 15px; font-weight: bold;">
+                            <div style="text-align: center; padding: 10px;">
+                                <div style="font-size: 1em; color: #fff; margin-bottom: 8px; font-weight: bold;">
                                     🎁 Вам отправили сюрприз!
                                 </div>
                                 <div style="
                                     background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffecd2 100%);
-                                    border-radius: 20px;
-                                    padding: 30px;
-                                    box-shadow: 0 10px 40px rgba(255, 154, 158, 0.5);
+                                    border-radius: 15px;
+                                    padding: 15px 20px;
+                                    box-shadow: 0 5px 20px rgba(255, 154, 158, 0.5);
                                     animation: dessertPulse 2s ease-in-out infinite;
+                                    max-width: 280px;
+                                    margin: 0 auto;
                                 ">
-                                    <div style="font-size: 8em; line-height: 1; margin-bottom: 15px;">🍰</div>
-                                    <div style="font-size: 1.5em; color: #d63384; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);">
+                                    <div style="font-size: 4em; line-height: 0.9; margin-bottom: 10px;">🍰</div>
+                                    <div style="font-size: 1.1em; color: #d63384; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); line-height: 1.2; margin-bottom: 8px;">
                                         Вкусный десерт для вас!
                                     </div>
-                                    <div style="font-size: 1.1em; color: #666; margin-top: 15px; font-weight: 600;">
+                                    <div style="font-size: 0.9em; color: #666; font-weight: 600; line-height: 1.3;">
                                         Напишите за какой столик принести
                                     </div>
                                 </div>
                             </div>
                             <style>
                                 @keyframes dessertPulse {
-                                    0%, 100% { transform: scale(1); box-shadow: 0 10px 40px rgba(255, 154, 158, 0.5); }
-                                    50% { transform: scale(1.05); box-shadow: 0 15px 50px rgba(255, 154, 158, 0.8); }
+                                    0%, 100% { transform: scale(1); box-shadow: 0 5px 20px rgba(255, 154, 158, 0.5); }
+                                    50% { transform: scale(1.03); box-shadow: 0 8px 30px rgba(255, 154, 158, 0.7); }
                                 }
                             </style>
                         `;
@@ -6976,57 +6997,59 @@ def chat(other_user_id):
                     // Обработка шампанского
                     else if (msg.includes('SURPRISE_CHAMPAGNE')) {
                         div.innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <div style="font-size: 1.2em; color: #fff; margin-bottom: 15px; font-weight: bold;">
+                            <div style="text-align: center; padding: 10px;">
+                                <div style="font-size: 1em; color: #fff; margin-bottom: 8px; font-weight: bold;">
                                     🎁 Вам отправили сюрприз!
                                 </div>
                                 <div style="
                                     background: linear-gradient(135deg, #fff9e6 0%, #ffe5b4 30%, #ffd700 60%, #ffcc00 100%);
-                                    border-radius: 20px;
-                                    padding: 35px;
-                                    box-shadow: 0 15px 50px rgba(255, 215, 0, 0.6);
+                                    border-radius: 15px;
+                                    padding: 15px 20px;
+                                    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.6);
                                     animation: champagneBubbles 3s ease-in-out infinite;
                                     position: relative;
                                     overflow: hidden;
+                                    max-width: 280px;
+                                    margin: 0 auto;
                                 ">
-                                    <div style="font-size: 10em; line-height: 1; margin-bottom: 15px; filter: drop-shadow(0 8px 15px rgba(255,215,0,0.5));">🍾</div>
-                                    <div style="font-size: 1.8em; color: #996515; font-weight: bold; text-shadow: 3px 3px 6px rgba(255,255,255,0.5);">
+                                    <div style="font-size: 4.5em; line-height: 0.9; margin-bottom: 10px; filter: drop-shadow(0 4px 10px rgba(255,215,0,0.5));">🍾</div>
+                                    <div style="font-size: 1.2em; color: #996515; font-weight: bold; text-shadow: 2px 2px 4px rgba(255,255,255,0.5); line-height: 1.2; margin-bottom: 6px;">
                                         Шампанское!
                                     </div>
-                                    <div style="font-size: 1.2em; color: #b8860b; margin-top: 12px; font-weight: 600;">
+                                    <div style="font-size: 1em; color: #b8860b; font-weight: 600; line-height: 1.3; margin-bottom: 6px;">
                                         За ваше знакомство! 🥂✨
                                     </div>
-                                    <div style="font-size: 1.1em; color: #996515; margin-top: 15px; font-weight: 600;">
+                                    <div style="font-size: 0.9em; color: #996515; font-weight: 600; line-height: 1.3;">
                                         Напишите за какой столик принести
                                     </div>
-                                    <div style="position: absolute; top: 10px; left: 10px; font-size: 2em; animation: sparkle1 2s ease-in-out infinite;">✨</div>
-                                    <div style="position: absolute; top: 20px; right: 20px; font-size: 1.5em; animation: sparkle2 2.5s ease-in-out infinite;">💫</div>
-                                    <div style="position: absolute; bottom: 15px; left: 20px; font-size: 1.8em; animation: sparkle3 3s ease-in-out infinite;">⭐</div>
-                                    <div style="position: absolute; bottom: 20px; right: 15px; font-size: 2em; animation: sparkle1 2.2s ease-in-out infinite;">✨</div>
+                                    <div style="position: absolute; top: 8px; left: 8px; font-size: 1.2em; animation: sparkle1 2s ease-in-out infinite;">✨</div>
+                                    <div style="position: absolute; top: 8px; right: 8px; font-size: 1em; animation: sparkle2 2.5s ease-in-out infinite;">💫</div>
+                                    <div style="position: absolute; bottom: 8px; left: 8px; font-size: 1.1em; animation: sparkle3 3s ease-in-out infinite;">⭐</div>
+                                    <div style="position: absolute; bottom: 8px; right: 8px; font-size: 1.2em; animation: sparkle1 2.2s ease-in-out infinite;">✨</div>
                                 </div>
                             </div>
                             <style>
                                 @keyframes champagneBubbles {
                                     0%, 100% { 
                                         transform: scale(1); 
-                                        box-shadow: 0 15px 50px rgba(255, 215, 0, 0.6);
+                                        box-shadow: 0 8px 25px rgba(255, 215, 0, 0.6);
                                     }
                                     50% { 
                                         transform: scale(1.03); 
-                                        box-shadow: 0 20px 60px rgba(255, 215, 0, 0.9), 0 0 30px rgba(255, 255, 255, 0.5);
+                                        box-shadow: 0 12px 35px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
                                     }
                                 }
                                 @keyframes sparkle1 {
                                     0%, 100% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
-                                    50% { opacity: 1; transform: scale(1.2) rotate(180deg); }
+                                    50% { opacity: 1; transform: scale(1.1) rotate(180deg); }
                                 }
                                 @keyframes sparkle2 {
                                     0%, 100% { opacity: 0.4; transform: translateY(0) scale(0.9); }
-                                    50% { opacity: 1; transform: translateY(-10px) scale(1.1); }
+                                    50% { opacity: 1; transform: translateY(-5px) scale(1); }
                                 }
                                 @keyframes sparkle3 {
                                     0%, 100% { opacity: 0.5; transform: rotate(0deg) scale(1); }
-                                    50% { opacity: 1; transform: rotate(360deg) scale(1.3); }
+                                    50% { opacity: 1; transform: rotate(360deg) scale(1.2); }
                                 }
                             </style>
                         `;
@@ -7035,73 +7058,74 @@ def chat(other_user_id):
                     else if (msg.includes('SURPRISE_JOKE')) {
                         const jokeText = msg.replace('😄 SURPRISE_JOKE', '').trim();
                         div.innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <div style="font-size: 1.3em; color: #fff; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5);">
+                            <div style="text-align: center; padding: 10px;">
+                                <div style="font-size: 1em; color: #fff; margin-bottom: 8px; font-weight: bold; text-shadow: 0 0 8px rgba(255,255,255,0.5);">
                                     🎁 Вам отправили сюрприз!
                                 </div>
                                 <div style="
                                     background: linear-gradient(135deg, #667eea 0%, #764ba2 35%, #f093fb 70%, #f5576c 100%);
-                                    border-radius: 25px;
-                                    padding: 35px 30px;
-                                    box-shadow: 0 15px 50px rgba(102, 126, 234, 0.6);
+                                    border-radius: 15px;
+                                    padding: 15px;
+                                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
                                     animation: jokePulse 4s ease-in-out infinite;
                                     position: relative;
                                     overflow: hidden;
+                                    max-width: 300px;
+                                    margin: 0 auto;
                                 ">
-                                    <div style="position: absolute; top: -50px; left: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%); border-radius: 50%; animation: shimmer1 3s ease-in-out infinite;"></div>
-                                    <div style="position: absolute; bottom: -30px; right: -30px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); border-radius: 50%; animation: shimmer2 4s ease-in-out infinite;"></div>
+                                    <div style="position: absolute; top: -30px; left: -30px; width: 80px; height: 80px; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%); border-radius: 50%; animation: shimmer1 3s ease-in-out infinite;"></div>
+                                    <div style="position: absolute; bottom: -20px; right: -20px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); border-radius: 50%; animation: shimmer2 4s ease-in-out infinite;"></div>
                                     
-                                    <div style="font-size: 5em; margin-bottom: 20px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3)); animation: laughBounce 2s ease-in-out infinite;">😄</div>
-                                    <div style="font-size: 1.5em; color: #fff; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3);">
+                                    <div style="font-size: 3em; margin-bottom: 10px; filter: drop-shadow(0 3px 10px rgba(0,0,0,0.3)); animation: laughBounce 2s ease-in-out infinite; line-height: 0.9;">😄</div>
+                                    <div style="font-size: 1.2em; color: #fff; font-weight: bold; margin-bottom: 10px; text-shadow: 1px 1px 4px rgba(0,0,0,0.3); line-height: 1.2;">
                                         Держите анекдот!
                                     </div>
                                     <div style="
                                         background: rgba(255, 255, 255, 0.95);
-                                        border-radius: 15px;
-                                        padding: 25px;
-                                        font-size: 1.15em;
+                                        border-radius: 10px;
+                                        padding: 12px;
+                                        font-size: 0.95em;
                                         color: #333;
-                                        line-height: 1.7;
+                                        line-height: 1.4;
                                         white-space: pre-line;
                                         text-align: left;
-                                        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                                        box-shadow: 0 3px 12px rgba(0,0,0,0.2);
                                         font-weight: 500;
                                         position: relative;
                                         z-index: 1;
                                     ">
                                         ${jokeText}
                                     </div>
-                                    <div style="font-size: 3em; margin-top: 20px; animation: laughRotate 3s ease-in-out infinite;">🤣</div>
+                                    <div style="font-size: 1.8em; margin-top: 10px; animation: laughRotate 3s ease-in-out infinite; line-height: 0.9;">🤣</div>
                                 </div>
                             </div>
                             <style>
                                 @keyframes jokePulse {
                                     0%, 100% { 
                                         transform: scale(1); 
-                                        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.6);
+                                        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
                                     }
                                     50% { 
                                         transform: scale(1.02); 
-                                        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.9), 0 0 40px rgba(245, 87, 108, 0.5);
+                                        box-shadow: 0 12px 35px rgba(102, 126, 234, 0.8), 0 0 25px rgba(245, 87, 108, 0.4);
                                     }
                                 }
                                 @keyframes laughBounce {
                                     0%, 100% { transform: translateY(0) scale(1); }
-                                    25% { transform: translateY(-10px) scale(1.1); }
-                                    75% { transform: translateY(-5px) scale(1.05); }
+                                    25% { transform: translateY(-6px) scale(1.08); }
+                                    75% { transform: translateY(-3px) scale(1.04); }
                                 }
                                 @keyframes laughRotate {
-                                    0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.8; }
-                                    25% { transform: rotate(-15deg) scale(1.2); opacity: 1; }
-                                    75% { transform: rotate(15deg) scale(1.2); opacity: 1; }
+                                    0%, 100% { transform: rotate(-10deg) scale(1); }
+                                    50% { transform: rotate(10deg) scale(1.08); }
                                 }
                                 @keyframes shimmer1 {
                                     0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-                                    50% { transform: translate(20px, 20px) scale(1.2); opacity: 0.6; }
+                                    50% { transform: translate(15px, 15px) scale(1.15); opacity: 0.5; }
                                 }
                                 @keyframes shimmer2 {
                                     0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.2; }
-                                    50% { transform: translate(-15px, -15px) scale(1.3); opacity: 0.5; }
+                                    50% { transform: translate(-10px, -10px) scale(1.2); opacity: 0.4; }
                                 }
                             </style>
                         `;
@@ -7284,33 +7308,8 @@ def chat(other_user_id):
                         });
                 }
 
-                // Socket.IO обработчики
-                socket.on('message', function(data) {
-                    addMessage(data.text, data.sender);
-                    // Обновляем счетчик только для сообщений от собеседника
-                    if (data.sender !== user_id) {
-                        lastMessageCount++;
-                        // Автоматически отмечаем сообщение как прочитанное
-                        markMessagesAsRead(other_user_id);
-                        // Звук теперь воспроизводится только при обновлении счетчиков в навигации
-                    }
-                });
-
-                socket.on('connect', function() {
-                    console.log('✅ Socket.IO подключен');
-                });
-
-                socket.on('disconnect', function() {
-                    console.log('❌ Socket.IO отключен, переключаемся на AJAX');
-                });
-
-                socket.on('connect_error', function(error) {
-                    console.error('❌ Ошибка подключения Socket.IO:', error);
-                });
-
-                socket.on('error', function(error) {
-                    console.error('❌ Ошибка Socket.IO:', error);
-                });
+                // Socket.IO обработчики отключены для продакшн
+                console.log('⚠️ Socket.IO обработчики отключены, используется только AJAX');
 
                 // Обработчик отправки сообщения
                 document.getElementById('chat-form').onsubmit = function(e) {
@@ -7318,13 +7317,32 @@ def chat(other_user_id):
                     const input = document.getElementById('message-input');
                     const msg = input.value;
                     if (msg.trim()) {
-                        console.log('📤 Отправка сообщения через Socket.IO...');
-
-                        // Отправляем через Socket.IO
-                        socket.emit('send_message', {room: chat_key, text: msg, sender: user_id});
-
-                        // Добавляем сообщение локально для мгновенного отображения
-                        addMessage(msg, user_id);
+                        if (socketConnected) {
+                            console.log('📤 Отправка сообщения через Socket.IO...');
+                            socket.emit('send_message', {room: chat_key, text: msg, sender: user_id});
+                        } else {
+                            console.log('📤 Отправка сообщения через AJAX (Socket.IO недоступен)...');
+                            // Fallback на AJAX
+                            fetch('/chat/' + other_user_id, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                },
+                                body: 'message=' + encodeURIComponent(msg)
+                            })
+                            .then(response => {
+                                if (response.ok) {
+                                    console.log('✅ Сообщение отправлено через AJAX');
+                                    // Добавляем сообщение локально
+                                    addMessage(msg, user_id);
+                                } else {
+                                    console.error('❌ Ошибка отправки через AJAX');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('❌ Ошибка AJAX:', error);
+                            });
+                        }
 
                         // Очищаем поле ввода
                         input.value = '';
@@ -7337,26 +7355,14 @@ def chat(other_user_id):
                 let typingTimer;
                 const typingIndicator = document.getElementById('typing-indicator');
 
+                // Socket.IO typing отключен для продакшн
                 document.getElementById('message-input').addEventListener('input', function() {
-                    if (this.value.trim()) {
-                        socket.emit('typing', {room: chat_key, user: user_id, isTyping: true});
-
-                        clearTimeout(typingTimer);
-                        typingTimer = setTimeout(() => {
-                            socket.emit('typing', {room: chat_key, user: user_id, isTyping: false});
-                        }, 1000);
-                    }
+                    // Typing индикатор отключен (Socket.IO не работает)
+                    console.log('⚠️ Typing индикатор отключен');
                 });
 
-                socket.on('user_typing', function(data) {
-                    if (data.user !== user_id) {
-                        if (data.isTyping) {
-                            typingIndicator.classList.add('show');
-                        } else {
-                            typingIndicator.classList.remove('show');
-                        }
-                    }
-                });
+                // Socket.IO typing обработчик отключен
+                console.log('⚠️ Socket.IO typing отключен');
 
                 // Загружаем ВСЕ сообщения при открытии страницы через JavaScript
                 // Это нужно для правильной обработки маркеров сюрпризов
@@ -8896,10 +8902,28 @@ def yookassa_webhook():
 
         if event == 'payment.succeeded' and payment_id:
             print(f"✅ Webhook: платеж {payment_id} успешен")
+            
+            # Находим пользователя по payment_id
+            payment = Payment.query.filter_by(yookassa_payment_id=payment_id).first()
+            if not payment:
+                print(f"❌ Webhook: платеж {payment_id} не найден в базе данных")
+                return jsonify({'status': 'error', 'message': 'Платеж не найден'}), 404
+            
+            user_id = payment.user_id
+            print(f"✅ Webhook: найден пользователь {user_id} для платежа {payment_id}")
+            
             process_payment_completion(user_id, payment_id, 'succeeded')
             return jsonify({'status': 'success'})
         elif event == 'payment.canceled' and payment_id:
             print(f"⚠️ Webhook: платеж {payment_id} отменен")
+            
+            # Находим пользователя по payment_id
+            payment = Payment.query.filter_by(yookassa_payment_id=payment_id).first()
+            if payment:
+                user_id = payment.user_id
+                print(f"✅ Webhook: найден пользователь {user_id} для отмененного платежа {payment_id}")
+                process_payment_completion(user_id, payment_id, 'canceled')
+            
             return jsonify({'status': 'success'})
         else:
             print(f"ℹ️ Webhook: неизвестное событие {event}")

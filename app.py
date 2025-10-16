@@ -15,6 +15,8 @@ import threading
 import time
 import base64
 import io
+import qrcode
+from PIL import Image
 
 app = Flask(__name__)
 app.secret_key = 'super-secret-key'
@@ -337,10 +339,69 @@ def get_user_qr_url(user_id):
 
 
 def generate_qr_code_server_side(user_id):
-    """Генерирует QR-код на сервере через Google Charts API"""
-    qr_url = get_user_qr_url(user_id)
-    google_qr_url = f"https://chart.googleapis.com/chart?chs=200x200&chld=L|0&cht=qr&chl={qr_url}"
-    return google_qr_url
+    """Генерирует QR-код на сервере через наш endpoint"""
+    base_url = request.url_root.rstrip('/')
+    return f"{base_url}/qr-image/{user_id}"
+
+
+@app.route('/qr-image/<string:user_id>')
+def qr_image(user_id):
+    """Endpoint для генерации QR-кода изображения"""
+    try:
+        # Проверяем, существует ли пользователь
+        profile = Profile.query.get(user_id)
+        if not profile:
+            return "Пользователь не найден", 404
+        
+        # Создаем URL для QR-кода
+        qr_url = get_user_qr_url(user_id)
+        
+        # Генерируем QR-код локально
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_url)
+        qr.make(fit=True)
+        
+        # Создаем изображение
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Конвертируем в PNG
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        # Возвращаем изображение
+        return make_response(img_buffer.getvalue(), 200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'public, max-age=3600'  # Кешируем на час
+        })
+            
+    except Exception as e:
+        print(f"Ошибка генерации QR-кода: {e}")
+        # Возвращаем простой QR-код в случае ошибки
+        qr_url = get_user_qr_url(user_id)
+        return generate_simple_qr(qr_url)
+
+
+def generate_simple_qr(url):
+    """Генерирует простой QR-код в случае ошибки"""
+    # Создаем простой SVG QR-код
+    svg_content = f'''
+    <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="200" fill="white"/>
+        <text x="100" y="100" text-anchor="middle" font-family="Arial" font-size="12" fill="black">
+            QR-код недоступен
+        </text>
+        <text x="100" y="120" text-anchor="middle" font-family="Arial" font-size="8" fill="gray">
+            Используйте ссылку
+        </text>
+    </svg>
+    '''
+    return make_response(svg_content, 200, {'Content-Type': 'image/svg+xml'})
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids

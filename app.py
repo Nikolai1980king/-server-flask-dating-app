@@ -13,6 +13,8 @@ from functools import wraps
 import requests
 import threading
 import time
+import base64
+import io
 
 app = Flask(__name__)
 app.secret_key = 'super-secret-key'
@@ -329,7 +331,16 @@ def cleanup_expired_qr_tokens():
 
 def get_user_qr_url(user_id):
     """Генерирует постоянный QR-код URL для пользователя"""
-    return f"https://ятута.рф/qr-login/{user_id}"
+    # Получаем домен из запроса
+    base_url = request.url_root.rstrip('/')
+    return f"{base_url}/qr-login/{user_id}"
+
+
+def generate_qr_code_server_side(user_id):
+    """Генерирует QR-код на сервере через Google Charts API"""
+    qr_url = get_user_qr_url(user_id)
+    google_qr_url = f"https://chart.googleapis.com/chart?chs=200x200&chld=L|0&cht=qr&chl={qr_url}"
+    return google_qr_url
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
@@ -8148,6 +8159,10 @@ def settings():
     navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
+    
+    # Генерируем QR-код на сервере
+    qr_code_url = generate_qr_code_server_side(user_id) if user_id else None
+    qr_login_url = get_user_qr_url(user_id) if user_id else None
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -8235,9 +8250,19 @@ def settings():
                     <button class="bell-button" onclick="toggleQR()" style="background: #3498db;">📱</button>
                 </div>
                 <div id="qr-container" style="display: none; text-align: center; margin-top: 20px;">
-                    <div id="qr-code" style="width: 200px; height: 200px; margin: 0 auto; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 2em;"></div>
+                    <div id="qr-code" style="width: 200px; height: 200px; margin: 0 auto; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 2em;">
+                        {% if qr_code_url %}
+                        <img src="{{ qr_code_url }}" alt="QR Code" style="width: 200px; height: 200px; border-radius: 10px;">
+                        {% else %}
+                        🔄 Загрузка QR-кода...
+                        {% endif %}
+                    </div>
                     <div id="qr-url" style="margin-top: 15px; color: #ccc; font-size: 0.9em; word-break: break-all; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                        {% if qr_login_url %}
+                        <a href="{{ qr_login_url }}" target="_blank" style="color: #3498db;">{{ qr_login_url }}</a>
+                        {% else %}
                         Ссылка для входа появится здесь
+                        {% endif %}
                     </div>
                     <div style="margin-top: 15px; color: #ccc; font-size: 0.9em;">
                         Отсканируйте QR-код камерой телефона или откройте ссылку на другом устройстве
@@ -8245,12 +8270,10 @@ def settings():
                 </div>
             </div>
 
-            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
             <script>
                 let audioContext = null;
                 let userInteracted = false;
                 let soundEnabled = true;
-                let qrGenerated = false;
 
                 // Загружаем настройки при загрузке страницы
                 window.addEventListener('load', function() {
@@ -8381,93 +8404,18 @@ def settings():
                 // Функция для переключения QR-кода
                 function toggleQR() {
                     const qrContainer = document.getElementById('qr-container');
-                    const qrCode = document.getElementById('qr-code');
                     
                     if (qrContainer.style.display === 'none') {
                         qrContainer.style.display = 'block';
-                        
-                        if (!qrGenerated) {
-                            generateQRCode();
-                        }
                     } else {
                         qrContainer.style.display = 'none';
                     }
                 }
 
-                // Функция генерации QR-кода
-                function generateQRCode() {
-                    const qrCodeElement = document.getElementById('qr-code');
-                    const qrUrlElement = document.getElementById('qr-url');
-                    qrCodeElement.innerHTML = '🔄 Генерируем QR-код...';
-                    
-                    // Получаем user_id из cookie
-                    const userId = getCookie('user_id');
-                    if (!userId) {
-                        qrCodeElement.innerHTML = '❌ Ошибка: пользователь не найден';
-                        return;
-                    }
-                    
-                    // Создаем URL для QR-кода
-                    const qrUrl = `https://ятута.рф/qr-login/${userId}`;
-                    console.log('🔗 QR URL:', qrUrl);
-                    
-                    // Показываем ссылку
-                    qrUrlElement.innerHTML = `<a href="${qrUrl}" target="_blank" style="color: #3498db;">${qrUrl}</a>`;
-                    
-                    // Проверяем, загружена ли библиотека QRCode
-                    if (typeof QRCode === 'undefined') {
-                        qrCodeElement.innerHTML = '📱 QR-код недоступен<br><small>Используйте ссылку выше</small>';
-                        console.error('❌ QRCode library not loaded');
-                        return;
-                    }
-                    
-                    // Генерируем QR-код
-                    try {
-                        QRCode.toCanvas(qrCodeElement, qrUrl, {
-                            width: 200,
-                            height: 200,
-                            color: {
-                                dark: '#000000',
-                                light: '#FFFFFF'
-                            }
-                        }, function (error) {
-                            if (error) {
-                                console.error('Ошибка генерации QR-кода:', error);
-                                // Пробуем альтернативный способ
-                                generateQRAlternative(qrUrl, qrCodeElement);
-                            } else {
-                                console.log('✅ QR-код сгенерирован');
-                                qrGenerated = true;
-                            }
-                        });
-                    } catch (error) {
-                        console.error('Ошибка при генерации QR-кода:', error);
-                        // Пробуем альтернативный способ
-                        generateQRAlternative(qrUrl, qrCodeElement);
-                    }
-                }
-
-                // Альтернативная функция генерации QR-кода
-                function generateQRAlternative(url, element) {
-                    // Используем Google Charts API как резервный вариант
-                    const qrImageUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=L|0&cht=qr&chl=${encodeURIComponent(url)}`;
-                    
-                    element.innerHTML = `<img src="${qrImageUrl}" alt="QR Code" style="width: 200px; height: 200px; border-radius: 10px;">`;
-                    console.log('✅ QR-код сгенерирован через Google Charts API');
-                    qrGenerated = true;
-                }
-
-                // Функция для получения cookie
-                function getCookie(name) {
-                    const value = `; ${document.cookie}`;
-                    const parts = value.split(`; ${name}=`);
-                    if (parts.length === 2) return parts.pop().split(';').shift();
-                    return null;
-                }
             </script>
         </body>
         </html>
-    ''', navbar=navbar, get_starry_night_css=get_starry_night_css)
+    ''', navbar=navbar, get_starry_night_css=get_starry_night_css, qr_code_url=qr_code_url, qr_login_url=qr_login_url)
 
 
 def cleanup_expired_profiles():

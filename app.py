@@ -8235,7 +8235,10 @@ def settings():
                     <button class="bell-button" onclick="toggleQR()" style="background: #3498db;">📱</button>
                 </div>
                 <div id="qr-container" style="display: none; text-align: center; margin-top: 20px;">
-                    <div id="qr-code" style="width: 200px; height: 200px; margin: 0 auto; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center;"></div>
+                    <div id="qr-code" style="width: 200px; height: 200px; margin: 0 auto; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 2em;"></div>
+                    <div id="qr-url" style="margin-top: 15px; color: #ccc; font-size: 0.9em; word-break: break-all; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                        Ссылка для входа появится здесь
+                    </div>
                     <div style="margin-top: 15px; color: #ccc; font-size: 0.9em;">
                         Отсканируйте QR-код камерой телефона или откройте ссылку на другом устройстве
                     </div>
@@ -8394,7 +8397,8 @@ def settings():
                 // Функция генерации QR-кода
                 function generateQRCode() {
                     const qrCodeElement = document.getElementById('qr-code');
-                    qrCodeElement.innerHTML = '';
+                    const qrUrlElement = document.getElementById('qr-url');
+                    qrCodeElement.innerHTML = '🔄 Генерируем QR-код...';
                     
                     // Получаем user_id из cookie
                     const userId = getCookie('user_id');
@@ -8405,24 +8409,52 @@ def settings():
                     
                     // Создаем URL для QR-кода
                     const qrUrl = `https://ятута.рф/qr-login/${userId}`;
+                    console.log('🔗 QR URL:', qrUrl);
+                    
+                    // Показываем ссылку
+                    qrUrlElement.innerHTML = `<a href="${qrUrl}" target="_blank" style="color: #3498db;">${qrUrl}</a>`;
+                    
+                    // Проверяем, загружена ли библиотека QRCode
+                    if (typeof QRCode === 'undefined') {
+                        qrCodeElement.innerHTML = '📱 QR-код недоступен<br><small>Используйте ссылку выше</small>';
+                        console.error('❌ QRCode library not loaded');
+                        return;
+                    }
                     
                     // Генерируем QR-код
-                    QRCode.toCanvas(qrCodeElement, qrUrl, {
-                        width: 200,
-                        height: 200,
-                        color: {
-                            dark: '#000000',
-                            light: '#FFFFFF'
-                        }
-                    }, function (error) {
-                        if (error) {
-                            console.error('Ошибка генерации QR-кода:', error);
-                            qrCodeElement.innerHTML = '❌ Ошибка QR-кода';
-                        } else {
-                            console.log('✅ QR-код сгенерирован');
-                            qrGenerated = true;
-                        }
-                    });
+                    try {
+                        QRCode.toCanvas(qrCodeElement, qrUrl, {
+                            width: 200,
+                            height: 200,
+                            color: {
+                                dark: '#000000',
+                                light: '#FFFFFF'
+                            }
+                        }, function (error) {
+                            if (error) {
+                                console.error('Ошибка генерации QR-кода:', error);
+                                // Пробуем альтернативный способ
+                                generateQRAlternative(qrUrl, qrCodeElement);
+                            } else {
+                                console.log('✅ QR-код сгенерирован');
+                                qrGenerated = true;
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Ошибка при генерации QR-кода:', error);
+                        // Пробуем альтернативный способ
+                        generateQRAlternative(qrUrl, qrCodeElement);
+                    }
+                }
+
+                // Альтернативная функция генерации QR-кода
+                function generateQRAlternative(url, element) {
+                    // Используем Google Charts API как резервный вариант
+                    const qrImageUrl = `https://chart.googleapis.com/chart?chs=200x200&chld=L|0&cht=qr&chl=${encodeURIComponent(url)}`;
+                    
+                    element.innerHTML = `<img src="${qrImageUrl}" alt="QR Code" style="width: 200px; height: 200px; border-radius: 10px;">`;
+                    console.log('✅ QR-код сгенерирован через Google Charts API');
+                    qrGenerated = true;
                 }
 
                 // Функция для получения cookie

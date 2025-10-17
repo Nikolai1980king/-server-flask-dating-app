@@ -331,19 +331,24 @@ def cleanup_expired_qr_tokens():
     return len(expired_tokens)
 
 
+def generate_google_search_url(query):
+    """Генерирует URL для поиска в Google"""
+    import urllib.parse
+    encoded_query = urllib.parse.quote_plus(query)
+    return f"https://www.google.com/search?q={encoded_query}"
+
 def get_user_qr_url(user_id):
-    """Генерирует постоянный QR-код URL для пользователя"""
-    # Получаем домен из запроса
-    base_url = request.url_root.rstrip('/')
-    return f"{base_url}/qr-login/{user_id}"
+    """Генерирует QR-код URL, который ведет на главную страницу ятута.рф"""
+    # Используем Punycode для лучшей совместимости с QR-сканерами
+    return "https://xn--80a9aad2d.xn--p1ai"
 
 
 def generate_qr_code_server_side(user_id):
     """Генерирует QR-код на сервере через наш endpoint"""
     import time
-    base_url = request.url_root.rstrip('/')
+    # Генерируем изображение QR-кода через наш endpoint
     timestamp = int(time.time())  # Добавляем timestamp для принудительного обновления
-    return f"{base_url}/qr-image/{user_id}?v={timestamp}"
+    return f"https://ятута.рф/qr-image/{user_id}?v={timestamp}"
 
 
 @app.route('/qr-image/<string:user_id>')
@@ -416,9 +421,9 @@ def add_text_below_qr(qr_img):
         
         # Текст
         text = "ятута.рф"
-        font_size = 28  # Увеличиваем размер шрифта
+        font_size = 28  # Возвращаем размер для короткого текста
         
-        # Добавляем подсказку о браузере
+        # Добавляем подсказку
         browser_hint = "Откройте в Chrome"
         hint_font_size = 12
         
@@ -8407,13 +8412,7 @@ def settings():
                         🔄 Загрузка QR-кода...
                         {% endif %}
                     </div>
-                    <div id="qr-url" style="margin-top: 15px; color: #ccc; font-size: 0.9em; word-break: break-all; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
-                        {% if qr_login_url %}
-                        <a href="{{ qr_login_url }}" target="_blank" style="color: #3498db;">{{ qr_login_url }}</a>
-                        {% else %}
-                        Ссылка для входа появится здесь
-                        {% endif %}
-                    </div>
+                    <!-- URL ссылка скрыта по запросу пользователя -->
                     <div style="margin-top: 15px; color: #ccc; font-size: 0.9em;">
                         Отсканируйте QR-код камерой телефона или откройте ссылку на другом устройстве
                     </div>
@@ -8850,7 +8849,8 @@ def qr_login_generator():
             
             <div class="qr-container" id="qrContainer" style="display: none;">
                 <div class="qr-code" id="qrCode"></div>
-                <div class="qr-url" id="qrUrl"></div>
+                <!-- URL ссылка скрыта по запросу пользователя -->
+                <!-- <div class="qr-url" id="qrUrl"></div> -->
                 <div class="timer" id="timer">⏰ Осталось: <span id="timeLeft">10:00</span></div>
             </div>
             
@@ -8903,8 +8903,8 @@ def qr_login_generator():
                                 }
                             });
                             
-                            // Показываем URL
-                            document.getElementById('qrUrl').textContent = qrUrl;
+                            // URL скрыт по запросу пользователя
+                            // document.getElementById('qrUrl').textContent = qrUrl;
                             
                             // Запускаем таймер
                             startCountdown(10 * 60); // 10 минут

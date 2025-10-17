@@ -168,6 +168,23 @@ def get_starry_night_css():
             0% { opacity: 0.3; }
             100% { opacity: 1; }
         }
+        
+        /* Стили для черно-белого режима */
+        .grayscale-mode {
+            filter: grayscale(100%);
+            -webkit-filter: grayscale(100%);
+            -moz-filter: grayscale(100%);
+            -ms-filter: grayscale(100%);
+            -o-filter: grayscale(100%);
+        }
+        
+        .grayscale-mode * {
+            filter: grayscale(100%);
+            -webkit-filter: grayscale(100%);
+            -moz-filter: grayscale(100%);
+            -ms-filter: grayscale(100%);
+            -o-filter: grayscale(100%);
+        }
     '''
 
 
@@ -303,10 +320,10 @@ def generate_qr_login_token(user_id):
     """Генерирует токен для QR-код входа"""
     token = str(uuid.uuid4())
     expires_at = datetime.utcnow() + timedelta(minutes=10)  # Токен действует 10 минут
-    
+
     # Удаляем старые токены этого пользователя
     QRLoginToken.query.filter_by(user_id=user_id).delete()
-    
+
     # Создаем новый токен
     qr_token = QRLoginToken(
         token=token,
@@ -315,7 +332,7 @@ def generate_qr_login_token(user_id):
     )
     db.session.add(qr_token)
     db.session.commit()
-    
+
     return token
 
 
@@ -323,10 +340,10 @@ def cleanup_expired_qr_tokens():
     """Очищает просроченные QR-токены"""
     current_time = datetime.utcnow()
     expired_tokens = QRLoginToken.query.filter(QRLoginToken.expires_at < current_time).all()
-    
+
     for token in expired_tokens:
         db.session.delete(token)
-    
+
     db.session.commit()
     return len(expired_tokens)
 
@@ -336,6 +353,7 @@ def generate_google_search_url(query):
     import urllib.parse
     encoded_query = urllib.parse.quote_plus(query)
     return f"https://www.google.com/search?q={encoded_query}"
+
 
 def get_user_qr_url(user_id):
     """Генерирует QR-код URL, который ведет на главную страницу ятута.рф"""
@@ -359,10 +377,10 @@ def qr_image(user_id):
         profile = Profile.query.get(user_id)
         if not profile:
             return "Пользователь не найден", 404
-        
+
         # Создаем URL для QR-кода
         qr_url = get_user_qr_url(user_id)
-        
+
         # Генерируем QR-код локально
         qr = qrcode.QRCode(
             version=1,
@@ -372,24 +390,24 @@ def qr_image(user_id):
         )
         qr.add_data(qr_url)
         qr.make(fit=True)
-        
+
         # Создаем изображение
         img = qr.make_image(fill_color="black", back_color="white")
-        
+
         # Добавляем текст снизу
         img = add_text_below_qr(img)
-        
+
         # Конвертируем в PNG
         img_buffer = io.BytesIO()
         img.save(img_buffer, format='PNG')
         img_buffer.seek(0)
-        
+
         # Возвращаем изображение
         return make_response(img_buffer.getvalue(), 200, {
             'Content-Type': 'image/png',
             'Cache-Control': 'no-cache, no-store, must-revalidate'  # Отключаем кеширование
         })
-            
+
     except Exception as e:
         print(f"Ошибка генерации QR-кода: {e}")
         # Возвращаем простой QR-код в случае ошибки
@@ -401,32 +419,32 @@ def add_text_below_qr(qr_img):
     """Добавляет текст 'ятута.рф' снизу QR-кода на белом фоне"""
     try:
         from PIL import ImageDraw, ImageFont
-        
+
         # Получаем размеры QR-кода
         qr_width, qr_height = qr_img.size
-        
+
         # Размер текста (увеличиваем высоту)
         text_height = 60  # Увеличиваем высоту области для текста
         new_height = qr_height + text_height
-        
+
         # Создаем новое изображение с дополнительным местом для текста
         new_img = Image.new('RGB', (qr_width, new_height), 'white')
-        
+
         # Копируем QR-код в верхнюю часть
         new_img.paste(qr_img, (0, 0))
-        
+
         # Создаем область для текста
         text_area = Image.new('RGB', (qr_width, text_height), 'white')
         draw = ImageDraw.Draw(text_area)
-        
+
         # Текст
         text = "ятута.рф"
         font_size = 28  # Возвращаем размер для короткого текста
-        
+
         # Добавляем подсказку
         browser_hint = "Откройте в Chrome"
         hint_font_size = 12
-        
+
         # Пытаемся использовать системный шрифт
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=font_size)
@@ -435,7 +453,7 @@ def add_text_below_qr(qr_img):
                 font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", size=font_size)
             except:
                 font = ImageFont.load_default()
-        
+
         # Получаем размеры текста
         try:
             bbox = draw.textbbox((0, 0), text, font=font)
@@ -445,37 +463,37 @@ def add_text_below_qr(qr_img):
             # Fallback для проблем с кодировкой
             text_width = len(text) * 16  # Увеличиваем для большего шрифта
             text_height_actual = 28
-        
+
         # Смещаем текст вправо и поднимаем от края
-        text_x = (qr_width - text_width) // 2   # Смещаем на 0px вправо
+        text_x = (qr_width - text_width) // 2  # Смещаем на 0px вправо
         text_y = (text_height - text_height_actual) // 2 - 20  # Поднимаем на 20px от центра
-        
+
         print(f"🔧 Отладка: text_x={text_x}, text_y={text_y}, text_width={text_width}")
-        
+
         # Рисуем основной текст
         try:
             draw.text((text_x, text_y), text, fill='black', font=font)
         except:
             # Если не получается с кириллицей, рисуем простой текст
             draw.text((text_x, text_y), "ятута.рф", fill='black', font=font)
-        
+
         # Рисуем подсказку о браузере
         try:
             hint_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size=hint_font_size)
         except:
             hint_font = ImageFont.load_default()
-        
+
         # Позиция подсказки (под основным текстом)
         hint_y = text_y + 35
         hint_x = (qr_width - len(browser_hint) * 6) // 2  # Примерное центрирование
-        
+
         draw.text((hint_x, hint_y), browser_hint, fill='gray', font=hint_font)
-        
+
         # Вставляем область с текстом в нижнюю часть
         new_img.paste(text_area, (0, qr_height))
-        
+
         return new_img
-        
+
     except Exception as e:
         print(f"Ошибка добавления текста: {e}")
         return qr_img  # Возвращаем оригинальный QR-код без текста
@@ -496,6 +514,7 @@ def generate_simple_qr(url):
     </svg>
     '''
     return make_response(svg_content, 200, {'Content-Type': 'image/svg+xml'})
+
 
 read_likes = defaultdict(set)  # user_id -> set(profile_id)
 new_matches = defaultdict(set)  # user_id -> set of new matched user_ids
@@ -1057,6 +1076,57 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
                 }
             });
     }, 5000);
+
+    // Глобальная функция для применения черно-белого режима
+    function applyGlobalGrayscaleMode() {
+        // Проверяем, есть ли user_id в cookie
+        const userId = document.cookie.split('; ').find(row => row.startsWith('user_id='));
+        if (!userId) {
+            console.log('🔍 Пользователь не авторизован, черно-белый режим не применяется');
+            return;
+        }
+
+        // Загружаем настройки пользователя
+        fetch('/api/get_settings')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(settings => {
+                console.log('📋 Настройки черно-белого режима загружены:', settings);
+                if (settings.grayscale_mode === true || settings.grayscale_mode === 1) {
+                    document.body.classList.add('grayscale-mode');
+                    console.log('⚫ Черно-белый режим включен');
+                } else {
+                    document.body.classList.remove('grayscale-mode');
+                    console.log('⚪ Черно-белый режим выключен');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Ошибка загрузки настроек черно-белого режима:', error);
+            });
+    }
+
+    // Применяем черно-белый режим при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        // Добавляем небольшую задержку для полной загрузки
+        setTimeout(applyGlobalGrayscaleMode, 100);
+    });
+
+    // Применяем черно-белый режим при загрузке страницы (fallback)
+    window.addEventListener('load', function() {
+        // Добавляем небольшую задержку для полной загрузки
+        setTimeout(applyGlobalGrayscaleMode, 200);
+    });
+
+    // Применяем черно-белый режим при изменении видимости страницы
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            setTimeout(applyGlobalGrayscaleMode, 50);
+        }
+    });
     </script>
     ''', active=active, unread_messages=unread_messages, unread_likes=unread_likes, unread_matches=unread_matches,
                                   avatar_html=avatar_html)
@@ -1247,32 +1317,32 @@ def api_send_surprise():
         # Определяем текст и тип сообщения в зависимости от типа сюрприза
         if surprise_type == 'dessert':
             message_text = "🍰 SURPRISE_DESSERT"  # Специальный маркер для фронтенда
-            
+
         elif surprise_type == 'champagne':
             message_text = "🍾 SURPRISE_CHAMPAGNE"  # Специальный маркер для фронтенда
-            
+
         elif surprise_type == 'puzzle':
             # Получаем список уже отправленных головоломок этому получателю
             sent_puzzles = SentPuzzle.query.filter_by(
-                sender_id=user_id, 
+                sender_id=user_id,
                 receiver_id=receiver_id
             ).all()
             sent_puzzle_ids = [sp.puzzle_id for sp in sent_puzzles]
-            
+
             # Находим доступные головоломки (не отправленные ранее)
             available_puzzle_ids = [i for i in range(len(LOGIC_PUZZLES)) if i not in sent_puzzle_ids]
-            
+
             if not available_puzzle_ids:
                 return jsonify({
                     "error": "Все головоломки уже отправлены этому пользователю",
                     "all_puzzles_sent": True
                 }), 400
-            
+
             # Выбираем случайную головоломку из доступных
             import random
             selected_puzzle_id = random.choice(available_puzzle_ids)
             selected_puzzle = LOGIC_PUZZLES[selected_puzzle_id]
-            
+
             # Сохраняем информацию об отправленной головоломке
             new_sent_puzzle = SentPuzzle(
                 sender_id=user_id,
@@ -1280,31 +1350,31 @@ def api_send_surprise():
                 puzzle_id=selected_puzzle_id
             )
             db.session.add(new_sent_puzzle)
-            
+
             message_text = f"🧠 SURPRISE_PUZZLE\n\n{selected_puzzle}"
-            
+
         elif surprise_type == 'joke':
             # Получаем список уже отправленных анекдотов этому получателю
             sent_jokes = SentJoke.query.filter_by(
-                sender_id=user_id, 
+                sender_id=user_id,
                 receiver_id=receiver_id
             ).all()
             sent_joke_ids = [sj.joke_id for sj in sent_jokes]
-            
+
             # Находим доступные анекдоты (не отправленные ранее)
             available_joke_ids = [i for i in range(len(RESTAURANT_JOKES)) if i not in sent_joke_ids]
-            
+
             if not available_joke_ids:
                 return jsonify({
                     "error": "Все анекдоты уже отправлены этому пользователю",
                     "all_jokes_sent": True
                 }), 400
-            
+
             # Выбираем случайный анекдот из доступных
             import random
             selected_joke_id = random.choice(available_joke_ids)
             selected_joke = RESTAURANT_JOKES[selected_joke_id]
-            
+
             # Сохраняем информацию об отправленном анекдоте
             new_sent_joke = SentJoke(
                 sender_id=user_id,
@@ -1312,7 +1382,7 @@ def api_send_surprise():
                 joke_id=selected_joke_id
             )
             db.session.add(new_sent_joke)
-            
+
             message_text = f"😄 SURPRISE_JOKE\n\n{selected_joke}"
         else:
             return jsonify({"error": "Неверный тип сюрприза"}), 400
@@ -1324,13 +1394,13 @@ def api_send_surprise():
             text=message_text
         )
         db.session.add(new_message)
-        
+
         # Создаем разрешение на общение (если еще не существует)
         existing_permission = ChatPermission.query.filter_by(
             sender_id=user_id,
             receiver_id=receiver_id
         ).first()
-        
+
         if not existing_permission:
             chat_permission = ChatPermission(
                 sender_id=user_id,
@@ -1338,7 +1408,7 @@ def api_send_surprise():
             )
             db.session.add(chat_permission)
             print(f"✅ Создано разрешение на общение: {user_id} → {receiver_id}")
-        
+
         db.session.commit()
 
         # Отправляем сообщение через Socket.IO
@@ -1382,7 +1452,7 @@ def api_pay_surprise_feature():
 
         # Сохраняем информацию о типе платежа и текущем получателе
         # Это нужно для возврата на правильную страницу после оплаты
-        
+
         # Создаем платеж через ЮKassa
         payment_result = create_yookassa_payment(
             user_id=user_id,
@@ -3350,23 +3420,40 @@ def get_user_settings(user_id):
         conn = sqlite3.connect('dating_app.db')
         cursor = conn.cursor()
 
-        cursor.execute('SELECT sound_notifications FROM user_settings WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT sound_notifications, grayscale_mode FROM user_settings WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
 
         conn.close()
 
         if result:
-            return {'sound_notifications': bool(result[0])}
+            # Проверяем, есть ли поле grayscale_mode в результате
+            grayscale_mode = False
+            if len(result) > 1 and result[1] is not None:
+                grayscale_mode = bool(result[1])
+            elif len(result) > 1 and result[1] is None:
+                # Если поле существует, но значение NULL, используем значение по умолчанию
+                grayscale_mode = False
+            
+            return {
+                'sound_notifications': bool(result[0]),
+                'grayscale_mode': grayscale_mode
+            }
         else:
             # Создаем настройки по умолчанию
-            return {'sound_notifications': True}
+            return {
+                'sound_notifications': True,
+                'grayscale_mode': False
+            }
 
     except Exception as e:
         print(f"❌ Ошибка получения настроек для {user_id}: {e}")
-        return {'sound_notifications': True}
+        return {
+            'sound_notifications': True,
+            'grayscale_mode': False
+        }
 
 
-def update_user_settings(user_id, sound_notifications):
+def update_user_settings(user_id, sound_notifications=None, grayscale_mode=None):
     """Обновляет настройки пользователя в базе данных"""
     try:
         import sqlite3
@@ -3374,31 +3461,49 @@ def update_user_settings(user_id, sound_notifications):
         cursor = conn.cursor()
 
         # Проверяем, есть ли уже настройки для пользователя
-        cursor.execute('SELECT id FROM user_settings WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT user_id FROM user_settings WHERE user_id = ?', (user_id,))
         existing = cursor.fetchone()
 
         if existing:
             # Обновляем существующие настройки
-            cursor.execute('''
-                UPDATE user_settings 
-                SET sound_notifications = ?, updated_at = ? 
-                WHERE user_id = ?
-            ''', (1 if sound_notifications else 0, datetime.utcnow(), user_id))
+            if sound_notifications is not None and grayscale_mode is not None:
+                cursor.execute('''
+                    UPDATE user_settings 
+                    SET sound_notifications = ?, grayscale_mode = ? 
+                    WHERE user_id = ?
+                ''', (1 if sound_notifications else 0, 1 if grayscale_mode else 0, user_id))
+            elif sound_notifications is not None:
+                cursor.execute('''
+                    UPDATE user_settings 
+                    SET sound_notifications = ? 
+                    WHERE user_id = ?
+                ''', (1 if sound_notifications else 0, user_id))
+            elif grayscale_mode is not None:
+                cursor.execute('''
+                    UPDATE user_settings 
+                    SET grayscale_mode = ? 
+                    WHERE user_id = ?
+                ''', (1 if grayscale_mode else 0, user_id))
         else:
             # Создаем новые настройки
+            sound_val = 1 if sound_notifications else 0 if sound_notifications is not None else 1
+            grayscale_val = 1 if grayscale_mode else 0 if grayscale_mode is not None else 0
+            
             cursor.execute('''
-                INSERT INTO user_settings (user_id, sound_notifications, created_at, updated_at) 
-                VALUES (?, ?, ?, ?)
-            ''', (user_id, 1 if sound_notifications else 0, datetime.utcnow(), datetime.utcnow()))
+                INSERT INTO user_settings (user_id, sound_notifications, grayscale_mode) 
+                VALUES (?, ?, ?)
+            ''', (user_id, sound_val, grayscale_val))
 
         conn.commit()
         conn.close()
 
-        print(f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}")
+        print(f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}, grayscale_mode = {grayscale_mode}")
         return True
 
     except Exception as e:
         print(f"❌ Ошибка обновления настроек для {user_id}: {e}")
+        import traceback
+        print(f"❌ Детали ошибки: {traceback.format_exc()}")
         return False
 
 
@@ -3635,7 +3740,7 @@ def view_visitors():
                     box-shadow: 0 4px 16px rgba(255,107,107,0.15);
                     transform: translateY(-2px) scale(1.03);
                 }
-                
+
                 /* Кнопка "Удивить" */
                 .surprise-btn {
                     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -3660,7 +3765,7 @@ def view_visitors():
                 .surprise-btn:active {
                     transform: scale(0.95);
                 }
-                
+
                 /* Модальное окно */
                 .modal {
                     display: none;
@@ -3763,7 +3868,7 @@ def view_visitors():
                     opacity: 0.8;
                     color: #ccc;
                 }
-                
+
                 /* Анимация шампанского с вылетающей пробкой */
                 .champagne-animation {
                     position: relative;
@@ -3928,7 +4033,7 @@ def view_visitors():
                     event.stopPropagation(); // Предотвращаем переход на профиль
                     currentReceiverId = profileId;
                     currentReceiverName = profileName;
-                    
+
                     // Проверяем статус оплаты функции
                     fetch('/api/check-surprise-feature-status')
                         .then(response => response.json())
@@ -4044,7 +4149,7 @@ def view_visitors():
                     })
                     .then(data => {
                         if (!data) return; // Если требуется оплата, data будет null
-                        
+
                         if (data.success) {
                             let message = '';
                             if (type === 'dessert') {
@@ -4056,11 +4161,11 @@ def view_visitors():
                             } else if (type === 'puzzle') {
                                 message = `🧠 Головоломка отправлена ${currentReceiverName}!`;
                             }
-                            
+
                             if (data.chat_enabled) {
                                 message += ' Теперь вы можете писать сообщения!';
                             }
-                            
+
                             showNotification(message, 'success');
                             closeSurpriseModal();
                         } else {
@@ -4301,7 +4406,8 @@ def view_visitors():
             </script>
         </body>
         </html>
-    ''', other_profiles=other_profiles, liked_ids=liked_ids, matched_ids=matched_ids, navbar=navbar, get_photo_url=get_photo_url,
+    ''', other_profiles=other_profiles, liked_ids=liked_ids, matched_ids=matched_ids, navbar=navbar,
+                                  get_photo_url=get_photo_url,
                                   get_starry_night_css=get_starry_night_css,
                                   get_profile_lifetime_remaining=get_profile_lifetime_remaining, user_id=user_id,
                                   SURPRISE_FEATURE_PRICE=SURPRISE_FEATURE_PRICE)
@@ -4900,7 +5006,7 @@ def toggle_like(profile_id):
     if mutual_like:
         # Взаимный лайк - создаем метч и удаляем ОБА лайка
         db.session.delete(mutual_like)  # Удаляем лайк от целевого пользователя
-        
+
         # Добавляем лайк от текущего пользователя
         new_like = Like(user_id=user_id, liked_id=profile_id)
         db.session.add(new_like)
@@ -5072,7 +5178,7 @@ def my_profile():
                     console.log('✅ Cookie user_id уже установлен правильно');
                 }
             }
-            
+
             // Функция подтверждения удаления анкеты
             function confirmDelete(button, formId) {
                 if (button.classList.contains('confirm-delete')) {
@@ -5084,7 +5190,7 @@ def my_profile():
                     button.innerHTML = '⚠️ Точно удалить?';
                     button.style.background = '#d32f2f';
                     button.style.animation = 'pulse 0.5s ease-in-out';
-                    
+
                     // Через 3 секунды возвращаем кнопку в исходное состояние
                     setTimeout(function() {
                         button.classList.remove('confirm-delete');
@@ -6268,7 +6374,7 @@ def view_profile(id):
         return "Анкета не найдена", 404
     user_id = request.cookies.get('user_id')
     is_owner = profile.id == user_id
-    
+
     # Проверяем, лайкал ли текущий пользователь этот профиль
     already_liked = False
     if user_id and not is_owner:
@@ -6280,7 +6386,7 @@ def view_profile(id):
             ((Match.user1_id == id) & (Match.user2_id == user_id))
         ).first()
         already_liked = bool(like_exists or match_exists)
-    
+
     navbar = render_navbar(user_id, active=None, unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id))
     return render_template_string('''
@@ -6415,12 +6521,12 @@ def view_profile(id):
 
                 function likeProfile(profileId) {
                     const button = event.target;
-                    
+
                     // Если кнопка уже disabled - не делаем ничего
                     if (button.disabled) {
                         return;
                     }
-                    
+
                     // Временно делаем кнопку неактивной
                     const originalContent = button.innerHTML;
                     button.innerHTML = '⏳';
@@ -6470,7 +6576,7 @@ def view_profile(id):
                         button.disabled = false;
                     });
                 }
-                
+
                 // Функция подтверждения удаления анкеты
                 function confirmDelete(button, formId) {
                     if (button.classList.contains('confirm-delete')) {
@@ -6482,7 +6588,7 @@ def view_profile(id):
                         button.innerHTML = '⚠️ Точно удалить?';
                         button.style.background = '#d32f2f';
                         button.style.animation = 'pulse 0.5s ease-in-out';
-                        
+
                         // Через 3 секунды возвращаем кнопку в исходное состояние
                         setTimeout(function() {
                             button.classList.remove('confirm-delete');
@@ -6730,7 +6836,7 @@ def my_messages():
     chat_permissions = ChatPermission.query.filter_by(sender_id=user_id).all()
     for permission in chat_permissions:
         chat_partners.add(permission.receiver_id)
-    
+
     # Добавляем пользователей, которые отправили нам сюрпризы
     received_permissions = ChatPermission.query.filter_by(receiver_id=user_id).all()
     for permission in received_permissions:
@@ -7067,7 +7173,7 @@ def chat(other_user_id):
                 // Socket.IO отключен для продакшн сервера (проблемы с конфигурацией)
                 const socket = null;
                 const socketConnected = false;
-                
+
                 console.log('⚠️ Socket.IO отключен, используется только AJAX');
 
                 // Переменные для звука
@@ -7146,14 +7252,14 @@ def chat(other_user_id):
                         const existingText = existingMsg.textContent.trim();
                         const existingSender = existingMsg.classList.contains('my-message') ? user_id : 'other';
                         const currentSender = sender === user_id ? user_id : 'other';
-                        
+
                         // Если сообщение с таким же текстом и отправителем уже есть
                         if (existingText === msg.trim() && existingSender === currentSender) {
                             console.log('⚠️ Дубликат сообщения обнаружен, пропускаем:', msg);
                             return;
                         }
                     }
-                    
+
                     // Дополнительная проверка по timestamp если есть
                     if (timestamp) {
                         for (let existingMsg of existingMessages) {
@@ -7167,16 +7273,16 @@ def chat(other_user_id):
 
                     const div = document.createElement('div');
                     div.className = 'message ' + (sender === user_id ? 'my-message' : 'their-message');
-                    
+
                     // Сохраняем timestamp как атрибут для проверки дубликатов
                     if (timestamp) {
                         div.setAttribute('data-timestamp', timestamp);
                     }
-                    
+
                     // ============================================================================
                     // ОБРАБОТКА СПЕЦИАЛЬНЫХ СЮРПРИЗОВ
                     // ============================================================================
-                    
+
                     // Обработка десерта
                     if (msg.includes('SURPRISE_DESSERT')) {
                         div.innerHTML = `
@@ -7291,7 +7397,7 @@ def chat(other_user_id):
                                 ">
                                     <div style="position: absolute; top: -30px; left: -30px; width: 80px; height: 80px; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%); border-radius: 50%; animation: shimmer1 3s ease-in-out infinite;"></div>
                                     <div style="position: absolute; bottom: -20px; right: -20px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); border-radius: 50%; animation: shimmer2 4s ease-in-out infinite;"></div>
-                                    
+
                                     <div style="font-size: 3em; margin-bottom: 10px; filter: drop-shadow(0 3px 10px rgba(0,0,0,0.3)); animation: laughBounce 2s ease-in-out infinite; line-height: 0.9;">😄</div>
                                     <div style="font-size: 1.2em; color: #fff; font-weight: bold; margin-bottom: 10px; text-shadow: 1px 1px 4px rgba(0,0,0,0.3); line-height: 1.2;">
                                         Держите анекдот!
@@ -7367,7 +7473,7 @@ def chat(other_user_id):
                                     <div style="position: absolute; top: 10px; right: 10px; font-size: 2em; animation: puzzleRotate2 4s linear infinite;">🎲</div>
                                     <div style="position: absolute; bottom: 10px; left: 15px; font-size: 1.8em; animation: puzzleFloat 3s ease-in-out infinite;">💭</div>
                                     <div style="position: absolute; bottom: 10px; right: 15px; font-size: 2em; animation: puzzleRotate1 3.5s linear infinite;">🧩</div>
-                                    
+
                                     <div style="font-size: 5em; margin-bottom: 20px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3)); animation: brainPulse 2s ease-in-out infinite;">🧠</div>
                                     <div style="font-size: 1.6em; color: #fff; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3);">
                                         Напрягись! 💪
@@ -8016,23 +8122,23 @@ def api_generate_qr_login():
         user_id = request.cookies.get('user_id')
         if not user_id:
             return jsonify({'success': False, 'error': 'Пользователь не авторизован'}), 401
-        
+
         # Очищаем просроченные токены
         cleanup_expired_qr_tokens()
-        
+
         # Генерируем новый токен
         token = generate_qr_login_token(user_id)
-        
+
         # Создаем URL для QR-кода
         qr_url = f"https://ятута.рф/qr-login/{token}"
-        
+
         return jsonify({
             'success': True,
             'token': token,
             'qr_url': qr_url,
             'expires_in_minutes': 10
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -8046,7 +8152,7 @@ def qr_login_page(user_id):
     try:
         # Проверяем, существует ли пользователь
         profile = Profile.query.get(user_id)
-        
+
         if not profile:
             return render_template_string('''
                 <!DOCTYPE html>
@@ -8064,13 +8170,13 @@ def qr_login_page(user_id):
                 </body>
                 </html>
             ''')
-        
+
         # Устанавливаем cookie и перенаправляем
         response = make_response(redirect(url_for('my_profile')))
-        response.set_cookie('user_id', profile.id, max_age=365*24*60*60)  # Cookie на год
-        
+        response.set_cookie('user_id', profile.id, max_age=365 * 24 * 60 * 60)  # Cookie на год
+
         return response
-        
+
     except Exception as e:
         return render_template_string('''
             <!DOCTYPE html>
@@ -8286,14 +8392,25 @@ def api_update_settings():
     user_id = request.cookies.get('user_id')
     data = request.get_json()
 
-    if not data or 'sound_notifications' not in data:
+    if not data:
         return jsonify({"error": "Неверные данные"}), 400
 
-    sound_enabled = data['sound_notifications']
-    success = update_user_settings(user_id, sound_enabled)
+    # Поддерживаем обновление как звуковых уведомлений, так и черно-белого режима
+    sound_enabled = data.get('sound_notifications')
+    grayscale_enabled = data.get('grayscale_mode')
+    
+    if sound_enabled is None and grayscale_enabled is None:
+        return jsonify({"error": "Не указаны настройки для обновления"}), 400
+
+    success = update_user_settings(user_id, sound_enabled, grayscale_enabled)
 
     if success:
-        return jsonify({"success": True, "sound_notifications": sound_enabled})
+        result = {"success": True}
+        if sound_enabled is not None:
+            result["sound_notifications"] = sound_enabled
+        if grayscale_enabled is not None:
+            result["grayscale_mode"] = grayscale_enabled
+        return jsonify(result)
     else:
         return jsonify({"error": "Ошибка обновления настроек"}), 500
 
@@ -8314,7 +8431,7 @@ def settings():
     navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
-    
+
     # Генерируем QR-код на сервере
     qr_code_url = generate_qr_code_server_side(user_id) if user_id else None
     qr_login_url = get_user_qr_url(user_id) if user_id else None
@@ -8381,6 +8498,23 @@ def settings():
                     color: #ccc;
                     margin-top: 5px;
                 }
+                
+                /* Стили для черно-белого режима */
+                .grayscale-mode {
+                    filter: grayscale(100%);
+                    -webkit-filter: grayscale(100%);
+                    -moz-filter: grayscale(100%);
+                    -ms-filter: grayscale(100%);
+                    -o-filter: grayscale(100%);
+                }
+                
+                .grayscale-mode * {
+                    filter: grayscale(100%);
+                    -webkit-filter: grayscale(100%);
+                    -moz-filter: grayscale(100%);
+                    -ms-filter: grayscale(100%);
+                    -o-filter: grayscale(100%);
+                }
             </style>
         </head>
         <body>
@@ -8394,8 +8528,15 @@ def settings():
                     </div>
                     <button id="sound-toggle" class="bell-button" onclick="toggleSound()">🔔</button>
                 </div>
+                <div class="setting-item">
+                    <div>
+                        <div class="setting-label">⚫ Черно-белый режим</div>
+                        <div class="setting-description">Переключить сайт в черно-белый режим</div>
+                    </div>
+                    <button id="grayscale-toggle" class="bell-button" onclick="toggleGrayscale()" style="background: #6c757d;">⚫</button>
+                </div>
             </div>
-            
+
             <div class="settings-card" style="margin-top: 20px;">
                 <div class="setting-item">
                     <div>
@@ -8423,6 +8564,7 @@ def settings():
                 let audioContext = null;
                 let userInteracted = false;
                 let soundEnabled = true;
+                let grayscaleEnabled = false;
 
                 // Загружаем настройки при загрузке страницы
                 window.addEventListener('load', function() {
@@ -8432,11 +8574,20 @@ def settings():
                 // Загрузка настроек
                 function loadSettings() {
                     fetch('/api/get_settings')
-                        .then(response => response.json())
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
                         .then(settings => {
                             soundEnabled = settings.sound_notifications;
+                            grayscaleEnabled = settings.grayscale_mode || false;
                             updateBellAppearance();
+                            updateGrayscaleAppearance();
+                            applyGrayscaleMode();
                             console.log('📋 Настройки загружены:', settings);
+                            console.log('⚫ Черно-белый режим:', grayscaleEnabled ? 'включен' : 'выключен');
                         })
                         .catch(error => {
                             console.error('❌ Ошибка загрузки настроек:', error);
@@ -8454,6 +8605,29 @@ def settings():
                         bellButton.textContent = '🔕';
                         bellButton.style.filter = 'grayscale(100%)';
                         bellButton.style.background = '#666';
+                    }
+                }
+
+                // Обновление внешнего вида кнопки черно-белого режима
+                function updateGrayscaleAppearance() {
+                    const grayscaleButton = document.getElementById('grayscale-toggle');
+                    if (grayscaleEnabled) {
+                        grayscaleButton.textContent = '⚫';
+                        grayscaleButton.style.background = '#000';
+                        grayscaleButton.style.color = '#fff';
+                    } else {
+                        grayscaleButton.textContent = '⚪';
+                        grayscaleButton.style.background = '#6c757d';
+                        grayscaleButton.style.color = '#fff';
+                    }
+                }
+
+                // Применение черно-белого режима к странице
+                function applyGrayscaleMode() {
+                    if (grayscaleEnabled) {
+                        document.body.classList.add('grayscale-mode');
+                    } else {
+                        document.body.classList.remove('grayscale-mode');
                     }
                 }
 
@@ -8488,6 +8662,42 @@ def settings():
                     })
                     .catch(error => {
                         console.error('❌ Ошибка сохранения настроек:', error);
+                    });
+                }
+
+                // Переключение черно-белого режима
+                function toggleGrayscale() {
+                    grayscaleEnabled = !grayscaleEnabled;
+
+                    // Обновляем внешний вид
+                    updateGrayscaleAppearance();
+                    applyGrayscaleMode();
+
+                    // Сохраняем настройки
+                    fetch('/api/update_settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            grayscale_mode: grayscaleEnabled
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('✅ Настройки черно-белого режима сохранены:', data);
+                            // Принудительно применяем режим после сохранения
+                            setTimeout(() => {
+                                applyGrayscaleMode();
+                                console.log('🔄 Черно-белый режим принудительно применен');
+                            }, 100);
+                        } else {
+                            console.error('❌ Ошибка сохранения настроек черно-белого режима:', data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Ошибка сохранения настроек черно-белого режима:', error);
                     });
                 }
 
@@ -8553,7 +8763,7 @@ def settings():
                 // Функция для переключения QR-кода
                 function toggleQR() {
                     const qrContainer = document.getElementById('qr-container');
-                    
+
                     if (qrContainer.style.display === 'none') {
                         qrContainer.style.display = 'block';
                     } else {
@@ -8574,10 +8784,10 @@ def cleanup_expired_profiles():
     try:
         from datetime import timedelta
         from datetime import datetime, timezone, timedelta
-        
+
         current_time = datetime.now(timezone.utc)
         cutoff_time = current_time - timedelta(hours=PROFILE_LIFETIME_HOURS)
-        
+
         print(f"⏰ ДИАГНОСТИКА УДАЛЕНИЯ АНКЕТ:")
         print(f"   - Используется время жизни: {PROFILE_LIFETIME_HOURS} часов")
         print(f"   - Текущее время UTC: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -8599,9 +8809,11 @@ def cleanup_expired_profiles():
             age_hours = (current_time - created_at).total_seconds() / 3600
             if created_at < cutoff_time:
                 expired_profiles.append(profile)
-                print(f"   ❌ {profile.name} ({profile.id[:8]}...): создана {created_at.strftime('%Y-%m-%d %H:%M:%S')}, возраст {age_hours:.2f}ч - УДАЛИТЬ")
+                print(
+                    f"   ❌ {profile.name} ({profile.id[:8]}...): создана {created_at.strftime('%Y-%m-%d %H:%M:%S')}, возраст {age_hours:.2f}ч - УДАЛИТЬ")
             else:
-                print(f"   ✅ {profile.name} ({profile.id[:8]}...): создана {created_at.strftime('%Y-%m-%d %H:%M:%S')}, возраст {age_hours:.2f}ч - ОК")
+                print(
+                    f"   ✅ {profile.name} ({profile.id[:8]}...): создана {created_at.strftime('%Y-%m-%d %H:%M:%S')}, возраст {age_hours:.2f}ч - ОК")
 
         print(f"🔍 Найдено {len(expired_profiles)} просроченных анкет для удаления")
 
@@ -8732,11 +8944,11 @@ def qr_login_generator():
     """Страница для генерации QR-кода для входа с другого устройства"""
     user_id = request.cookies.get('user_id')
     profile = Profile.query.get(user_id)
-    
+
     navbar = render_navbar(user_id, active='settings', unread_messages=get_unread_messages_count(user_id),
                            unread_likes=get_unread_likes_count(user_id),
                            unread_matches=get_unread_matches_count(user_id))
-    
+
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -8836,7 +9048,7 @@ def qr_login_generator():
         <body>
             {{ navbar|safe }}
             <h1>📱 QR-код для входа</h1>
-            
+
             <div class="instructions">
                 <h3>Как войти с другого устройства:</h3>
                 <ol>
@@ -8846,19 +9058,19 @@ def qr_login_generator():
                     <li>QR-код действителен 10 минут</li>
                 </ol>
             </div>
-            
+
             <div class="qr-container" id="qrContainer" style="display: none;">
                 <div class="qr-code" id="qrCode"></div>
                 <!-- URL ссылка скрыта по запросу пользователя -->
                 <!-- <div class="qr-url" id="qrUrl"></div> -->
                 <div class="timer" id="timer">⏰ Осталось: <span id="timeLeft">10:00</span></div>
             </div>
-            
+
             <div style="text-align: center;">
                 <button class="generate-btn" onclick="generateQR()">🔗 Сгенерировать QR-код</button>
                 <button class="generate-btn" onclick="refreshQR()" style="background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);">🔄 Обновить</button>
             </div>
-            
+
             <div class="info-text">
                 <p>💡 <strong>Совет:</strong> QR-код позволяет войти в ваш профиль с любого устройства без повторной регистрации!</p>
             </div>
@@ -8866,7 +9078,7 @@ def qr_login_generator():
             <script>
                 let currentToken = null;
                 let countdownInterval = null;
-                
+
                 function generateQR() {
                     fetch('/api/generate-qr-login', {
                         method: 'POST',
@@ -8879,14 +9091,14 @@ def qr_login_generator():
                         if (data.success) {
                             currentToken = data.token;
                             const qrUrl = data.qr_url;
-                            
+
                             // Показываем контейнер
                             document.getElementById('qrContainer').style.display = 'block';
-                            
+
                             // Генерируем QR-код
                             const qrCodeElement = document.getElementById('qrCode');
                             qrCodeElement.innerHTML = '';
-                            
+
                             QRCode.toCanvas(qrCodeElement, qrUrl, {
                                 width: 200,
                                 height: 200,
@@ -8902,13 +9114,13 @@ def qr_login_generator():
                                     console.log('✅ QR-код сгенерирован');
                                 }
                             });
-                            
+
                             // URL скрыт по запросу пользователя
                             // document.getElementById('qrUrl').textContent = qrUrl;
-                            
+
                             // Запускаем таймер
                             startCountdown(10 * 60); // 10 минут
-                            
+
                         } else {
                             alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
                         }
@@ -8918,35 +9130,35 @@ def qr_login_generator():
                         alert('Ошибка при генерации QR-кода');
                     });
                 }
-                
+
                 function refreshQR() {
                     if (currentToken) {
                         generateQR();
                     }
                 }
-                
+
                 function startCountdown(seconds) {
                     if (countdownInterval) {
                         clearInterval(countdownInterval);
                     }
-                    
+
                     countdownInterval = setInterval(() => {
                         const minutes = Math.floor(seconds / 60);
                         const secs = seconds % 60;
                         const timeString = `${minutes}:${secs.toString().padStart(2, '0')}`;
-                        
+
                         document.getElementById('timeLeft').textContent = timeString;
-                        
+
                         if (seconds <= 0) {
                             clearInterval(countdownInterval);
                             document.getElementById('qrContainer').style.display = 'none';
                             document.getElementById('timeLeft').textContent = 'Истекло';
                         }
-                        
+
                         seconds--;
                     }, 1000);
                 }
-                
+
                 // Автоматически генерируем QR-код при загрузке страницы
                 document.addEventListener('DOMContentLoaded', function() {
                     generateQR();
@@ -9198,14 +9410,14 @@ def payment_success():
     if payment_type == 'surprise':
         try:
             print(f"💰 Обрабатываем оплату функции 'Удивить' для пользователя: {user_id}")
-            
+
             profile = Profile.query.get(user_id)
             if profile:
                 profile.surprise_feature_paid = True
                 profile.surprise_feature_payment_date = datetime.utcnow()
                 db.session.commit()
                 print(f"✅ Функция 'Удивить' активирована для {user_id}")
-                
+
                 # Перенаправляем на страницу visitors
                 return '''
                 <!DOCTYPE html>
@@ -9478,28 +9690,28 @@ def yookassa_webhook():
 
         if event == 'payment.succeeded' and payment_id:
             print(f"✅ Webhook: платеж {payment_id} успешен")
-            
+
             # Находим пользователя по payment_id
             payment = Payment.query.filter_by(yookassa_payment_id=payment_id).first()
             if not payment:
                 print(f"❌ Webhook: платеж {payment_id} не найден в базе данных")
                 return jsonify({'status': 'error', 'message': 'Платеж не найден'}), 404
-            
+
             user_id = payment.user_id
             print(f"✅ Webhook: найден пользователь {user_id} для платежа {payment_id}")
-            
+
             process_payment_completion(user_id, payment_id, 'succeeded')
             return jsonify({'status': 'success'})
         elif event == 'payment.canceled' and payment_id:
             print(f"⚠️ Webhook: платеж {payment_id} отменен")
-            
+
             # Находим пользователя по payment_id
             payment = Payment.query.filter_by(yookassa_payment_id=payment_id).first()
             if payment:
                 user_id = payment.user_id
                 print(f"✅ Webhook: найден пользователь {user_id} для отмененного платежа {payment_id}")
                 process_payment_completion(user_id, payment_id, 'canceled')
-            
+
             return jsonify({'status': 'success'})
         else:
             print(f"ℹ️ Webhook: неизвестное событие {event}")
@@ -9600,15 +9812,15 @@ def periodic_cleanup():
 def debug_lifetime_settings():
     """Диагностический endpoint для проверки настроек времени жизни анкет"""
     from datetime import datetime, timezone
-    
+
     # Получаем все анкеты
     all_profiles = Profile.query.all()
     all_pending = PendingProfile.query.all()
-    
+
     current_time = datetime.now(timezone.utc)
     cutoff_time_profile = current_time - timedelta(hours=PROFILE_LIFETIME_HOURS)
     cutoff_time_pending = current_time - timedelta(hours=PENDING_PROFILE_LIFETIME_HOURS)
-    
+
     # Информация по каждой анкете
     profiles_info = []
     for p in all_profiles:
@@ -9617,7 +9829,7 @@ def debug_lifetime_settings():
             created_at = created_at.replace(tzinfo=timezone.utc)
         age_hours = (current_time - created_at).total_seconds() / 3600
         remaining_hours = PROFILE_LIFETIME_HOURS - age_hours
-        
+
         profiles_info.append({
             'id': p.id[:12] + '...',
             'name': p.name,
@@ -9627,7 +9839,7 @@ def debug_lifetime_settings():
             'will_expire': created_at < cutoff_time_profile,
             'is_paid': p.is_paid
         })
-    
+
     pending_info = []
     for p in all_pending:
         created_at = p.created_at
@@ -9635,7 +9847,7 @@ def debug_lifetime_settings():
             created_at = created_at.replace(tzinfo=timezone.utc)
         age_hours = (current_time - created_at).total_seconds() / 3600
         remaining_hours = PENDING_PROFILE_LIFETIME_HOURS - age_hours
-        
+
         pending_info.append({
             'id': p.id[:12] + '...',
             'name': p.name,
@@ -9644,7 +9856,7 @@ def debug_lifetime_settings():
             'remaining_hours': f"{remaining_hours:.2f}",
             'will_expire': created_at < cutoff_time_pending
         })
-    
+
     # Генерируем HTML для таблицы оплаченных анкет
     profiles_table_html = ''
     if profiles_info:
@@ -9657,7 +9869,7 @@ def debug_lifetime_settings():
         profiles_table_html += '</table>'
     else:
         profiles_table_html = '<p>Нет оплаченных анкет</p>'
-    
+
     # Генерируем HTML для таблицы временных анкет
     pending_table_html = ''
     if pending_info:
@@ -9669,9 +9881,9 @@ def debug_lifetime_settings():
         pending_table_html += '</table>'
     else:
         pending_table_html = '<p>Нет временных анкет</p>'
-    
+
     warning_html = '<div class="warning">⚠️ ВНИМАНИЕ: Комментарии в коде не соответствуют значениям! Проверьте строки 35-36 в app.py</div>' if PROFILE_LIFETIME_HOURS == 10 else ''
-    
+
     html = f'''
     <!DOCTYPE html>
     <html lang="ru">
@@ -9728,7 +9940,7 @@ def debug_lifetime_settings():
     </head>
     <body>
         <h1>🔧 ДИАГНОСТИКА ВРЕМЕНИ ЖИЗНИ АНКЕТ</h1>
-        
+
         <div class="section">
             <h2>⚙️ Текущие настройки</h2>
             <p><strong>Время жизни ОПЛАЧЕННОЙ анкеты:</strong> {PROFILE_LIFETIME_HOURS} часов</p>
@@ -9737,19 +9949,19 @@ def debug_lifetime_settings():
             <p><strong>Граница удаления оплаченных:</strong> {cutoff_time_profile.strftime('%Y-%m-%d %H:%M:%S')}</p>
             <p><strong>Граница удаления временных:</strong> {cutoff_time_pending.strftime('%Y-%m-%d %H:%M:%S')}</p>
         </div>
-        
+
         {warning_html}
-        
+
         <div class="section">
             <h2>📋 Оплаченные анкеты ({len(profiles_info)})</h2>
             {profiles_table_html}
         </div>
-        
+
         <div class="section">
             <h2>⏳ Временные анкеты ({len(pending_info)})</h2>
             {pending_table_html}
         </div>
-        
+
         <div class="section">
             <h2>📝 Инструкции</h2>
             <ol>
@@ -9760,12 +9972,12 @@ def debug_lifetime_settings():
                 <li>Периодическая очистка запускается каждые 5 минут</li>
             </ol>
         </div>
-        
+
         <div class="section">
             <p><a href="/" style="color: #00ff00;">← Вернуться на главную</a></p>
             <p><a href="/debug/lifetime-settings" style="color: #00ff00;">🔄 Обновить данные</a></p>
         </div>
-        
+
         <script>
             // Автообновление каждые 10 секунд
             setTimeout(() => location.reload(), 10000);
@@ -9773,7 +9985,7 @@ def debug_lifetime_settings():
     </body>
     </html>
     '''
-    
+
     return html
 
 
@@ -9781,26 +9993,26 @@ def debug_lifetime_settings():
 def debug_likes_and_matches():
     """Диагностический endpoint для проверки лайков и метчей"""
     user_id = request.cookies.get('user_id')
-    
+
     if not user_id:
         return "⚠️ Нет user_id в cookie. Сначала создайте профиль."
-    
+
     # Получаем профиль текущего пользователя
     current_profile = Profile.query.get(user_id)
     if not current_profile:
         return "⚠️ Профиль не найден"
-    
+
     # Получаем все лайки ОТ текущего пользователя
     my_likes = Like.query.filter_by(user_id=user_id).all()
-    
+
     # Получаем все лайки К текущему пользователю
     likes_to_me = Like.query.filter_by(liked_id=user_id).all()
-    
+
     # Получаем все метчи
     all_matches = Match.query.filter(
         (Match.user1_id == user_id) | (Match.user2_id == user_id)
     ).all()
-    
+
     # Получаем liked_ids (как на странице visitors)
     liked_ids = set(l.liked_id for l in my_likes)
     for match in all_matches:
@@ -9808,10 +10020,10 @@ def debug_likes_and_matches():
             liked_ids.add(match.user2_id)
         else:
             liked_ids.add(match.user1_id)
-    
+
     # Все профили
     all_profiles = Profile.query.filter(Profile.id != user_id).all()
-    
+
     html = f'''
     <!DOCTYPE html>
     <html lang="ru">
@@ -9872,17 +10084,17 @@ def debug_likes_and_matches():
     </head>
     <body>
         <h1>🔍 ДИАГНОСТИКА ЛАЙКОВ И МЕТЧЕЙ</h1>
-        
+
         <div class="section">
             <h2>👤 Текущий пользователь</h2>
             <p><strong>ID:</strong> {user_id[:12]}...</p>
             <p><strong>Имя:</strong> {current_profile.name}</p>
         </div>
-        
+
         <div class="section">
             <h2>❤️ Мои лайки (я лайкнул)</h2>
     '''
-    
+
     if my_likes:
         html += '<table><tr><th>ID получателя</th><th>Имя получателя</th><th>Like ID</th></tr>'
         for like in my_likes:
@@ -9892,14 +10104,14 @@ def debug_likes_and_matches():
         html += f'</table><p><strong>Всего:</strong> {len(my_likes)}</p>'
     else:
         html += '<p class="yellow">Вы еще никого не лайкнули</p>'
-    
+
     html += '''
         </div>
-        
+
         <div class="section">
             <h2>💖 Лайки мне (меня лайкнули)</h2>
     '''
-    
+
     if likes_to_me:
         html += '<table><tr><th>ID отправителя</th><th>Имя отправителя</th><th>Like ID</th></tr>'
         for like in likes_to_me:
@@ -9909,14 +10121,14 @@ def debug_likes_and_matches():
         html += f'</table><p><strong>Всего:</strong> {len(likes_to_me)}</p>'
     else:
         html += '<p class="yellow">Вас еще никто не лайкнул</p>'
-    
+
     html += '''
         </div>
-        
+
         <div class="section">
             <h2>✨ Мои метчи</h2>
     '''
-    
+
     if all_matches:
         html += '<table><tr><th>ID партнера</th><th>Имя партнера</th><th>Match ID</th></tr>'
         for match in all_matches:
@@ -9927,10 +10139,10 @@ def debug_likes_and_matches():
         html += f'</table><p><strong>Всего:</strong> {len(all_matches)}</p>'
     else:
         html += '<p class="yellow">У вас пока нет метчей</p>'
-    
+
     html += '''
         </div>
-        
+
         <div class="section">
             <h2>👥 Все профили и их статус</h2>
             <div class="info-box">
@@ -9948,26 +10160,26 @@ def debug_likes_and_matches():
                     <th>Сердечко</th>
                 </tr>
     '''
-    
+
     my_likes_ids = [l.liked_id for l in my_likes]
     matches_ids = [(m.user2_id if m.user1_id == user_id else m.user1_id) for m in all_matches]
-    
+
     for profile in all_profiles:
         i_liked = profile.id in my_likes_ids
         has_match = profile.id in matches_ids
         in_liked_ids = profile.id in liked_ids
-        
+
         i_liked_class = 'green' if i_liked else 'red'
         i_liked_icon = '✅' if i_liked else '❌'
-        
+
         match_class = 'green' if has_match else 'red'
         match_icon = '✅' if has_match else '❌'
-        
+
         liked_class = 'green' if in_liked_ids else 'red'
         liked_icon = '✅' if in_liked_ids else '❌'
-        
+
         heart = '❤️' if in_liked_ids else '🤍'
-        
+
         html += f'''
                 <tr>
                     <td>{profile.id[:12]}...</td>
@@ -9978,11 +10190,11 @@ def debug_likes_and_matches():
                     <td>{heart}</td>
                 </tr>
         '''
-    
+
     html += '''
             </table>
         </div>
-        
+
         <div class="section">
             <h2>🔧 Что делать, если видите проблему</h2>
             <ol>
@@ -9992,12 +10204,12 @@ def debug_likes_and_matches():
                 <li>Если есть метч, но вы не лайкали - это СТРАННО, проверьте таблицу "Мои лайки"</li>
             </ol>
         </div>
-        
+
         <div class="section">
             <p><a href="/visitors" style="color: #00ff00;">← Вернуться к посетителям</a></p>
             <p><a href="/debug/likes-and-matches" style="color: #00ff00;">🔄 Обновить данные</a></p>
         </div>
-        
+
         <script>
             // Автообновление каждые 5 секунд
             setTimeout(() => location.reload(), 5000);
@@ -10005,7 +10217,7 @@ def debug_likes_and_matches():
     </body>
     </html>
     '''
-    
+
     return html
 
 
@@ -10033,20 +10245,20 @@ def test_qr_logo():
         )
         qr.add_data('https://ятута.рф/qr-login/test-user')
         qr.make(fit=True)
-        
+
         img = qr.make_image(fill_color='black', back_color='white')
         img = add_text_below_qr(img)
-        
+
         # Сохраняем в буфер
         img_buffer = io.BytesIO()
         img.save(img_buffer, format='PNG')
         img_buffer.seek(0)
-        
+
         return make_response(img_buffer.getvalue(), 200, {
             'Content-Type': 'image/png',
             'Cache-Control': 'no-cache'
         })
-        
+
     except Exception as e:
         return f"Ошибка: {e}", 500
 

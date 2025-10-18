@@ -7456,84 +7456,37 @@ def chat(other_user_id):
                     else if (msg.includes('SURPRISE_PUZZLE')) {
                         const puzzleText = msg.replace('🧠 SURPRISE_PUZZLE', '').trim();
                         div.innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <div style="font-size: 1.3em; color: #fff; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5);">
-                                    🎁 Вам отправили сюрприз!
-                                </div>
+                            <div style="text-align: center; padding: 15px;">
                                 <div style="
-                                    background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 35%, #9d50bb 70%, #6e48aa 100%);
-                                    border-radius: 25px;
-                                    padding: 35px 30px;
-                                    box-shadow: 0 15px 50px rgba(0, 210, 255, 0.6);
-                                    animation: puzzleGlow 4s ease-in-out infinite;
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    border-radius: 20px;
+                                    padding: 20px;
+                                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
                                     position: relative;
-                                    overflow: hidden;
+                                    margin: 0 auto;
+                                    max-width: 350px;
+                                    border: 2px solid rgba(255, 255, 255, 0.2);
                                 ">
-                                    <div style="position: absolute; top: 10px; left: 10px; font-size: 2em; animation: puzzleRotate1 3s linear infinite;">🧩</div>
-                                    <div style="position: absolute; top: 10px; right: 10px; font-size: 2em; animation: puzzleRotate2 4s linear infinite;">🎲</div>
-                                    <div style="position: absolute; bottom: 10px; left: 15px; font-size: 1.8em; animation: puzzleFloat 3s ease-in-out infinite;">💭</div>
-                                    <div style="position: absolute; bottom: 10px; right: 15px; font-size: 2em; animation: puzzleRotate1 3.5s linear infinite;">🧩</div>
-
-                                    <div style="font-size: 5em; margin-bottom: 20px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3)); animation: brainPulse 2s ease-in-out infinite;">🧠</div>
-                                    <div style="font-size: 1.6em; color: #fff; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 8px rgba(0,0,0,0.3);">
+                                    <div style="font-size: 2.5em; margin-bottom: 15px;">🧠</div>
+                                    <div style="font-size: 1.3em; color: #fff; font-weight: bold; margin-bottom: 15px;">
                                         Напрягись! 💪
                                     </div>
                                     <div style="
                                         background: rgba(255, 255, 255, 0.95);
-                                        border-radius: 15px;
-                                        padding: 25px;
-                                        font-size: 1.15em;
+                                        border-radius: 12px;
+                                        padding: 15px;
+                                        font-size: 1em;
                                         color: #333;
-                                        line-height: 1.7;
+                                        line-height: 1.5;
                                         white-space: pre-line;
                                         text-align: left;
-                                        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                                        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
                                         font-weight: 500;
-                                        position: relative;
-                                        z-index: 1;
-                                        border: 3px solid rgba(58, 123, 213, 0.3);
                                     ">
                                         ${puzzleText}
                                     </div>
-                                    <div style="font-size: 2.5em; margin-top: 20px; animation: thinkingRotate 4s ease-in-out infinite;">🤔</div>
                                 </div>
                             </div>
-                            <style>
-                                @keyframes puzzleGlow {
-                                    0%, 100% { 
-                                        transform: scale(1); 
-                                        box-shadow: 0 15px 50px rgba(0, 210, 255, 0.6);
-                                    }
-                                    50% { 
-                                        transform: scale(1.02); 
-                                        box-shadow: 0 20px 60px rgba(0, 210, 255, 0.9), 0 0 40px rgba(157, 80, 187, 0.5);
-                                    }
-                                }
-                                @keyframes brainPulse {
-                                    0%, 100% { transform: scale(1) rotate(0deg); }
-                                    25% { transform: scale(1.1) rotate(-5deg); }
-                                    50% { transform: scale(1.15) rotate(0deg); }
-                                    75% { transform: scale(1.1) rotate(5deg); }
-                                }
-                                @keyframes puzzleRotate1 {
-                                    0% { transform: rotate(0deg); }
-                                    100% { transform: rotate(360deg); }
-                                }
-                                @keyframes puzzleRotate2 {
-                                    0% { transform: rotate(360deg); }
-                                    100% { transform: rotate(0deg); }
-                                }
-                                @keyframes puzzleFloat {
-                                    0%, 100% { transform: translateY(0); opacity: 0.6; }
-                                    50% { transform: translateY(-15px); opacity: 1; }
-                                }
-                                @keyframes thinkingRotate {
-                                    0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.7; }
-                                    25% { transform: rotate(-20deg) scale(1.2); opacity: 1; }
-                                    50% { transform: rotate(0deg) scale(1.3); opacity: 1; }
-                                    75% { transform: rotate(20deg) scale(1.2); opacity: 1; }
-                                }
-                            </style>
                         `;
                     }
                     // Обычное текстовое сообщение

@@ -50,3 +50,4 @@ echo "📋 Примеры команд:"
 echo "scp grayscale_deployment.tar.gz root@192.168.1.100:/var/www/html/"
 echo "scp grayscale_deployment.tar.gz ubuntu@your-server.com:/home/ubuntu/project/"
 echo "scp -i ~/.ssh/key.pem grayscale_deployment.tar.gz user@server:/path/"
+

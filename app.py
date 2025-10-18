@@ -2281,6 +2281,21 @@ def create_profile():
                     background: rgba(76, 175, 80, 0.15);
                 }
 
+                /* Стили для readonly полей */
+                input[readonly] {
+                    background: rgba(76, 175, 80, 0.05) !important;
+                    border: 1px solid rgba(76, 175, 80, 0.2) !important;
+                    color: rgba(255, 255, 255, 0.8) !important;
+                    cursor: not-allowed;
+                }
+
+                input[readonly]:focus {
+                    outline: none !important;
+                    border-color: rgba(76, 175, 80, 0.2) !important;
+                    box-shadow: none !important;
+                    background: rgba(76, 175, 80, 0.05) !important;
+                }
+
                 select option {
                     background: rgba(76, 175, 80, 0.9);
                     color: #fff;
@@ -2486,7 +2501,7 @@ def create_profile():
 
 
                 <div class="field-container">
-                    <input type="text" name="venue" id="venue-input" placeholder="Название заведения (кафе, ресторан и т.д.)" required onchange="updateVenueCoordinates()">
+                    <input type="text" name="venue" id="venue-input" placeholder="Выберите заведение на карте" readonly required onchange="updateVenueCoordinates()">
                 </div>
                 <input type="hidden" name="latitude" id="latitude-input">
                 <input type="hidden" name="longitude" id="longitude-input">
@@ -4558,6 +4573,21 @@ def edit_pending_profile():
                     background: rgba(76, 175, 80, 0.15);
                 }
 
+                /* Стили для readonly полей */
+                input[readonly] {
+                    background: rgba(76, 175, 80, 0.05) !important;
+                    border: 1px solid rgba(76, 175, 80, 0.2) !important;
+                    color: rgba(255, 255, 255, 0.8) !important;
+                    cursor: not-allowed;
+                }
+
+                input[readonly]:focus {
+                    outline: none !important;
+                    border-color: rgba(76, 175, 80, 0.2) !important;
+                    box-shadow: none !important;
+                    background: rgba(76, 175, 80, 0.05) !important;
+                }
+
                 select option {
                     background: rgba(76, 175, 80, 0.9);
                     color: #fff;
@@ -4756,7 +4786,7 @@ def edit_pending_profile():
                     </div>
 
                 <div class="field-container">
-                    <input type="text" name="venue" id="venue-input" value="{{ pending.venue or '' }}" placeholder="Название заведения (кафе, ресторан и т.д.)" required onchange="updateVenueCoordinates()">
+                    <input type="text" name="venue" id="venue-input" value="{{ pending.venue or '' }}" placeholder="Выберите заведение на карте" readonly required onchange="updateVenueCoordinates()">
                 </div>
                 <input type="hidden" name="latitude" id="latitude-input" value="{{ pending.latitude or '' }}">
                 <input type="hidden" name="longitude" id="longitude-input" value="{{ pending.longitude or '' }}">
@@ -5339,6 +5369,21 @@ def edit_profile():
                     border-color: #4CAF50;
                     box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
                     background: rgba(76, 175, 80, 0.15);
+                }
+
+                /* Стили для readonly полей */
+                input[readonly] {
+                    background: rgba(76, 175, 80, 0.05) !important;
+                    border: 1px solid rgba(76, 175, 80, 0.2) !important;
+                    color: rgba(255, 255, 255, 0.8) !important;
+                    cursor: not-allowed;
+                }
+
+                input[readonly]:focus {
+                    outline: none !important;
+                    border-color: rgba(76, 175, 80, 0.2) !important;
+                    box-shadow: none !important;
+                    background: rgba(76, 175, 80, 0.05) !important;
                 }
 
                 select option {
@@ -6128,7 +6173,7 @@ def edit_profile():
                 </div>
 
                 <div class="field-container">
-                    <input type="text" name="venue" id="venue-input" placeholder="Название заведения (кафе, ресторан и т.д.)" value="{{ profile.venue or '' }}" required onchange="updateVenueCoordinates()">
+                    <input type="text" name="venue" id="venue-input" placeholder="Выберите заведение на карте" value="{{ profile.venue or '' }}" readonly required onchange="updateVenueCoordinates()">
                 </div>
                 <input type="hidden" name="latitude" id="latitude-input" value="{{ profile.latitude or '' }}">
                 <input type="hidden" name="longitude" id="longitude-input" value="{{ profile.longitude or '' }}">

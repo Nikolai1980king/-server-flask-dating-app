@@ -176,7 +176,7 @@ def get_starry_night_css():
             0% { opacity: 0.3; }
             100% { opacity: 1; }
         }
-        
+
         /* Стили для черно-белого режима */
         .grayscale-mode {
             filter: grayscale(100%);
@@ -185,7 +185,7 @@ def get_starry_night_css():
             -ms-filter: grayscale(100%);
             -o-filter: grayscale(100%);
         }
-        
+
         .grayscale-mode * {
             filter: grayscale(100%);
             -webkit-filter: grayscale(100%);
@@ -3458,7 +3458,7 @@ def get_user_settings(user_id):
             elif len(result) > 1 and result[1] is None:
                 # Если поле существует, но значение NULL, используем значение по умолчанию
                 grayscale_mode = False
-            
+
             return {
                 'sound_notifications': bool(result[0]),
                 'grayscale_mode': grayscale_mode
@@ -3513,7 +3513,7 @@ def update_user_settings(user_id, sound_notifications=None, grayscale_mode=None)
             # Создаем новые настройки
             sound_val = 1 if sound_notifications else 0 if sound_notifications is not None else 1
             grayscale_val = 1 if grayscale_mode else 0 if grayscale_mode is not None else 0
-            
+
             cursor.execute('''
                 INSERT INTO user_settings (user_id, sound_notifications, grayscale_mode) 
                 VALUES (?, ?, ?)
@@ -3522,7 +3522,8 @@ def update_user_settings(user_id, sound_notifications=None, grayscale_mode=None)
         conn.commit()
         conn.close()
 
-        print(f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}, grayscale_mode = {grayscale_mode}")
+        print(
+            f"✅ Настройки обновлены для {user_id}: sound_notifications = {sound_notifications}, grayscale_mode = {grayscale_mode}")
         return True
 
     except Exception as e:
@@ -7990,8 +7991,8 @@ def api_restore_session():
             'redirect_url': url_for('view_profile', id=user_id)
         })
         # 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
-        response.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60, 
-                          secure=True, httponly=True, samesite='Lax')  # 1 год, только HTTPS
+        response.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60,
+                            secure=True, httponly=True, samesite='Lax')  # 1 год, только HTTPS
 
         return response
 
@@ -8186,7 +8187,7 @@ def qr_login_page(user_id):
         response = make_response(redirect(url_for('my_profile')))
         # 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
         response.set_cookie('user_id', profile.id, max_age=365 * 24 * 60 * 60,
-                          secure=True, httponly=True, samesite='Lax')  # Cookie на год, только HTTPS
+                            secure=True, httponly=True, samesite='Lax')  # Cookie на год, только HTTPS
 
         return response
 
@@ -8411,7 +8412,7 @@ def api_update_settings():
     # Поддерживаем обновление как звуковых уведомлений, так и черно-белого режима
     sound_enabled = data.get('sound_notifications')
     grayscale_enabled = data.get('grayscale_mode')
-    
+
     if sound_enabled is None and grayscale_enabled is None:
         return jsonify({"error": "Не указаны настройки для обновления"}), 400
 
@@ -8511,7 +8512,7 @@ def settings():
                     color: #ccc;
                     margin-top: 5px;
                 }
-                
+
                 /* Стили для черно-белого режима */
                 .grayscale-mode {
                     filter: grayscale(100%);
@@ -8520,7 +8521,7 @@ def settings():
                     -ms-filter: grayscale(100%);
                     -o-filter: grayscale(100%);
                 }
-                
+
                 .grayscale-mode * {
                     filter: grayscale(100%);
                     -webkit-filter: grayscale(100%);

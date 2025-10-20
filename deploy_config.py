@@ -29,7 +29,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
 # Настройки для загрузки файлов
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', '/var/www/uploads')
-MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', '16 * 1024 * 1024'))  # 16MB
+MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', '50 * 1024 * 1024'))  # 50MB
 
 print(f"""
 🚀 Конфигурация для деплоя:

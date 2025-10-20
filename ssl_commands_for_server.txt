@@ -1,0 +1,77 @@
+# 🔐 Команды для исправления SSL на сервере 212.67.11.50
+# Выполните эти команды на сервере
+
+# 1. Подключитесь к серверу
+ssh root@212.67.11.50
+
+# 2. Остановите nginx
+systemctl stop nginx
+
+# 3. Удалите старые сертификаты
+rm -f /etc/ssl/certs/nginx-selfsigned.crt
+rm -f /etc/ssl/private/nginx-selfsigned.key
+
+# 4. Создайте директории
+mkdir -p /etc/ssl/certs
+mkdir -p /etc/ssl/private
+
+# 5. Создайте самоподписанный сертификат
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/ssl/private/nginx-selfsigned.key \
+    -out /etc/ssl/certs/nginx-selfsigned.crt \
+    -subj "/C=RU/ST=Moscow/L=Moscow/O=Yatuta/OU=IT/CN=ятута.рф" \
+    -addext "subjectAltName=DNS:ятута.рф,DNS:www.ятута.рф,DNS:localhost,DNS:127.0.0.1"
+
+# 6. Установите права
+chmod 600 /etc/ssl/private/nginx-selfsigned.key
+chmod 644 /etc/ssl/certs/nginx-selfsigned.crt
+
+# 7. Создайте конфигурацию nginx
+cat > /etc/nginx/sites-available/yatuta << 'EOF'
+server {
+    listen 443 ssl;
+    server_name ятута.рф www.ятута.рф;
+
+    # SSL сертификаты
+    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+
+    # SSL настройки
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Проксирование к Flask
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Редирект HTTP на HTTPS
+server {
+    listen 80;
+    server_name ятута.рф www.ятута.рф;
+    return 301 https://$server_name$request_uri;
+}
+EOF
+
+# 8. Активируйте конфигурацию
+ln -sf /etc/nginx/sites-available/yatuta /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+# 9. Проверьте конфигурацию
+nginx -t
+
+# 10. Запустите nginx
+systemctl start nginx
+systemctl enable nginx
+
+# 11. Проверьте статус
+systemctl status nginx
+
+# 12. Проверьте работу
+curl -k -I https://ятута.рф
+

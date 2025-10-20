@@ -4,7 +4,7 @@
 # Flask настройки
 FLASK_ENV=production
 FLASK_APP=run_production.py
-SECRET_KEY=your-super-secret-production-key-change-this
+SECRET_KEY=yatuta-rf-2024-secure-production-key-ятута-рф-безопасность
 
 # База данных
 DATABASE_URL=sqlite:///dating_app.db

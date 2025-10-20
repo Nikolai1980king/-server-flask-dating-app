@@ -19,8 +19,16 @@ import qrcode
 from PIL import Image
 
 app = Flask(__name__)
-app.secret_key = 'super-secret-key'
+# 🔐 БЕЗОПАСНЫЙ СЕКРЕТНЫЙ КЛЮЧ ДЛЯ ПРОДАКШЕНА
+app.secret_key = os.environ.get('SECRET_KEY', 'yatuta-rf-2024-secure-key-change-in-production')
 socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
+
+# 🔐 НАСТРОЙКИ БЕЗОПАСНОСТИ ДЛЯ HTTPS
+# Настройки безопасности куки для HTTPS
+app.config['SESSION_COOKIE_SECURE'] = True  # Куки только по HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Защита от XSS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Защита от CSRF
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 часа
 
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -1880,10 +1888,11 @@ def home():
                     return null;
                 }
 
+                // 🔐 БЕЗОПАСНАЯ ФУНКЦИЯ УСТАНОВКИ КУКИ ДЛЯ HTTPS
                 function setCookie(name, value, days = 365) {
                     const expires = new Date();
                     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-                    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
+                    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax; Secure`;
                 }
 
                 function saveUserId(userId) {
@@ -3328,7 +3337,8 @@ def create_profile():
                                     console.log('✅ Успешная регистрация, перенаправляем на:', data.redirect);
 
                                     // Сохраняем в cookie с дополнительными параметрами для мобильных устройств
-                                    const cookieValue = 'user_id=' + data.user_id + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
+                                    // 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
+                                    const cookieValue = 'user_id=' + data.user_id + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax; Secure';
                                     document.cookie = cookieValue;
 
                                     // Сохраняем в localStorage для мобильных устройств
@@ -5193,7 +5203,8 @@ def my_profile():
                 const currentUserId = document.cookie.match(/user_id=([^;]+)/);
                 if (!currentUserId || currentUserId[1] !== userIdFromUrl) {
                     // Устанавливаем cookie
-                    document.cookie = 'user_id=' + userIdFromUrl + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
+                    // 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
+                    document.cookie = 'user_id=' + userIdFromUrl + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax; Secure';
                     console.log('🍪 Cookie user_id установлен из URL:', userIdFromUrl);
 
                     // Также сохраняем в localStorage
@@ -7978,7 +7989,9 @@ def api_restore_session():
             'profile_exists': True,
             'redirect_url': url_for('view_profile', id=user_id)
         })
-        response.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60)  # 1 год
+        # 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
+        response.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60, 
+                          secure=True, httponly=True, samesite='Lax')  # 1 год, только HTTPS
 
         return response
 
@@ -8171,7 +8184,9 @@ def qr_login_page(user_id):
 
         # Устанавливаем cookie и перенаправляем
         response = make_response(redirect(url_for('my_profile')))
-        response.set_cookie('user_id', profile.id, max_age=365 * 24 * 60 * 60)  # Cookie на год
+        # 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
+        response.set_cookie('user_id', profile.id, max_age=365 * 24 * 60 * 60,
+                          secure=True, httponly=True, samesite='Lax')  # Cookie на год, только HTTPS
 
         return response
 
@@ -9604,7 +9619,8 @@ def payment_success():
                 console.log('🆔 User ID из URL:', userId);
 
                 // Сохраняем user_id в cookie
-                document.cookie = 'user_id=' + userId + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
+                // 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
+                document.cookie = 'user_id=' + userId + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax; Secure';
                 console.log('🍪 Cookie установлен:', document.cookie);
 
                 // Также сохраняем в localStorage для надежности

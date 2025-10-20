@@ -1,3 +1,26 @@
+#!/bin/bash
+
+# 🔧 СКРИПТ ИСПРАВЛЕНИЯ ОШИБКИ 413 ДЛЯ ЗАГРУЗКИ ФАЙЛОВ
+# Этот скрипт исправляет проблему с загрузкой больших файлов (ошибка 413)
+
+echo "🔧 ИСПРАВЛЕНИЕ ОШИБКИ 413 ДЛЯ ЗАГРУЗКИ ФАЙЛОВ"
+echo "=============================================="
+
+echo "🔧 Применение исправлений для загрузки файлов..."
+
+# 1. Создаем резервную копию текущей конфигурации
+echo "💾 Создание резервной копии..."
+sudo cp /etc/nginx/sites-available/yatuta-rf /etc/nginx/sites-available/yatuta-rf.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || echo "Файл конфигурации не найден, создаем новый"
+
+# 2. Остановка сервисов
+echo "⏹️  Остановка сервисов..."
+sudo systemctl stop nginx 2>/dev/null || true
+
+# 3. Обновление конфигурации Nginx с исправлениями для загрузки файлов
+echo "🔧 Обновление конфигурации Nginx..."
+
+# Создаем исправленную конфигурацию
+sudo tee /etc/nginx/sites-available/yatuta-rf > /dev/null << 'EOF'
 server {
     listen 443 ssl;
     server_name ятута.рф www.ятута.рф;
@@ -65,4 +88,52 @@ server {
     listen 80;
     server_name ятута.рф www.ятута.рф;
     return 301 https://$server_name$request_uri;
-} 
+}
+EOF
+
+# 4. Активация конфигурации
+echo "🔗 Активация конфигурации..."
+sudo ln -sf /etc/nginx/sites-available/yatuta-rf /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# 5. Проверка конфигурации Nginx
+echo "✅ Проверка конфигурации Nginx..."
+sudo nginx -t
+if [ $? -ne 0 ]; then
+    echo "❌ Ошибка в конфигурации Nginx!"
+    echo "🔄 Восстанавливаем резервную копию..."
+    sudo cp /etc/nginx/sites-available/yatuta-rf.backup.* /etc/nginx/sites-available/yatuta-rf 2>/dev/null || true
+    exit 1
+fi
+
+# 6. Запуск сервисов
+echo "🚀 Запуск сервисов..."
+sudo systemctl start nginx
+
+# 7. Проверка статуса
+echo "✅ Проверка статуса сервисов..."
+sudo systemctl status nginx --no-pager -l | head -10
+
+# 8. Проверка доступности
+echo "🌐 Проверка доступности сайта..."
+sleep 3
+curl -k -I https://ятута.рф 2>/dev/null | head -5 || echo "Сайт недоступен"
+
+echo ""
+echo "🎉 ИСПРАВЛЕНИЕ ОШИБКИ 413 ЗАВЕРШЕНО!"
+echo "================================================"
+echo "✅ Лимит размера файлов увеличен до 100MB"
+echo "✅ Отключена буферизация запросов"
+echo "✅ Увеличены таймауты для загрузки"
+echo "✅ Оптимизированы размеры буферов"
+echo ""
+echo "📋 ИСПРАВЛЕНИЯ:"
+echo "   • client_max_body_size: 100M"
+echo "   • proxy_request_buffering: off"
+echo "   • proxy_buffering: off"
+echo "   • proxy_*_timeout: 300s"
+echo "   • Увеличены размеры буферов"
+echo ""
+echo "🌐 Теперь можно загружать фото до 100MB!"
+echo "🔧 Проверьте загрузку фото размером 11.8MB"
+

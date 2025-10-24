@@ -19,14 +19,75 @@ import qrcode
 from PIL import Image
 
 app = Flask(__name__)
+
+def compress_image(image_file, max_size=(800, 800), quality=85, max_file_size=5*1024*1024):
+    """
+    Сжимает изображение до оптимального размера
+    max_size: максимальные размеры (ширина, высота)
+    quality: качество JPEG (1-100)
+    max_file_size: максимальный размер файла в байтах (5MB)
+    """
+    try:
+        # Открываем изображение
+        img = Image.open(image_file)
+        
+        # Конвертируем в RGB если нужно (для PNG с прозрачностью)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            # Создаем белый фон
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Получаем размеры
+        original_width, original_height = img.size
+        max_width, max_height = max_size
+        
+        # Вычисляем новые размеры с сохранением пропорций
+        if original_width > max_width or original_height > max_height:
+            ratio = min(max_width/original_width, max_height/original_height)
+            new_width = int(original_width * ratio)
+            new_height = int(original_height * ratio)
+            
+            # Изменяем размер
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            print(f"📸 Изображение сжато: {original_width}x{original_height} → {new_width}x{new_height}")
+        
+        # Сохраняем в буфер с заданным качеством
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=quality, optimize=True)
+        output.seek(0)
+        
+        # Проверяем размер файла
+        file_size = len(output.getvalue())
+        print(f"📊 Размер файла после сжатия: {file_size / 1024 / 1024:.2f} MB")
+        
+        # Если файл все еще слишком большой, уменьшаем качество
+        if file_size > max_file_size:
+            quality = max(50, int(quality * (max_file_size / file_size)))
+            output = io.BytesIO()
+            img.save(output, format='JPEG', quality=quality, optimize=True)
+            output.seek(0)
+            print(f"🔧 Качество уменьшено до {quality}% для соответствия лимиту размера")
+        
+        return output
+        
+    except Exception as e:
+        print(f"❌ Ошибка сжатия изображения: {e}")
+        # Возвращаем оригинальный файл если сжатие не удалось
+        image_file.seek(0)
+        return image_file
 # 🔐 БЕЗОПАСНЫЙ СЕКРЕТНЫЙ КЛЮЧ ДЛЯ ПРОДАКШЕНА
 app.secret_key = os.environ.get('SECRET_KEY', 'yatuta-rf-2024-secure-key-change-in-production')
 socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
 
-# 🔐 НАСТРОЙКИ БЕЗОПАСНОСТИ ДЛЯ HTTPS
-# Настройки безопасности куки для HTTPS
-app.config['SESSION_COOKIE_SECURE'] = True  # Куки только по HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True  # Защита от XSS
+# 🔐 НАСТРОЙКИ БЕЗОПАСНОСТИ ДЛЯ СОВМЕСТИМОСТИ HTTP/HTTPS
+# Настройки безопасности куки для совместимости
+app.config['SESSION_COOKIE_SECURE'] = False  # False для совместимости HTTP/HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = False  # False для доступа JavaScript
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Защита от CSRF
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 часа
 
@@ -1752,7 +1813,25 @@ def home():
         n for n in user_notifications
         if datetime.now() - n['timestamp'] < timedelta(minutes=5)
     ]
-    has_profile = Profile.query.get(user_id)
+    
+    # Улучшенная проверка профиля
+    has_profile = None
+    if user_id:
+        profile = Profile.query.get(user_id)
+        if profile and profile.is_paid:
+            # Проверяем, не истек ли срок жизни профиля
+            try:
+                remaining_time = get_profile_lifetime_remaining(user_id)
+                if remaining_time != 'Истекла':
+                    has_profile = profile
+                    print(f"✅ Пользователь {user_id} имеет активный оплаченный профиль")
+                else:
+                    print(f"⏰ Профиль пользователя {user_id} истек")
+            except Exception as e:
+                print(f"⚠️ Ошибка при проверке времени жизни профиля: {e}")
+                has_profile = profile  # В случае ошибки считаем профиль активным
+        else:
+            print(f"❌ Пользователь {user_id} не имеет оплаченного профиля")
     navbar = render_navbar(
         user_id,
         active=None,
@@ -1892,7 +1971,7 @@ def home():
                 function setCookie(name, value, days = 365) {
                     const expires = new Date();
                     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-                    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax; Secure`;
+                    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
                 }
 
                 function saveUserId(userId) {
@@ -1923,6 +2002,12 @@ def home():
                 async function autoRestoreSession() {
                     console.log('🔄 Начинаем автоматическое восстановление сессии...');
 
+                    // Защита от множественных переадресаций
+                    if (sessionStorage.getItem('redirecting')) {
+                        console.log('⚠️ Переадресация уже выполняется, пропускаем...');
+                        return false;
+                    }
+
                     const cookie = getCookie('user_id');
                     const storage = getUserIdFromStorage();
 
@@ -1941,8 +2026,11 @@ def home():
 
                             console.log('📊 Ответ API:', data);
 
-                            if (data.success && data.exists) {
-                                console.log('✅ Профиль найден! Восстанавливаем сессию...');
+                            if (data.success && data.exists && data.is_paid && data.is_active) {
+                                console.log('✅ Профиль найден, оплачен и активен! Восстанавливаем сессию...');
+                                console.log('💰 Профиль оплачен:', data.is_paid);
+                                console.log('⏰ Оставшееся время:', data.remaining_time);
+                                console.log('👤 Имя пользователя:', data.profile_data?.name || 'Неизвестно');
 
                                 // Восстанавливаем сессию
                                 setCookie('user_id', userId);
@@ -1955,8 +2043,24 @@ def home():
                                     console.log('✅ Кнопка создания анкеты скрыта');
                                 }
 
+                                // Устанавливаем флаг переадресации
+                                sessionStorage.setItem('redirecting', 'true');
                                 console.log('✅ Сессия восстановлена, возвращаем true для перенаправления');
                                 return true;
+                            } else if (data.success && data.exists && !data.is_paid) {
+                                console.log('⚠️ Профиль найден, но не оплачен. Перенаправляем на оплату...');
+                                // Устанавливаем флаг переадресации
+                                sessionStorage.setItem('redirecting', 'true');
+                                window.location.href = '/payment';
+                                return true;
+                            } else if (data.success && data.exists && !data.is_active) {
+                                console.log('⏰ Профиль найден, но истек срок жизни. Позволяем создать новый...');
+                                // Показываем кнопку создания анкеты
+                                const createSection = document.getElementById('create-profile-section');
+                                if (createSection) {
+                                    createSection.style.display = 'block';
+                                    console.log('✅ Кнопка создания анкеты показана (профиль истек)');
+                                }
                             } else {
                                 console.log('❌ Профиль не найден или ошибка API');
 
@@ -1987,14 +2091,18 @@ def home():
                             const response = await fetch(`/api/check-profile/${userId}`);
                             const data = await response.json();
 
-                            if (data.success && data.exists) {
-                                // Профиль существует - скрываем кнопку
+                            if (data.success && data.exists && data.is_paid && data.is_active) {
+                                // Профиль существует, оплачен и активен - скрываем кнопку
                                 createSection.style.display = 'none';
-                                console.log('✅ Профиль существует, кнопка создания скрыта');
+                                console.log('✅ Профиль существует, оплачен и активен, кнопка создания скрыта');
+                            } else if (data.success && data.exists && !data.is_paid) {
+                                // Профиль существует, но не оплачен - скрываем кнопку (перенаправим на оплату)
+                                createSection.style.display = 'none';
+                                console.log('⚠️ Профиль существует, но не оплачен, кнопка создания скрыта');
                             } else {
-                                // Профиль не существует - показываем кнопку
+                                // Профиль не существует или истек - показываем кнопку
                                 createSection.style.display = 'block';
-                                console.log('❌ Профиль не существует, кнопка создания показана');
+                                console.log('❌ Профиль не существует или истек, кнопка создания показана');
                             }
                         } catch (error) {
                             console.error('❌ Ошибка при проверке состояния профиля:', error);
@@ -2011,6 +2119,9 @@ def home():
                 // Запускаем восстановление сессии при загрузке страницы
                 window.onload = function() {
                     console.log('🚀 Страница загружена, начинаем восстановление сессии...');
+
+                    // Очищаем флаг переадресации при загрузке страницы
+                    sessionStorage.removeItem('redirecting');
 
                     // Проверяем тип устройства
                     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2029,6 +2140,8 @@ def home():
                         } else {
                             // Если сессия восстановлена, сразу перенаправляем на профиль
                             console.log('✅ Сессия восстановлена, перенаправляем на профиль');
+                            // Устанавливаем флаг переадресации для предотвращения множественных переадресаций
+                            sessionStorage.setItem('redirecting', 'true');
                             window.location.href = '/my_profile';
                         }
                     }, delay);
@@ -2152,7 +2265,15 @@ def create_profile():
             if photo and photo.filename:
                 filename = f"{user_id}_{photo.filename}"
                 photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                photo.save(photo_path)
+                
+                # 📸 СЖАТИЕ ИЗОБРАЖЕНИЯ
+                print(f"🔄 Обрабатываем фото: {photo.filename}")
+                compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5*1024*1024)
+                
+                # Сохраняем сжатое изображение
+                with open(photo_path, 'wb') as f:
+                    f.write(compressed_photo.getvalue())
+                print(f"✅ Фото сохранено: {photo_path}")
                 # Получаем IP-адрес клиента для безопасности
                 client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
 
@@ -2180,7 +2301,7 @@ def create_profile():
                     'user_id': user_id,
                     'redirect': url_for('payment')
                 })
-                resp.set_cookie('user_id', user_id)
+                resp.set_cookie('user_id', user_id, max_age=365*24*60*60, path='/', secure=False, httponly=False, samesite='Lax')
                 return resp
             else:
                 return jsonify({
@@ -3338,7 +3459,7 @@ def create_profile():
 
                                     // Сохраняем в cookie с дополнительными параметрами для мобильных устройств
                                     // 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
-                                    const cookieValue = 'user_id=' + data.user_id + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax; Secure';
+                                    const cookieValue = 'user_id=' + data.user_id + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
                                     document.cookie = cookieValue;
 
                                     // Сохраняем в localStorage для мобильных устройств
@@ -3382,26 +3503,8 @@ def create_profile():
                     }
                 });
 
-                // Функция для проверки существующего профиля
-                async function checkExistingProfile() {
-                    const userId = getCookie('user_id') || localStorage.getItem('dating_app_user_id');
-
-                    if (userId) {
-                        try {
-                            const response = await fetch(`/api/check-profile/${userId}`);
-                            const data = await response.json();
-
-                            if (data.success && data.exists) {
-                                console.log('✅ Профиль уже существует, перенаправляем на профиль');
-                                window.location.href = '/my_profile';
-                                return true;
-                            }
-                        } catch (error) {
-                            console.error('❌ Ошибка при проверке профиля:', error);
-                        }
-                    }
-                    return false;
-                }
+                // Функция для проверки существующего профиля (УДАЛЕНА - дублирует autoRestoreSession)
+                // Эта логика теперь обрабатывается в autoRestoreSession() на главной странице
 
                 // Инициализация карты при загрузке страницы
                 window.onload = function() {
@@ -3564,13 +3667,38 @@ def require_profile(check_payment=True):
             if check_payment and profile and not profile.is_paid:
                 print(f"💰 @require_profile: профиль не оплачен, перенаправляем на оплату")
                 return redirect(url_for('payment'))
+            
+            # Дополнительная проверка для оплаченных профилей
+            if profile and profile.is_paid:
+                try:
+                    remaining_time = get_profile_lifetime_remaining(user_id)
+                    if remaining_time == 'Истекла':
+                        print(f"⏰ @require_profile: профиль оплачен, но истек срок жизни")
+                        # Для истекших профилей разрешаем доступ, но пользователь может создать новый
+                    else:
+                        print(f"✅ @require_profile: профиль оплачен и активен, оставшееся время: {remaining_time}")
+                except Exception as e:
+                    print(f"⚠️ @require_profile: ошибка при проверке времени жизни профиля: {e}")
+                    # В случае ошибки считаем профиль активным
 
             # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
             # Это предотвращает доступ к чужим анкетам через общие cookies
+            # ИСПРАВЛЕНО: Полностью убираем IP-проверку для оплаченных профилей
             if profile and hasattr(profile, 'creation_ip') and profile.creation_ip:
                 client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-                if profile.creation_ip != client_ip:
-                    return redirect(url_for('create_profile'))
+                
+                if profile.is_paid:
+                    # Для оплаченных профилей НЕ проверяем IP - разрешаем доступ с любого IP
+                    if profile.creation_ip != client_ip:
+                        print(f"✅ IP изменился для оплаченного профиля {profile.name}: {profile.creation_ip} -> {client_ip} (доступ разрешен)")
+                else:
+                    # Для неоплаченных профилей проверяем IP
+                    if profile.creation_ip != client_ip:
+                        print(f"⚠️ IP не совпадает для неоплаченного профиля {profile.name}: {profile.creation_ip} != {client_ip}")
+                        print(f"🔄 Перенаправляем на создание профиля")
+                        return redirect(url_for('create_profile'))
+                    else:
+                        print(f"✅ IP совпадает для неоплаченного профиля {profile.name}: {client_ip}")
 
             return view_func(*args, **kwargs)
 
@@ -4481,7 +4609,15 @@ def edit_pending_profile():
                 pass
             filename = f"{user_id}_{photo.filename}"
             photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            photo.save(photo_path)
+            
+            # 📸 СЖАТИЕ ИЗОБРАЖЕНИЯ
+            print(f"🔄 Обрабатываем фото для редактирования: {photo.filename}")
+            compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5*1024*1024)
+            
+            # Сохраняем сжатое изображение
+            with open(photo_path, 'wb') as f:
+                f.write(compressed_photo.getvalue())
+            print(f"✅ Фото сохранено: {photo_path}")
             pending.photo = filename
 
         db.session.commit()
@@ -5205,7 +5341,7 @@ def my_profile():
                 if (!currentUserId || currentUserId[1] !== userIdFromUrl) {
                     // Устанавливаем cookie
                     // 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
-                    document.cookie = 'user_id=' + userIdFromUrl + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax; Secure';
+                    document.cookie = 'user_id=' + userIdFromUrl + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
                     console.log('🍪 Cookie user_id установлен из URL:', userIdFromUrl);
 
                     // Также сохраняем в localStorage
@@ -5276,7 +5412,15 @@ def edit_profile():
                 pass
             filename = f"{user_id}_{photo.filename}"
             photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            photo.save(photo_path)
+            
+            # 📸 СЖАТИЕ ИЗОБРАЖЕНИЯ
+            print(f"🔄 Обрабатываем фото для основного профиля: {photo.filename}")
+            compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5*1024*1024)
+            
+            # Сохраняем сжатое изображение
+            with open(photo_path, 'wb') as f:
+                f.write(compressed_photo.getvalue())
+            print(f"✅ Фото сохранено: {photo_path}")
             profile.photo = filename
         db.session.commit()
         return redirect(url_for('my_profile'))
@@ -7914,14 +8058,32 @@ def test_geolocation():
 def api_check_profile(user_id):
     """
     API endpoint для проверки существования профиля по user_id
+    ИСПРАВЛЕНО: Добавлена проверка оплаты и активности профиля
     """
     try:
         profile = Profile.query.get(user_id)
         exists = profile is not None
-
+        
+        # Дополнительные проверки для существующего профиля
+        is_paid = False
+        is_active = False
+        remaining_time = None
+        
+        if profile:
+            is_paid = profile.is_paid
+            # Проверяем активность профиля
+            try:
+                remaining_time = get_profile_lifetime_remaining(user_id)
+                is_active = remaining_time != 'Истекла'
+            except:
+                is_active = True  # Если не можем проверить, считаем активным
+        
         return jsonify({
             'success': True,
             'exists': exists,
+            'is_paid': is_paid,
+            'is_active': is_active,
+            'remaining_time': remaining_time,
             'user_id': user_id,
             'profile_data': {
                 'name': profile.name if profile else None,
@@ -7992,7 +8154,7 @@ def api_restore_session():
         })
         # 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
         response.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60,
-                            secure=True, httponly=True, samesite='Lax')  # 1 год, только HTTPS
+                            secure=False, httponly=False, samesite='Lax')  # 1 год, совместимость HTTP/HTTPS
 
         return response
 
@@ -8187,7 +8349,7 @@ def qr_login_page(user_id):
         response = make_response(redirect(url_for('my_profile')))
         # 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
         response.set_cookie('user_id', profile.id, max_age=365 * 24 * 60 * 60,
-                            secure=True, httponly=True, samesite='Lax')  # Cookie на год, только HTTPS
+                            secure=False, httponly=False, samesite='Lax')  # Cookie на год, совместимость HTTP/HTTPS
 
         return response
 
@@ -9621,7 +9783,7 @@ def payment_success():
 
                 // Сохраняем user_id в cookie
                 // 🔐 БЕЗОПАСНАЯ УСТАНОВКА КУКИ ДЛЯ HTTPS
-                document.cookie = 'user_id=' + userId + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax; Secure';
+                document.cookie = 'user_id=' + userId + '; path=/; max-age=' + (365*24*60*60) + '; SameSite=Lax';
                 console.log('🍪 Cookie установлен:', document.cookie);
 
                 // Также сохраняем в localStorage для надежности

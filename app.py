@@ -196,6 +196,32 @@ def get_location_name(lat, lon):
         return None
 
 
+def get_yandex_metrica_code():
+    """
+    Возвращает HTML код Яндекс.Метрики для вставки в head
+    Замените YOUR_COUNTER_ID на ваш ID счетчика
+    """
+    counter_id = "104971048"  # ID счетчика Яндекс.Метрики
+    
+    # Используем обычное форматирование строки вместо f-string для избежания проблем с экранированием
+    return '''<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();
+   for (j=0; j<document.scripts.length; j++){if (document.scripts[j].src===r){ return; }}
+   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)}}
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym"));
+
+   ym(''' + counter_id + ''', "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true,
+        webvisor:true
+   });
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/''' + counter_id + '''" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->'''
+
 def get_starry_night_css():
     return '''
         body { 
@@ -1847,6 +1873,7 @@ def home():
             <meta name="format-detection" content="telephone=no">
             <meta name="msapplication-tap-highlight" content="no">
             <title>Знакомства в кафе</title>
+            {{ get_yandex_metrica_code()|safe }}
             <style>
                 {{ get_starry_night_css()|safe }}
                 body { 
@@ -2151,6 +2178,7 @@ def home():
         </html>
     ''', unread_notifications=unread_notifications, navbar=navbar, has_profile=has_profile,
                                   get_starry_night_css=get_starry_night_css,
+                                  get_yandex_metrica_code=get_yandex_metrica_code,
                                   PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE)
 
 

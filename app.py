@@ -2631,7 +2631,7 @@ def create_profile():
                         <option value="">Выберите пол</option>
                         <option value="male">Мужской</option>
                         <option value="female">Женский</option>
-                        <option value="other">Другое</option>
+                        
                     </select>
                 </div>
                 <div class="field-container">
@@ -4935,7 +4935,6 @@ def edit_pending_profile():
                         <option value="">Выберите пол</option>
                         <option value="male" {% if pending.gender == 'male' %}selected{% endif %}>Мужской</option>
                         <option value="female" {% if pending.gender == 'female' %}selected{% endif %}>Женский</option>
-                        <option value="other" {% if pending.gender == 'other' %}selected{% endif %}>Другое</option>
                     </select>
                 </div>
                 <div class="field-container">
@@ -6339,7 +6338,6 @@ def edit_profile():
                     <option value="">Выберите пол</option>
                     <option value="male" {% if profile.gender == 'male' %}selected{% endif %}>Мужской</option>
                     <option value="female" {% if profile.gender == 'female' %}selected{% endif %}>Женский</option>
-                    <option value="other" {% if profile.gender == 'other' %}selected{% endif %}>Другое</option>
                 </select>
                 </div>
                 <div class="field-container">

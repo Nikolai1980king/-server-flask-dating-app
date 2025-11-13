@@ -1984,6 +1984,11 @@ def home():
                     Создать анкету
                 </a>
             </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/about" class="big-create-btn" style="background: #667eea; box-shadow: 0 6px 24px rgba(102, 126, 234, 0.3);">
+                    О приложении
+                </a>
+            </div>
 
             <script>
                 // Функции для работы с cookie и localStorage
@@ -2180,6 +2185,226 @@ def home():
                                   get_starry_night_css=get_starry_night_css,
                                   get_yandex_metrica_code=get_yandex_metrica_code,
                                   PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE)
+
+
+@app.route('/about')
+def about():
+    """Страница с информацией о приложении"""
+    user_id = request.cookies.get('user_id')
+    navbar = render_navbar(
+        user_id,
+        active=None,
+        unread_messages=get_unread_messages_count(user_id),
+        unread_likes=get_unread_likes_count(user_id),
+        unread_matches=get_unread_matches_count(user_id)
+    )
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="format-detection" content="telephone=no">
+            <meta name="msapplication-tap-highlight" content="no">
+            <title>О приложении</title>
+            {{ get_yandex_metrica_code()|safe }}
+            <style>
+                {{ get_starry_night_css()|safe }}
+                body { 
+                    font-family: Arial, sans-serif; 
+                    max-width: 800px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                    color: #fff;
+                }
+                .content-container {
+                    background: rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(10px);
+                    border-radius: 20px;
+                    padding: 30px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    margin-top: 20px;
+                }
+                h1 {
+                    color: #fff;
+                    text-align: center;
+                    margin-bottom: 30px;
+                    font-size: 2.5em;
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                }
+                h2 {
+                    color: #fff;
+                    margin-top: 30px;
+                    margin-bottom: 15px;
+                    font-size: 1.5em;
+                    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+                }
+                h3 {
+                    color: #fff;
+                    margin-top: 20px;
+                    margin-bottom: 10px;
+                    font-size: 1.2em;
+                }
+                p {
+                    line-height: 1.8;
+                    margin-bottom: 15px;
+                    color: #f0f0f0;
+                }
+                ul {
+                    line-height: 1.8;
+                    margin-bottom: 20px;
+                    padding-left: 20px;
+                }
+                li {
+                    margin-bottom: 10px;
+                    color: #f0f0f0;
+                }
+                .intro-text {
+                    font-size: 1.2em;
+                    font-weight: bold;
+                    margin-bottom: 25px;
+                    text-align: center;
+                    color: #fff;
+                    background: rgba(102, 126, 234, 0.2);
+                    padding: 20px;
+                    border-radius: 15px;
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                }
+                .section {
+                    background: rgba(255, 255, 255, 0.05);
+                    padding: 20px;
+                    border-radius: 15px;
+                    margin-bottom: 25px;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                .advantages {
+                    background: rgba(76, 175, 80, 0.1);
+                    padding: 20px;
+                    border-radius: 15px;
+                    margin-top: 30px;
+                    border: 1px solid rgba(76, 175, 80, 0.3);
+                }
+                .advantages ul {
+                    list-style: none;
+                    padding-left: 0;
+                }
+                .advantages li {
+                    padding-left: 25px;
+                    position: relative;
+                }
+                .advantages li:before {
+                    content: "✓";
+                    position: absolute;
+                    left: 0;
+                    color: #4CAF50;
+                    font-weight: bold;
+                    font-size: 1.2em;
+                }
+                .back-btn {
+                    display: inline-block;
+                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    border-radius: 25px;
+                    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+                    font-size: 1.1em;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-weight: bold;
+                    text-decoration: none;
+                    margin-top: 30px;
+                    text-align: center;
+                }
+                .back-btn:hover {
+                    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+                    transform: translateY(-3px) scale(1.05);
+                }
+                .back-btn-container {
+                    text-align: center;
+                    margin-top: 30px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="content-container">
+                <h1>О приложении</h1>
+                
+                <div class="intro-text">
+                    Знакомства там, где ты есть: Без свайпов. Без лишних слов. Только живое общение.
+                </div>
+
+                <p>Устали от бесконечных переписок в обычных dating-приложениях? Наше приложение использует геолокацию, чтобы показать вас людям вокруг и наоборот. Знакомьтесь легко и естественно там, где вы находитесь прямо сейчас — в кафе, ресторанах, отелях и торговых центрах. Наше  приложение против фейков и "Диванных посетителей"</p>
+
+                <h2>Почему это работает идеально?</h2>
+
+                <div class="section">
+                    <h3>1. Кафе: Идеальное место для спонтанной встречи</h3>
+                    <p><strong>Чем хорошо:</strong> Кафе — это неформальная, уютная и расслабляющая атмосфера, идеальная для первого, быстрого свидания.</p>
+                    <p><strong>Как поможет наше приложение:</strong></p>
+                    <ul>
+                        <li><strong>Мгновенный кофе-брейк:</strong> Увидели интересного человека за соседним столиком? Отправьте виртуальную "чашку кофе" и начните общение. Не нужно гадать, свободен ли он(а) и хочет ли познакомиться.</li>
+                        <li><strong>Общий повод:</strong> Вы оба уже в кафе! Это снимает напряжение и дает естественный повод для встречи: "Я тоже заказал(а) капучино, стоит попробовать их круассан!".</li>
+                        <li><strong>Безопасность и комфорт:</strong> Публичное место делает первую встречу безопасной и ненапряженной.</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <h3>2. Рестораны: Романтика начинается здесь и сейчас</h3>
+                    <p><strong>Чем хорошо:</strong> Ресторан предполагает более долгое и романтическое общение. Идеально для тех, кто ценит гастрономию и хочет серьезного знакомства.</p>
+                    <p><strong>Как поможет наше приложение:</strong></p>
+                    <ul>
+                        <li><strong>Сосед за столиком:</strong> Ужинаете в одиночестве или с друзьями? Приложение покажет, кто еще в этом ресторане настроен на общение. Возможно, ваша вторая половинка сидит в двух метрах от вас.</li>
+                        <li><strong>Общий вкус:</strong> Сам факт выбора одного и того же ресторана говорит о возможной схожести вкусов. Это отличный старт для беседы.</li>
+                        <li><strong>План на вечер:</strong> Запланируйте ужин в хорошем ресторане и посмотрите, кто составит вам компанию. Это делает вечер по-настоящему особенным.</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <h3>3. Отели и Гостиницы: Знакомства в путешествиях без границ</h3>
+                    <p><strong>Чем хорошо:</strong> Отели полны интересных людей со всего мира, но познакомиться с ними традиционным способом почти невозможно.</p>
+                    <p><strong>Как поможет наше приложение:</strong></p>
+                    <ul>
+                        <li><strong>Победите одиночество в поездке:</strong> Вы в командировке или отпуске в одиночку? Приложение покажет таких же путешественников в вашем отеле. Найдите компанию для ужина, экскурсии или прогулки по незнакомому городу.</li>
+                        <li><strong>Нетворкинг и романтика:</strong> Найдите не только романтические приключения, но и полезные деловые контакты.</li>
+                        <li><strong>Локальный гид:</strong> Местный житель, остановившийся в том же отеле, может стать вашим гидом и показать город с нового ракурса.</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <h3>4. Торговые Комплексы (ТЦ): Сделайте шопинг социальным</h3>
+                    <p><strong>Чем хорошо:</strong> Торговый центр — это место, где люди проводят много времени, но знакомства здесь случайны и редки.</p>
+                    <p><strong>Как поможет наше приложение:</strong></p>
+                    <ul>
+                        <li><strong>Шопинг-свидание:</strong> Увидели в приложении кого-то интересного в том же ТЦ? Предложите вместе выбрать подарок другу или просто прогуляться по магазинам. Это весело и непринужденно.</li>
+                        <li><strong>Общие интересы по локации:</strong> Вы оба в книжном магазине? В отделе техники? В кино? Это сразу дает тему для разговора.</li>
+                        <li><strong>Перерыв с пользой:</strong> Вместо того чтобы пить кофе в одиночестве, найдите компанию на фуд-корте или в кино.</li>
+                    </ul>
+                </div>
+
+                <div class="advantages">
+                    <h2>Ключевые преимущества нашего приложения:</h2>
+                    <ul>
+                        <li><strong>Контекстное общение:</strong> Вы сразу видите, где находится человек, и у вас есть общий контекст (кафе, ресторан, ТЦ), что упрощает начало беседы.</li>
+                        <li><strong>Экономия времени:</strong> Не нужно неделями переписываться. Вы рядом — можно встретиться здесь и сейчас.</li>
+                        <li><strong>Естественность:</strong> Знакомства происходят в реальной жизни, а не в виртуальном пространстве.</li>
+                        <li><strong>Безопасность:</strong> Все встречи происходят в публичных местах.</li>
+                        <li><strong>Спонтанность и адреналин:</strong> Приложение добавляет в жизнь элемент неожиданности и волнения.</li>
+                    </ul>
+                </div>
+
+                <p style="text-align: center; font-size: 1.1em; margin-top: 30px; font-weight: bold;">
+                    Перейдите в приложение и откройте для себя мир живых знакомств вокруг!
+                </p>
+
+                <div class="back-btn-container">
+                    <a href="/" class="back-btn">← Назад</a>
+                </div>
+            </div>
+        </body>
+        </html>
+    ''', navbar=navbar, get_starry_night_css=get_starry_night_css,
+                                  get_yandex_metrica_code=get_yandex_metrica_code)
 
 
 @app.route('/create', methods=['GET', 'POST'])

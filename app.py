@@ -199,27 +199,27 @@ def get_location_name(lat, lon):
 def get_yandex_metrica_code():
     """
     Возвращает HTML код Яндекс.Метрики для вставки в head
-    Замените YOUR_COUNTER_ID на ваш ID счетчика
     """
     counter_id = "104971048"  # ID счетчика Яндекс.Метрики
     
-    # Используем обычное форматирование строки вместо f-string для избежания проблем с экранированием
-    return '''<!-- Yandex.Metrika counter -->
+    # Исправленный код с кавычками вокруг ID счетчика и актуальным форматом
+    return f'''<!-- Yandex.Metrika counter -->
 <script type="text/javascript">
-   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   (function(m,e,t,r,i,k,a){{
+   m[i]=m[i]||function(){{(m[i].a=m[i].a||[]).push(arguments)}};
    m[i].l=1*new Date();
-   for (j=0; j<document.scripts.length; j++){if (document.scripts[j].src===r){ return; }}
+   for (j=0; j<document.scripts.length; j++){{if (document.scripts[j].src===r){{ return; }}}}
    k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)}}
    (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym"));
 
-   ym(''' + counter_id + ''', "init", {
+   ym("{counter_id}", "init", {{
         clickmap:true,
         trackLinks:true,
         accurateTrackBounce:true,
         webvisor:true
-   });
+   }});
 </script>
-<noscript><div><img src="https://mc.yandex.ru/watch/''' + counter_id + '''" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<noscript><div><img src="https://mc.yandex.ru/watch/{counter_id}" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 <!-- /Yandex.Metrika counter -->'''
 
 def get_starry_night_css():
@@ -1975,10 +1975,10 @@ def home():
             {% endfor %}
             <div class="welcome-message">
                 <p class="welcome-text">Хотите найти приятную компанию за чашечкой кофе? ☕</p>
-                <p class="welcome-description">Наше приложение поможет вам познакомиться с интересными людьми в заведениях — для душевных бесед, новых знакомств или просто хорошего времени.</p>
+                <p class="welcome-description">Наше приложение работает во всех заведениях(кафе, рестораны, торговые центры), оно поможет вам познакомиться с интересными людьми  — для душевных бесед, новых знакомств или просто хорошего времени.</p>
                 <p class="welcome-price">Регистрация — всего {{ PROFILE_CREATION_PRICE }} рублей, а возможности — бесценны! 😊</p>
             </div>
-            <p style="color: white;">Здесь вы можете найти интересных людей для общения.</p>
+            <p style="color: white;">Осуществляйте вход в приложение с того браузера где была регистрация.</p>
             <div id="create-profile-section" style="display: {% if not has_profile %}block{% else %}none{% endif %};">
                 <a href="/create" class="big-create-btn">
                     Создать анкету

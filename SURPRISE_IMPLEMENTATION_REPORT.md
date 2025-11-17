@@ -330,3 +330,6 @@ class SentJoke(db.Model):
 
 
 
+
+
+

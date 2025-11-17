@@ -2198,6 +2198,8 @@ def about():
         unread_likes=get_unread_likes_count(user_id),
         unread_matches=get_unread_matches_count(user_id)
     )
+    # Получаем количество посетителей (анкет) в приложении
+    visitor_count = Profile.query.count()
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -2396,6 +2398,9 @@ def about():
                 <p style="text-align: center; font-size: 1.1em; margin-top: 30px; font-weight: bold;">
                     Перейдите в приложение и откройте для себя мир живых знакомств вокруг!
                 </p>
+                <p style="text-align: center; font-size: 0.85em; color: rgba(255,255,255,0.6); margin-top: 10px;">
+                    Сейчас в приложении: {{ visitor_count }} посетителей
+                </p>
 
                 <div class="back-btn-container">
                     <a href="/" class="back-btn">← Назад</a>
@@ -2404,7 +2409,8 @@ def about():
         </body>
         </html>
     ''', navbar=navbar, get_starry_night_css=get_starry_night_css,
-                                  get_yandex_metrica_code=get_yandex_metrica_code)
+                                  get_yandex_metrica_code=get_yandex_metrica_code,
+                                  visitor_count=visitor_count)
 
 
 @app.route('/create', methods=['GET', 'POST'])

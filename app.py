@@ -1,14 +1,14 @@
 # нужно вводить https://192.168.255.137
 # Тестовое изменение для демонстрации коммита
 
-from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify, send_from_directory
+from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify, send_from_directory, flash
 from flask_socketio import SocketIO, emit, join_room
 import os
 import uuid
 from datetime import datetime, timedelta
 from collections import defaultdict
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_
+from sqlalchemy import and_, inspect, text
 from functools import wraps
 import requests
 import threading
@@ -20,7 +20,8 @@ from PIL import Image
 
 app = Flask(__name__)
 
-def compress_image(image_file, max_size=(800, 800), quality=85, max_file_size=5*1024*1024):
+
+def compress_image(image_file, max_size=(800, 800), quality=85, max_file_size=5 * 1024 * 1024):
     """
     Сжимает изображение до оптимального размера
     max_size: максимальные размеры (ширина, высота)
@@ -48,7 +49,7 @@ def compress_image(image_file, max_size=(800, 800), quality=85, max_file_size=5*
         
         # Вычисляем новые размеры с сохранением пропорций
         if original_width > max_width or original_height > max_height:
-            ratio = min(max_width/original_width, max_height/original_height)
+            ratio = min(max_width / original_width, max_height / original_height)
             new_width = int(original_width * ratio)
             new_height = int(original_height * ratio)
             
@@ -80,6 +81,8 @@ def compress_image(image_file, max_size=(800, 800), quality=85, max_file_size=5*
         # Возвращаем оригинальный файл если сжатие не удалось
         image_file.seek(0)
         return image_file
+
+
 # 🔐 БЕЗОПАСНЫЙ СЕКРЕТНЫЙ КЛЮЧ ДЛЯ ПРОДАКШЕНА
 app.secret_key = os.environ.get('SECRET_KEY', 'yatuta-rf-2024-secure-key-change-in-production')
 socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
@@ -102,7 +105,9 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 db = SQLAlchemy(app)
 
 # Максимальное расстояние для регистрации (в метрах) - СТРОКА 29
-MAX_REGISTRATION_DISTANCE = 10000000  # 10000 км = 1000000 метров
+MAX_REGISTRATION_DISTANCE = 300  # 300 метров
+LOCATION_HEARTBEAT_INTERVAL_SECONDS = 120
+LOCATION_TIMEOUT_MINUTES = 10
 
 # Время жизни анкеты в часах - НАСТРАИВАЕМАЯ ПЕРЕМЕННАЯ
 # ⚠️ ВАЖНО: После изменения этих значений ОБЯЗАТЕЛЬНО ПЕРЕЗАПУСТИТЕ СЕРВЕР!
@@ -222,6 +227,7 @@ def get_yandex_metrica_code():
 <noscript><div><img src="https://mc.yandex.ru/watch/{counter_id}" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 <!-- /Yandex.Metrika counter -->'''
 
+
 def get_starry_night_css():
     return '''
         body { 
@@ -297,6 +303,9 @@ class Profile(db.Model):
     likes = db.Column(db.Integer, default=0)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
+    venue_latitude = db.Column(db.Float, nullable=True)
+    venue_longitude = db.Column(db.Float, nullable=True)
+    last_location_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # Поля для оплаты
     is_paid = db.Column(db.Boolean, default=False)
@@ -321,8 +330,54 @@ class PendingProfile(db.Model):
     photo = db.Column(db.String, nullable=True)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
+    venue_latitude = db.Column(db.Float, nullable=True)
+    venue_longitude = db.Column(db.Float, nullable=True)
+    last_location_at = db.Column(db.DateTime, nullable=True)
     creation_ip = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+def ensure_location_columns():
+    """Гарантирует наличие колонок для отслеживания локации профилей"""
+    engine = db.engine
+    inspector = inspect(engine)
+
+    def add_columns_if_missing(table_name, columns_to_add):
+        try:
+            existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
+        except Exception as e:
+            print(f"⚠️ Не удалось получить список колонок таблицы {table_name}: {e}")
+            return
+
+        for column_name, column_definition in columns_to_add.items():
+            if column_name not in existing_columns:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"))
+                    print(f"✅ Добавлен столбец {column_name} в таблицу {table_name}")
+                except Exception as e:
+                    print(f"❌ Не удалось добавить столбец {column_name} в {table_name}: {e}")
+
+    add_columns_if_missing('profile', {
+        'venue_latitude': 'REAL',
+        'venue_longitude': 'REAL',
+        'last_location_at': 'TEXT'
+    })
+
+    table_names = inspector.get_table_names()
+    if 'pending_profile' in table_names:
+        add_columns_if_missing('pending_profile', {
+            'venue_latitude': 'REAL',
+            'venue_longitude': 'REAL',
+            'last_location_at': 'TEXT'
+        })
+
+
+with app.app_context():
+    try:
+        ensure_location_columns()
+    except Exception as ensure_err:
+        print(f"⚠️ Ошибка инициализации колонок локации: {ensure_err}")
 
 
 class Message(db.Model):
@@ -893,10 +948,13 @@ def process_payment_completion(user_id, payment_id, status):
                         likes=0,
                         latitude=pending.latitude,
                         longitude=pending.longitude,
+                        venue_latitude=pending.venue_latitude,
+                        venue_longitude=pending.venue_longitude,
                         creation_ip=pending.creation_ip,
                         is_paid=True,
                         payment_date=datetime.utcnow(),
-                        created_at=datetime.utcnow()  # Таймер запускается после оплаты!
+                        created_at=datetime.utcnow(),  # Таймер запускается после оплаты!
+                        last_location_at=pending.last_location_at or datetime.utcnow()
                     )
                     db.session.add(profile)
                     # Удаляем временную анкету
@@ -1000,6 +1058,79 @@ def get_profile_lifetime_remaining(user_id):
         return f"{total_hours}ч {total_minutes}м"
     else:
         return f"{total_minutes}м"
+
+
+def require_profile(check_payment=True):
+    """Декоратор для проверки наличия профиля и опционально оплаты"""
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            # Автоматически запускаем очистку просроченных анкет при каждом запросе
+            try:
+                cleanup_expired_profiles()
+                cleanup_expired_pending_profiles()  # Очищаем временные анкеты
+            except Exception as e:
+                print(f"⚠️ Ошибка при автоматической очистке: {e}")
+
+            user_id = request.cookies.get('user_id')
+            print(f"🔍 @require_profile: проверяем пользователя {user_id}")
+
+            if not user_id:
+                print(f"❌ @require_profile: нет user_id в cookie, перенаправляем на создание")
+                return redirect(url_for('create_profile'))
+
+            profile = Profile.query.get(user_id)
+            if profile is None:
+                print(f"❌ @require_profile: профиль {user_id} не найден, перенаправляем на создание")
+                return redirect(url_for('create_profile'))
+
+            print(f"✅ @require_profile: профиль найден - {profile.name}, оплачен: {profile.is_paid}")
+
+            # Проверяем оплату только если требуется
+            if check_payment and profile and not profile.is_paid:
+                print(f"💰 @require_profile: профиль не оплачен, перенаправляем на оплату")
+                return redirect(url_for('payment'))
+
+            # Дополнительная проверка для оплаченных профилей
+            if profile and profile.is_paid:
+                try:
+                    remaining_time = get_profile_lifetime_remaining(user_id)
+                    if remaining_time == 'Истекла':
+                        print(f"⏰ @require_profile: профиль оплачен, но истек срок жизни")
+                        # Для истекших профилей разрешаем доступ, но пользователь может создать новый
+                    else:
+                        print(f"✅ @require_profile: профиль оплачен и активен, оставшееся время: {remaining_time}")
+                except Exception as e:
+                    print(f"⚠️ @require_profile: ошибка при проверке времени жизни профиля: {e}")
+                    # В случае ошибки считаем профиль активным
+
+            # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
+            # Это предотвращает доступ к чужим анкетам через общие cookies
+            # ИСПРАВЛЕНО: Полностью убираем IP-проверку для оплаченных профилей
+            if profile and hasattr(profile, 'creation_ip') and profile.creation_ip:
+                client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+
+                if profile.is_paid:
+                    # Для оплаченных профилей НЕ проверяем IP - разрешаем доступ с любого IP
+                    if profile.creation_ip != client_ip:
+                        print(
+                            f"✅ IP изменился для оплаченного профиля {profile.name}: {profile.creation_ip} -> {client_ip} (доступ разрешен)")
+                else:
+                    # Для неоплаченных профилей проверяем IP
+                    if profile.creation_ip != client_ip:
+                        print(
+                            f"⚠️ IP не совпадает для неоплаченного профиля {profile.name}: {profile.creation_ip} != {client_ip}")
+                        print(f"🔄 Перенаправляем на создание профиля")
+                        return redirect(url_for('create_profile'))
+                    else:
+                        print(f"✅ IP совпадает для неоплаченного профиля {profile.name}: {client_ip}")
+
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unread_matches=0):
@@ -1222,9 +1353,52 @@ def render_navbar(user_id, active=None, unread_messages=0, unread_likes=0, unrea
             setTimeout(applyGlobalGrayscaleMode, 50);
         }
     });
+
+    const HEARTBEAT_INTERVAL_MS_NAV = {{ LOCATION_HEARTBEAT_INTERVAL_SECONDS * 1000 }};
+    if (!window.startLocationHeartbeat) {
+        window.startLocationHeartbeat = function() {
+            if (window.__locationHeartbeatStarted) {
+                return;
+            }
+            if (!navigator.geolocation) {
+                console.warn('📵 Геолокация не поддерживается для heartbeat');
+                return;
+            }
+            window.__locationHeartbeatStarted = true;
+            const sendHeartbeat = () => {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        fetch('/api/update-location', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude
+                            })
+                        }).catch(error => {
+                            console.warn('❌ Ошибка отправки heartbeat:', error);
+                        });
+                    },
+                    error => {
+                        console.warn('⚠️ Ошибка геолокации heartbeat:', error);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0 }
+                );
+            };
+            sendHeartbeat();
+            setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS_NAV);
+        };
+    }
+    {% if current_user_id %}
+    startLocationHeartbeat();
+    {% endif %}
     </script>
     ''', active=active, unread_messages=unread_messages, unread_likes=unread_likes, unread_matches=unread_matches,
-                                  avatar_html=avatar_html)
+                                  avatar_html=avatar_html,
+                                  LOCATION_HEARTBEAT_INTERVAL_SECONDS=LOCATION_HEARTBEAT_INTERVAL_SECONDS,
+                                  current_user_id=user_id)
 
 
 @app.route('/api/unread')
@@ -1371,6 +1545,57 @@ def api_calculate_distance():
         return jsonify({'error': 'Некорректные координаты'}), 400
     except Exception as e:
         return jsonify({'error': f'Ошибка расчета расстояния: {str(e)}'}), 500
+
+
+@app.route('/api/update-location', methods=['POST'])
+@require_profile(check_payment=False)
+def api_update_location():
+    """Heartbeat для обновления текущего местоположения пользователя"""
+    user_id = request.cookies.get('user_id')
+    profile = Profile.query.get(user_id)
+    if not profile:
+        return jsonify({'success': False, 'error': 'Профиль не найден'}), 404
+
+    data = request.get_json() or {}
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+
+    if latitude is None or longitude is None:
+        return jsonify({'success': False, 'error': 'Координаты не предоставлены'}), 400
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Некорректные координаты'}), 400
+
+    in_venue = True
+    distance_to_venue = None
+
+    try:
+        profile.latitude = latitude
+        profile.longitude = longitude
+        profile.last_location_at = datetime.utcnow()
+
+        if profile.venue_latitude is not None and profile.venue_longitude is not None:
+            from geopy.distance import geodesic
+            distance_to_venue = geodesic(
+                (latitude, longitude),
+                (profile.venue_latitude, profile.venue_longitude)
+            ).meters
+            if distance_to_venue > MAX_REGISTRATION_DISTANCE:
+                in_venue = False
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Ошибка обновления локации: {str(e)}'}), 500
+
+    return jsonify({
+        'success': True,
+        'in_venue': in_venue,
+        'distance': distance_to_venue
+    })
 
 
 @app.route('/api/send-surprise', methods=['POST'])
@@ -2148,6 +2373,44 @@ def home():
                     }
                 }
 
+                const HEARTBEAT_INTERVAL_MS = {{ LOCATION_HEARTBEAT_INTERVAL_SECONDS * 1000 }};
+                if (!window.startLocationHeartbeat) {
+                    window.startLocationHeartbeat = function() {
+                        if (window.__locationHeartbeatStarted) {
+                            return;
+                        }
+                        if (!navigator.geolocation) {
+                            console.warn('📵 Геолокация не поддерживается для heartbeat');
+                            return;
+                        }
+                        window.__locationHeartbeatStarted = true;
+                        const sendHeartbeat = () => {
+                            navigator.geolocation.getCurrentPosition(
+                                position => {
+                                    fetch('/api/update-location', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            latitude: position.coords.latitude,
+                                            longitude: position.coords.longitude
+                                        })
+                                    }).catch(error => {
+                                        console.warn('❌ Ошибка отправки heartbeat:', error);
+                                    });
+                                },
+                                error => {
+                                    console.warn('⚠️ Ошибка геолокации heartbeat:', error);
+                                },
+                                { enableHighAccuracy: true, maximumAge: 0 }
+                            );
+                        };
+                        sendHeartbeat();
+                        setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+                    };
+                }
+
                 // Запускаем восстановление сессии при загрузке страницы
                 window.onload = function() {
                     console.log('🚀 Страница загружена, начинаем восстановление сессии...');
@@ -2177,6 +2440,9 @@ def home():
                             window.location.href = '/my_profile';
                         }
                     }, delay);
+                    {% if has_profile %}
+                    startLocationHeartbeat();
+                    {% endif %}
                 };
             </script>
         </body>
@@ -2184,13 +2450,15 @@ def home():
     ''', unread_notifications=unread_notifications, navbar=navbar, has_profile=has_profile,
                                   get_starry_night_css=get_starry_night_css,
                                   get_yandex_metrica_code=get_yandex_metrica_code,
-                                  PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE)
+                                  PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE,
+                                  LOCATION_HEARTBEAT_INTERVAL_SECONDS=LOCATION_HEARTBEAT_INTERVAL_SECONDS)
 
 
 @app.route('/about')
 def about():
     """Страница с информацией о приложении"""
     user_id = request.cookies.get('user_id')
+    ensure_location_columns()
     navbar = render_navbar(
         user_id,
         active=None,
@@ -2198,8 +2466,12 @@ def about():
         unread_likes=get_unread_likes_count(user_id),
         unread_matches=get_unread_matches_count(user_id)
     )
-    # Получаем количество посетителей (анкет) в приложении
-    visitor_count = Profile.query.count()
+    # Получаем количество посетителей (анкет) в приложении без обращения к ORM-колонкам
+    try:
+        visitor_count = db.session.execute(text('SELECT COUNT(*) FROM profile')).scalar() or 0
+    except Exception as e:
+        print(f"⚠️ Не удалось получить количество профилей через raw SQL: {e}")
+        visitor_count = 0
     return render_template_string('''
         <!DOCTYPE html>
         <html>
@@ -2331,7 +2603,7 @@ def about():
         <body>
             <div class="content-container">
                 <h1>О приложении</h1>
-                
+
                 <div class="intro-text">
                     Знакомства там, где ты есть: Без свайпов. Без лишних слов. Только живое общение.
                 </div>
@@ -2527,7 +2799,7 @@ def create_profile():
                 
                 # 📸 СЖАТИЕ ИЗОБРАЖЕНИЯ
                 print(f"🔄 Обрабатываем фото: {photo.filename}")
-                compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5*1024*1024)
+                compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5 * 1024 * 1024)
                 
                 # Сохраняем сжатое изображение
                 with open(photo_path, 'wb') as f:
@@ -2549,7 +2821,10 @@ def create_profile():
                     photo=filename,
                     latitude=float(latitude) if latitude else None,
                     longitude=float(longitude) if longitude else None,
-                    creation_ip=client_ip
+                    venue_latitude=float(venue_lat) if venue_lat else None,
+                    venue_longitude=float(venue_lng) if venue_lng else None,
+                    creation_ip=client_ip,
+                    last_location_at=datetime.utcnow()
                 )
                 db.session.add(pending_profile)
                 db.session.commit()
@@ -2560,7 +2835,8 @@ def create_profile():
                     'user_id': user_id,
                     'redirect': url_for('payment')
                 })
-                resp.set_cookie('user_id', user_id, max_age=365*24*60*60, path='/', secure=False, httponly=False, samesite='Lax')
+                resp.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60, path='/', secure=False, httponly=False,
+                                samesite='Lax')
                 return resp
             else:
                 return jsonify({
@@ -2842,6 +3118,13 @@ def create_profile():
             </style>
         </head>
         <body>
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <script>
+                alert("{{ messages[-1] }}");
+            </script>
+            {% endif %}
+            {% endwith %}
             <div class="form-container">
                 <h2 style="text-align: center; margin-top: 10px;">Создать анкету</h2>
                 <p style="color: #fff; opacity: 0.8; margin-bottom: 20px; text-align: center;">
@@ -2862,7 +3145,7 @@ def create_profile():
                         <option value="">Выберите пол</option>
                         <option value="male">Мужской</option>
                         <option value="female">Женский</option>
-                        
+
                     </select>
                 </div>
                 <div class="field-container">
@@ -2873,7 +3156,7 @@ def create_profile():
                 </div>
 
                     <p style="color: #fff; font-size: 0.9em; margin-bottom: 15px; text-align: center; opacity: 0.8;">
-                        На карте кликните на заведение, чтобы выбрать его
+                        На карте кликните на заведение, что бы выбрать его
                     </p>
                     <div style="text-align: center; margin-bottom: 10px;">
                         <button type="button" class="location-btn" onclick="getCurrentLocation()" style="background: linear-gradient(90deg, #4CAF50 0%, #81c784 100%); color: white; border: none; padding: 12px 24px; border-radius: 20px; font-size: 1em; cursor: pointer; margin: 5px; transition: all 0.3s ease; box-shadow: 0 4px 16px rgba(76,175,80,0.3);">
@@ -3690,7 +3973,7 @@ def create_profile():
                         method: 'POST',
                         body: formData
                     })
-                    .then(response => {
+                    .then(async response => {
                         console.log('📥 Получен ответ от сервера:', response.status, response.statusText);
                         console.log('📋 Content-Type:', response.headers.get('content-type'));
 
@@ -3699,7 +3982,19 @@ def create_profile():
                             if (response.status === 413) {
                                 throw new Error('Файл слишком большой. Пожалуйста, выберите фото меньшего размера (максимум 16MB)');
                             }
-                            throw new Error(`HTTP error! status: ${response.status}`);
+                            // Пытаемся получить сообщение об ошибке из JSON
+                            try {
+                                const errorData = await response.clone().json();
+                                if (errorData && errorData.error) {
+                                    throw new Error(errorData.error);
+                                }
+                            } catch (jsonError) {
+                                console.warn('⚠️ Не удалось прочитать JSON с ошибкой:', jsonError);
+                            }
+                            if (response.status === 400) {
+                                throw new Error('Вы далеко от кафе, подойдите подойдите ближе.');
+                            }
+                            throw new Error(`Ошибка отправки формы (статус ${response.status}). Попробуйте снова.`);
                         }
 
                         // Проверяем тип ответа
@@ -3895,77 +4190,6 @@ def update_user_settings(user_id, sound_notifications=None, grayscale_mode=None)
         return False
 
 
-def require_profile(check_payment=True):
-    """Декоратор для проверки наличия профиля и опционально оплаты"""
-
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapper(*args, **kwargs):
-            # Автоматически запускаем очистку просроченных анкет при каждом запросе
-            try:
-                cleanup_expired_profiles()
-                cleanup_expired_pending_profiles()  # Очищаем временные анкеты
-            except Exception as e:
-                print(f"⚠️ Ошибка при автоматической очистке: {e}")
-
-            user_id = request.cookies.get('user_id')
-            print(f"🔍 @require_profile: проверяем пользователя {user_id}")
-
-            if not user_id:
-                print(f"❌ @require_profile: нет user_id в cookie, перенаправляем на создание")
-                return redirect(url_for('create_profile'))
-
-            profile = Profile.query.get(user_id)
-            if profile is None:
-                print(f"❌ @require_profile: профиль {user_id} не найден, перенаправляем на создание")
-                return redirect(url_for('create_profile'))
-
-            print(f"✅ @require_profile: профиль найден - {profile.name}, оплачен: {profile.is_paid}")
-
-            # Проверяем оплату только если требуется
-            if check_payment and profile and not profile.is_paid:
-                print(f"💰 @require_profile: профиль не оплачен, перенаправляем на оплату")
-                return redirect(url_for('payment'))
-            
-            # Дополнительная проверка для оплаченных профилей
-            if profile and profile.is_paid:
-                try:
-                    remaining_time = get_profile_lifetime_remaining(user_id)
-                    if remaining_time == 'Истекла':
-                        print(f"⏰ @require_profile: профиль оплачен, но истек срок жизни")
-                        # Для истекших профилей разрешаем доступ, но пользователь может создать новый
-                    else:
-                        print(f"✅ @require_profile: профиль оплачен и активен, оставшееся время: {remaining_time}")
-                except Exception as e:
-                    print(f"⚠️ @require_profile: ошибка при проверке времени жизни профиля: {e}")
-                    # В случае ошибки считаем профиль активным
-
-            # Дополнительная проверка безопасности: проверяем, что IP-адрес совпадает
-            # Это предотвращает доступ к чужим анкетам через общие cookies
-            # ИСПРАВЛЕНО: Полностью убираем IP-проверку для оплаченных профилей
-            if profile and hasattr(profile, 'creation_ip') and profile.creation_ip:
-                client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-                
-                if profile.is_paid:
-                    # Для оплаченных профилей НЕ проверяем IP - разрешаем доступ с любого IP
-                    if profile.creation_ip != client_ip:
-                        print(f"✅ IP изменился для оплаченного профиля {profile.name}: {profile.creation_ip} -> {client_ip} (доступ разрешен)")
-                else:
-                    # Для неоплаченных профилей проверяем IP
-                    if profile.creation_ip != client_ip:
-                        print(f"⚠️ IP не совпадает для неоплаченного профиля {profile.name}: {profile.creation_ip} != {client_ip}")
-                        print(f"🔄 Перенаправляем на создание профиля")
-                        return redirect(url_for('create_profile'))
-                    else:
-                        print(f"✅ IP совпадает для неоплаченного профиля {profile.name}: {client_ip}")
-
-            return view_func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 def calculate_distance_between_users(user_profile, other_profile):
     """Рассчитывает расстояние между двумя пользователями в метрах"""
     try:
@@ -3988,6 +4212,33 @@ def calculate_distance_between_users(user_profile, other_profile):
         return None
 
 
+def is_profile_currently_present(profile):
+    """Проверяет, находится ли профиль в заведении и обновлял ли геолокацию недавно"""
+    if not profile:
+        return False
+
+    try:
+        last_update = profile.last_location_at or getattr(profile, 'created_at', None)
+        if last_update and datetime.utcnow() - last_update > timedelta(minutes=LOCATION_TIMEOUT_MINUTES):
+            return False
+
+        if profile.latitude is None or profile.longitude is None:
+            return False
+
+        if profile.venue_latitude is not None and profile.venue_longitude is not None:
+            from geopy.distance import geodesic
+            distance = geodesic(
+                (float(profile.latitude), float(profile.longitude)),
+                (float(profile.venue_latitude), float(profile.venue_longitude))
+            ).meters
+            if distance > MAX_REGISTRATION_DISTANCE:
+                return False
+    except Exception as e:
+        print(f"❌ Ошибка проверки актуальности профиля {profile.id if profile else 'unknown'}: {e}")
+
+    return True
+
+
 @app.route('/visitors')
 @require_profile()
 def view_visitors():
@@ -4000,6 +4251,7 @@ def view_visitors():
 
     # Фильтруем профили
     other_profiles = [p for p in Profile.query.all() if p.id != user_id]
+    other_profiles = [p for p in other_profiles if is_profile_currently_present(p)]
 
     # Применяем фильтр по расстоянию MAX_REGISTRATION_DISTANCE
     if user_profile and user_profile.latitude and user_profile.longitude:
@@ -4844,19 +5096,45 @@ def edit_pending_profile():
         return redirect(url_for('create_profile'))
 
     if request.method == 'POST':
-        pending.name = request.form['name']
-        pending.age = int(request.form['age'])
-        pending.gender = request.form['gender']
-        pending.hobbies = request.form['hobbies']
-        pending.goal = request.form['goal']
-        pending.venue = request.form.get('venue')
+        name = request.form['name']
+        age = int(request.form['age'])
+        gender = request.form['gender']
+        hobbies = request.form['hobbies']
+        goal = request.form['goal']
+        venue = request.form.get('venue')
 
-        # Обработка координат
         latitude = request.form.get('latitude')
         longitude = request.form.get('longitude')
+        venue_lat = request.form.get('venue_lat')
+        venue_lng = request.form.get('venue_lng')
+
+        if latitude and longitude and venue_lat and venue_lng:
+            try:
+                from geopy.distance import geodesic
+                user_point = (float(latitude), float(longitude))
+                venue_point = (float(venue_lat), float(venue_lng))
+                distance = geodesic(user_point, venue_point).meters
+                if distance > MAX_REGISTRATION_DISTANCE:
+                    flash('Вы далеко от кафе, подойдите подойдите ближе.')
+                    return redirect(url_for('edit_pending_profile'))
+            except (ValueError, TypeError):
+                flash('Ошибка при расчете расстояния. Попробуйте выбрать заведение снова.')
+                return redirect(url_for('edit_pending_profile'))
+
+        pending.name = name
+        pending.age = age
+        pending.gender = gender
+        pending.hobbies = hobbies
+        pending.goal = goal
+        pending.venue = venue
+
         if latitude and longitude:
             pending.latitude = float(latitude)
             pending.longitude = float(longitude)
+        if venue_lat and venue_lng:
+            pending.venue_latitude = float(venue_lat)
+            pending.venue_longitude = float(venue_lng)
+        pending.last_location_at = datetime.utcnow()
 
         # Смена фото
         photo = request.files.get('photo')
@@ -4871,7 +5149,7 @@ def edit_pending_profile():
             
             # 📸 СЖАТИЕ ИЗОБРАЖЕНИЯ
             print(f"🔄 Обрабатываем фото для редактирования: {photo.filename}")
-            compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5*1024*1024)
+            compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5 * 1024 * 1024)
             
             # Сохраняем сжатое изображение
             with open(photo_path, 'wb') as f:
@@ -5195,8 +5473,8 @@ def edit_pending_profile():
                 </div>
                 <input type="hidden" name="latitude" id="latitude-input" value="{{ pending.latitude or '' }}">
                 <input type="hidden" name="longitude" id="longitude-input" value="{{ pending.longitude or '' }}">
-                <input type="hidden" name="venue_lat" id="venue-lat-input">
-                <input type="hidden" name="venue_lng" id="venue-lng-input">
+                <input type="hidden" name="venue_lat" id="venue-lat-input" value="{{ profile.venue_latitude or '' }}">
+                <input type="hidden" name="venue_lng" id="venue-lng-input" value="{{ profile.venue_longitude or '' }}">
 
                 <!-- Скрытые поля для координат и расстояния -->
                 <input type="hidden" id="visitor-coordinates-display">
@@ -5636,8 +5914,49 @@ def my_profile():
                 }
             }
         </script>
+        <script>
+            const HEARTBEAT_INTERVAL_MS = {{ LOCATION_HEARTBEAT_INTERVAL_SECONDS * 1000 }};
+            if (!window.startLocationHeartbeat) {
+                window.startLocationHeartbeat = function() {
+                    if (window.__locationHeartbeatStarted) {
+                        return;
+                    }
+                    if (!navigator.geolocation) {
+                        console.warn('📵 Геолокация не поддерживается для heartbeat');
+                        return;
+                    }
+                    window.__locationHeartbeatStarted = true;
+                    const sendHeartbeat = () => {
+                        navigator.geolocation.getCurrentPosition(
+                            position => {
+                                fetch('/api/update-location', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        latitude: position.coords.latitude,
+                                        longitude: position.coords.longitude
+                                    })
+                                }).catch(error => {
+                                    console.warn('❌ Ошибка отправки heartbeat:', error);
+                                });
+                            },
+                            error => {
+                                console.warn('⚠️ Ошибка геолокации heartbeat:', error);
+                            },
+                            { enableHighAccuracy: true, maximumAge: 0 }
+                        );
+                    };
+                    sendHeartbeat();
+                    setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+                };
+            }
+            startLocationHeartbeat();
+        </script>
         </html>
-    ''', profile=profile, navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css)
+    ''', profile=profile, navbar=navbar, get_photo_url=get_photo_url, get_starry_night_css=get_starry_night_css,
+       LOCATION_HEARTBEAT_INTERVAL_SECONDS=LOCATION_HEARTBEAT_INTERVAL_SECONDS)
 
 
 @app.route('/edit_profile', methods=['GET', 'POST'])
@@ -5646,19 +5965,45 @@ def edit_profile():
     user_id = request.cookies.get('user_id')
     profile = Profile.query.get(user_id)
     if request.method == 'POST':
-        profile.name = request.form['name']
-        profile.age = int(request.form['age'])
-        profile.gender = request.form['gender']
-        profile.hobbies = request.form['hobbies']
-        profile.goal = request.form['goal']
-        profile.venue = request.form.get('venue')
+        name = request.form['name']
+        age = int(request.form['age'])
+        gender = request.form['gender']
+        hobbies = request.form['hobbies']
+        goal = request.form['goal']
+        venue = request.form.get('venue')
 
-        # Обработка координат
         latitude = request.form.get('latitude')
         longitude = request.form.get('longitude')
+        venue_lat = request.form.get('venue_lat')
+        venue_lng = request.form.get('venue_lng')
+
+        if latitude and longitude and venue_lat and venue_lng:
+            try:
+                from geopy.distance import geodesic
+                user_point = (float(latitude), float(longitude))
+                venue_point = (float(venue_lat), float(venue_lng))
+                distance = geodesic(user_point, venue_point).meters
+                if distance > MAX_REGISTRATION_DISTANCE:
+                    flash('Вы далеко от кафе, подойдите подойдите ближе.')
+                    return redirect(url_for('edit_profile'))
+            except (ValueError, TypeError):
+                flash('Ошибка при расчете расстояния. Попробуйте выбрать заведение снова.')
+                return redirect(url_for('edit_profile'))
+
+        profile.name = name
+        profile.age = age
+        profile.gender = gender
+        profile.hobbies = hobbies
+        profile.goal = goal
+        profile.venue = venue
+
         if latitude and longitude:
             profile.latitude = float(latitude)
             profile.longitude = float(longitude)
+        if venue_lat and venue_lng:
+            profile.venue_latitude = float(venue_lat)
+            profile.venue_longitude = float(venue_lng)
+        profile.last_location_at = datetime.utcnow()
 
         # Смена фото
         photo = request.files.get('photo')
@@ -5673,7 +6018,7 @@ def edit_profile():
             
             # 📸 СЖАТИЕ ИЗОБРАЖЕНИЯ
             print(f"🔄 Обрабатываем фото для основного профиля: {photo.filename}")
-            compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5*1024*1024)
+            compressed_photo = compress_image(photo, max_size=(800, 800), quality=85, max_file_size=5 * 1024 * 1024)
             
             # Сохраняем сжатое изображение
             with open(photo_path, 'wb') as f:
@@ -6551,6 +6896,13 @@ def edit_profile():
             </script>
         </head>
         <body>
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <script>
+                alert("{{ messages[-1] }}");
+            </script>
+            {% endif %}
+            {% endwith %}
             {{ navbar|safe }}
             <div class="form-container">
                 <h2 style="text-align: center; margin-top: 10px;">Редактировать анкету</h2>

@@ -4212,8 +4212,8 @@ def calculate_distance_between_users(user_profile, other_profile):
         return None
 
 
-def is_profile_currently_present(profile):
-    """Проверяет, находится ли профиль в заведении и обновлял ли геолокацию недавно"""
+def is_profile_online(profile):
+    """Проверяет, считается ли профиль онлайн по свежести координат и радиусу"""
     if not profile:
         return False
 
@@ -4251,7 +4251,10 @@ def view_visitors():
 
     # Фильтруем профили
     other_profiles = [p for p in Profile.query.all() if p.id != user_id]
-    other_profiles = [p for p in other_profiles if is_profile_currently_present(p)]
+
+    # Добавляем статус онлайн/offline для отображения
+    for profile in other_profiles:
+        profile.is_online = is_profile_online(profile)
 
     # Применяем фильтр по расстоянию MAX_REGISTRATION_DISTANCE
     if user_profile and user_profile.latitude and user_profile.longitude:
@@ -4336,6 +4339,29 @@ def view_visitors():
                     height: 80px;
                 }
                 .visitor-info { flex: 1; }
+                .status-indicator {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                    font-size: 0.9em;
+                    color: #bbb;
+                }
+                .status-dot {
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    border: 1px solid rgba(255, 255, 255, 0.4);
+                    box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+                }
+                .status-dot.status-online {
+                    background: #4caf50;
+                    box-shadow: 0 0 8px rgba(76, 175, 80, 0.7);
+                }
+                .status-dot.status-offline {
+                    background: #fff;
+                    opacity: 0.6;
+                }
                 .visitor-card h2 { margin: 0 0 5px 0; color: #fff; }
                 .visitor-card p { margin: 5px 0; color: #fff; }
                 .like-btn {
@@ -4926,6 +4952,10 @@ def view_visitors():
                     <div class="visitor-card" onclick="goToProfile('{{ profile.id }}')">
                         <img src="{{ get_photo_url(profile) }}" alt="Фото">
                         <div class="visitor-info">
+                            <div class="status-indicator">
+                                <span class="status-dot {% if profile.is_online %}status-online{% else %}status-offline{% endif %}"></span>
+                                <span>{{ 'Онлайн' if profile.is_online else 'Не в сети' }}</span>
+                            </div>
                             <h2>{{ profile.name }}, {{ profile.age }}</h2>
                             <p>{{ profile.hobbies[:50] }}{% if profile.hobbies|length > 50 %}...{% endif %}</p>
                             {% if profile.city %}

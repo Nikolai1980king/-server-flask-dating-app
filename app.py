@@ -131,6 +131,11 @@ YOOKASSA_WEBHOOK_SECRET = "real_webhook_secret_2024"  # Реальный webhook
 # Цена создания профиля в рублях
 PROFILE_CREATION_PRICE = 100.00
 
+# Флаг включения/выключения платной регистрации
+# Если True - посетитель оплачивает PROFILE_CREATION_PRICE для регистрации
+# Если False - регистрация бесплатная
+PAID_REGISTRATION_ENABLED = False
+
 # Цена функции "Удивить" (один раз навсегда)
 SURPRISE_FEATURE_PRICE = 150.00
 
@@ -1087,8 +1092,8 @@ def require_profile(check_payment=True):
 
             print(f"✅ @require_profile: профиль найден - {profile.name}, оплачен: {profile.is_paid}")
 
-            # Проверяем оплату только если требуется
-            if check_payment and profile and not profile.is_paid:
+            # Проверяем оплату только если требуется И если платная регистрация включена
+            if check_payment and profile and not profile.is_paid and PAID_REGISTRATION_ENABLED:
                 print(f"💰 @require_profile: профиль не оплачен, перенаправляем на оплату")
                 return redirect(url_for('payment'))
 
@@ -2201,7 +2206,11 @@ def home():
             <div class="welcome-message">
                 <p class="welcome-text">Хотите найти приятную компанию за чашечкой кофе? ☕</p>
                 <p class="welcome-description">Наше приложение работает во всех заведениях(кафе, рестораны, торговые центры), оно поможет вам познакомиться с интересными людьми  — для душевных бесед, новых знакомств или просто хорошего времени.</p>
+                {% if PAID_REGISTRATION_ENABLED %}
                 <p class="welcome-price">Регистрация — всего {{ PROFILE_CREATION_PRICE }} рублей, а возможности — бесценны! 😊</p>
+                {% else %}
+                <p class="welcome-price">Регистрация бесплатна, а возможности — бесценны! 😊</p>
+                {% endif %}
             </div>
             <p style="color: white;">Осуществляйте вход в приложение с того браузера где была регистрация.</p>
             <div id="create-profile-section" style="display: {% if not has_profile %}block{% else %}none{% endif %};">
@@ -2451,6 +2460,7 @@ def home():
                                   get_starry_night_css=get_starry_night_css,
                                   get_yandex_metrica_code=get_yandex_metrica_code,
                                   PROFILE_CREATION_PRICE=PROFILE_CREATION_PRICE,
+                                  PAID_REGISTRATION_ENABLED=PAID_REGISTRATION_ENABLED,
                                   LOCATION_HEARTBEAT_INTERVAL_SECONDS=LOCATION_HEARTBEAT_INTERVAL_SECONDS)
 
 
@@ -2808,36 +2818,73 @@ def create_profile():
                 # Получаем IP-адрес клиента для безопасности
                 client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
 
-                # Создаем ВРЕМЕННУЮ анкету (до оплаты)
-                pending_profile = PendingProfile(
-                    id=user_id,
-                    name=name,
-                    age=int(request.form['age']),
-                    gender=request.form['gender'],
-                    hobbies=hobbies,
-                    goal=goal,
-                    city=location_name,
-                    venue=venue,
-                    photo=filename,
-                    latitude=float(latitude) if latitude else None,
-                    longitude=float(longitude) if longitude else None,
-                    venue_latitude=float(venue_lat) if venue_lat else None,
-                    venue_longitude=float(venue_lng) if venue_lng else None,
-                    creation_ip=client_ip,
-                    last_location_at=datetime.utcnow()
-                )
-                db.session.add(pending_profile)
-                db.session.commit()
+                # Проверяем флаг платной регистрации
+                if PAID_REGISTRATION_ENABLED:
+                    # Создаем ВРЕМЕННУЮ анкету (до оплаты)
+                    pending_profile = PendingProfile(
+                        id=user_id,
+                        name=name,
+                        age=int(request.form['age']),
+                        gender=request.form['gender'],
+                        hobbies=hobbies,
+                        goal=goal,
+                        city=location_name,
+                        venue=venue,
+                        photo=filename,
+                        latitude=float(latitude) if latitude else None,
+                        longitude=float(longitude) if longitude else None,
+                        venue_latitude=float(venue_lat) if venue_lat else None,
+                        venue_longitude=float(venue_lng) if venue_lng else None,
+                        creation_ip=client_ip,
+                        last_location_at=datetime.utcnow()
+                    )
+                    db.session.add(pending_profile)
+                    db.session.commit()
 
-                # Возвращаем JSON ответ для AJAX запроса
-                resp = jsonify({
-                    'success': True,
-                    'user_id': user_id,
-                    'redirect': url_for('payment')
-                })
-                resp.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60, path='/', secure=False, httponly=False,
-                                samesite='Lax')
-                return resp
+                    # Возвращаем JSON ответ для AJAX запроса
+                    resp = jsonify({
+                        'success': True,
+                        'user_id': user_id,
+                        'redirect': url_for('payment')
+                    })
+                    resp.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60, path='/', secure=False, httponly=False,
+                                    samesite='Lax')
+                    return resp
+                else:
+                    # Создаем сразу оплаченный профиль (бесплатная регистрация)
+                    profile = Profile(
+                        id=user_id,
+                        name=name,
+                        age=int(request.form['age']),
+                        gender=request.form['gender'],
+                        hobbies=hobbies,
+                        goal=goal,
+                        city=location_name,
+                        venue=venue,
+                        photo=filename,
+                        likes=0,
+                        latitude=float(latitude) if latitude else None,
+                        longitude=float(longitude) if longitude else None,
+                        venue_latitude=float(venue_lat) if venue_lat else None,
+                        venue_longitude=float(venue_lng) if venue_lng else None,
+                        creation_ip=client_ip,
+                        is_paid=True,  # Бесплатная регистрация - сразу помечаем как оплаченную
+                        payment_date=datetime.utcnow(),
+                        created_at=datetime.utcnow(),
+                        last_location_at=datetime.utcnow()
+                    )
+                    db.session.add(profile)
+                    db.session.commit()
+
+                    # Возвращаем JSON ответ для AJAX запроса
+                    resp = jsonify({
+                        'success': True,
+                        'user_id': user_id,
+                        'redirect': url_for('my_profile')
+                    })
+                    resp.set_cookie('user_id', user_id, max_age=365 * 24 * 60 * 60, path='/', secure=False, httponly=False,
+                                    samesite='Lax')
+                    return resp
             else:
                 return jsonify({
                     'success': False,
@@ -10033,6 +10080,15 @@ def qr_login_generator():
 @app.route('/payment')
 def payment():
     """Страница оплаты создания профиля"""
+    # Если платная регистрация выключена, редиректим на профиль
+    if not PAID_REGISTRATION_ENABLED:
+        user_id = request.cookies.get('user_id')
+        if user_id:
+            profile = Profile.query.get(user_id)
+            if profile:
+                return redirect(url_for('my_profile'))
+        return redirect(url_for('home'))
+    
     user_id = request.cookies.get('user_id')
     if not user_id:
         return redirect(url_for('home'))
@@ -10182,6 +10238,10 @@ def payment():
 @app.route('/payment/create', methods=['POST'])
 def create_payment():
     """Создание платежа через ЮKassa"""
+    # Если платная регистрация выключена, возвращаем ошибку
+    if not PAID_REGISTRATION_ENABLED:
+        return jsonify({'success': False, 'error': 'Платная регистрация отключена'}), 400
+    
     try:
         data = request.get_json()
         user_id = data.get('user_id')

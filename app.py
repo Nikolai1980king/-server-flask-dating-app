@@ -1,20 +1,21 @@
 # нужно вводить https://192.168.255.137
 # Тестовое изменение для демонстрации коммита
 
-from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify, send_from_directory, flash
+from flask import Flask, render_template_string, request, redirect, url_for, make_response, jsonify, send_from_directory, flash, session, Response, abort
 from flask_socketio import SocketIO, emit, join_room
 import os
 import uuid
 from datetime import datetime, timedelta
 from collections import defaultdict
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import and_, inspect, text
+from sqlalchemy import and_, or_, inspect, text
 from functools import wraps
 import requests
 import threading
 import time
 import base64
 import io
+import html as html_module
 import qrcode
 from PIL import Image
 
@@ -320,6 +321,8 @@ class Profile(db.Model):
     surprise_feature_payment_date = db.Column(db.DateTime, nullable=True)
     # Поле для безопасности - IP-адрес создания профиля
     creation_ip = db.Column(db.String, nullable=True)
+    # Блокировка доступа администратором (веб и API)
+    is_admin_blocked = db.Column(db.Boolean, default=False)
 
 
 class PendingProfile(db.Model):
@@ -376,6 +379,10 @@ def ensure_location_columns():
             'venue_longitude': 'REAL',
             'last_location_at': 'TEXT'
         })
+
+    add_columns_if_missing('profile', {
+        'is_admin_blocked': 'BOOLEAN',
+    })
 
 
 with app.app_context():
@@ -465,6 +472,41 @@ class QRLoginToken(db.Model):
 # Удаляю in-memory структуру сообщений:
 # messages = defaultdict(list)
 notifications = defaultdict(list)
+
+
+def _path_exempt_from_admin_block():
+    p = request.path or ''
+    if p.startswith('/static/'):
+        return True
+    if p.startswith('/admin'):
+        return True
+    if p == '/account-blocked':
+        return True
+    if p == '/yookassa/webhook':
+        return True
+    if p in ('/api/clear-user-cookie', '/api/clear-cookie'):
+        return True
+    return False
+
+
+@app.before_request
+def enforce_profile_admin_block():
+    """Запрет доступа для анкет с флагом is_admin_blocked (веб и /api/)."""
+    if _path_exempt_from_admin_block():
+        return None
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return None
+    profile = Profile.query.get(user_id)
+    if not profile or not profile.is_admin_blocked:
+        return None
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'success': False,
+            'error': 'Аккаунт заблокирован администратором.',
+            'code': 'admin_blocked',
+        }), 403
+    return redirect(url_for('account_blocked'))
 
 
 # ============================================================================
@@ -2693,6 +2735,30 @@ def about():
     ''', navbar=navbar, get_starry_night_css=get_starry_night_css,
                                   get_yandex_metrica_code=get_yandex_metrica_code,
                                   visitor_count=visitor_count)
+
+
+@app.route('/account-blocked')
+def account_blocked():
+    """Страница для пользователей, заблокированных через админ-панель."""
+    return '''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Доступ ограничен</title>
+        <style>
+            body { font-family: system-ui, sans-serif; max-width: 520px; margin: 48px auto; padding: 0 16px; line-height: 1.5; }
+            h1 { color: #c0392b; }
+        </style>
+    </head>
+    <body>
+        <h1>Доступ ограничен</h1>
+        <p>Аккаунт заблокирован администратором. Если вы считаете это ошибкой, свяжитесь с поддержкой.</p>
+        <p>Вы можете <a href="/api/clear-cookie">выйти из сессии на этом устройстве</a> (cookie будет удалён).</p>
+    </body>
+    </html>
+    '''
 
 
 @app.route('/create', methods=['GET', 'POST'])
@@ -10647,42 +10713,414 @@ def _generate_payment_rows(payments):
         row = f'''
         <tr>
             <td>{p.id}</td>
-            <td>{p.user_id}</td>
+            <td>{html_module.escape(p.user_id)}</td>
             <td>{p.amount} руб.</td>
-            <td class="status-{p.status}">{p.status}</td>
+            <td class="status-{html_module.escape(p.status)}">{html_module.escape(p.status)}</td>
             <td>{p.created_at.strftime('%d.%m.%Y %H:%M') if p.created_at else 'N/A'}</td>
-            <td>{p.yookassa_payment_id or 'N/A'}</td>
+            <td>{html_module.escape(p.yookassa_payment_id or 'N/A')}</td>
         </tr>
         '''
         rows.append(row)
     return ''.join(rows)
 
 
-@app.route('/admin/payments')
-def admin_payments():
-    """Админ-панель для просмотра платежей"""
-    payments = Payment.query.order_by(Payment.created_at.desc()).limit(50).all()
+def _admin_panel_token_configured():
+    return bool(os.environ.get('ADMIN_PANEL_TOKEN', '').strip())
 
+
+def admin_required(view_func):
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        if not _admin_panel_token_configured():
+            return Response(
+                'Админ-панель отключена: на сервере задайте переменную окружения ADMIN_PANEL_TOKEN и перезапустите приложение.',
+                status=503,
+                mimetype='text/plain; charset=utf-8',
+            )
+        if not session.get('admin_ok'):
+            return redirect(url_for('admin_login', next=request.path))
+        return view_func(*args, **kwargs)
+
+    return wrapper
+
+
+def _admin_nav(current=''):
+    items = [
+        ('/admin', 'Обзор', 'dash'),
+        ('/admin/users', 'Пользователи', 'users'),
+        ('/admin/pending', 'Ожидают оплаты', 'pending'),
+        ('/admin/payments', 'Платежи', 'pay'),
+    ]
+    parts = []
+    for href, label, key in items:
+        cls = ' class="active"' if current == key else ''
+        parts.append(f'<a href="{href}"{cls}>{html_module.escape(label)}</a>')
+    parts.append(f'<a href="{url_for("admin_logout")}">Выход</a>')
+    return ' · '.join(parts)
+
+
+ADMIN_PANEL_CSS = '''
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f4f4f6; color: #222; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+    nav.admin-nav { background: #1a1a2e; color: #fff; padding: 12px 16px; }
+    nav.admin-nav a { color: #9df; margin-right: 12px; text-decoration: none; }
+    nav.admin-nav a.active { color: #fff; font-weight: bold; }
+    h1 { font-size: 1.35rem; margin: 20px 0 12px; }
+    h2 { font-size: 1.1rem; margin: 24px 0 10px; }
+    table { border-collapse: collapse; width: 100%; background: #fff; border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    th, td { border: 1px solid #e8e8ec; padding: 8px 10px; text-align: left; font-size: 0.9rem; }
+    th { background: #eef0f4; }
+    tr.blocked { background: #fdecea; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.75rem; }
+    .badge-ok { background: #d4edda; color: #155724; }
+    .badge-bad { background: #f8d7da; color: #721c24; }
+    .btn { display: inline-block; padding: 6px 14px; background: #2d6cdf; color: #fff !important;
+      border-radius: 6px; text-decoration: none; font-size: 0.9rem; border: 0; cursor: pointer; }
+    .btn-secondary { background: #6c757d; }
+    .btn-danger { background: #c0392b; }
+    form.inline { display: inline; }
+    .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+    .stat { background: #fff; padding: 14px 18px; border-radius: 8px; min-width: 140px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .stat b { font-size: 1.4rem; display: block; }
+    input[type="text"], input[type="password"], input[type="search"] {
+      padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; min-width: 220px; }
+    .login-box { max-width: 400px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.1); }
+    .err { color: #c0392b; margin-top: 8px; }
+    .mono { font-family: ui-monospace, monospace; font-size: 0.8rem; word-break: break-all; }
+    .status-pending { color: #c60; }
+    .status-succeeded { color: #080; }
+    .status-canceled { color: #c00; }
+'''
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if not _admin_panel_token_configured():
+        return Response(
+            'Админ-панель отключена: задайте ADMIN_PANEL_TOKEN на сервере.',
+            status=503,
+            mimetype='text/plain; charset=utf-8',
+        )
+    err = ''
+    if session.get('admin_ok'):
+        return redirect(url_for('admin_dashboard'))
+    nxt = request.args.get('next') or (request.form.get('next') if request.method == 'POST' else '') or ''
+    if nxt and not (nxt.startswith('/') and not nxt.startswith('//')):
+        nxt = ''
+    if request.method == 'POST':
+        token = (request.form.get('token') or '').strip()
+        if token and token == os.environ.get('ADMIN_PANEL_TOKEN', '').strip():
+            session['admin_ok'] = True
+            session.permanent = True
+            return redirect(nxt or url_for('admin_dashboard'))
+        err = 'Неверный токен доступа.'
     return f'''
     <!DOCTYPE html>
     <html lang="ru">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Админ - Платежи</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 20px; }}
-            table {{ border-collapse: collapse; width: 100%; }}
-            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-            th {{ background-color: #f2f2f2; }}
-            .status-pending {{ color: orange; }}
-            .status-succeeded {{ color: green; }}
-            .status-canceled {{ color: red; }}
-        </style>
+        <title>Вход в админ-панель</title>
+        <style>{ADMIN_PANEL_CSS}</style>
     </head>
     <body>
-        <h1>Админ - Платежи</h1>
-        <p><strong>Тестовый режим:</strong> {"Да" if YOOKASSA_TEST_MODE else "Нет"}</p>
+        <div class="login-box">
+            <h1 style="margin-top:0;">Админ-панель</h1>
+            <p>Введите тот же секрет, что задан на сервере в переменной <code>ADMIN_PANEL_TOKEN</code>.</p>
+            <form method="post">
+                <input type="hidden" name="next" value="{html_module.escape(nxt)}">
+                <p><input type="password" name="token" placeholder="Токен" autocomplete="off" required autofocus></p>
+                <p><button type="submit" class="btn">Войти</button></p>
+            </form>
+            {'<p class="err">' + html_module.escape(err) + '</p>' if err else ''}
+        </div>
+    </body>
+    </html>
+    '''
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_ok', None)
+    return redirect(url_for('admin_login'))
+
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    n_profiles = Profile.query.count()
+    n_pending = PendingProfile.query.count()
+    n_blocked = Profile.query.filter_by(is_admin_blocked=True).count()
+    recent = Profile.query.order_by(Profile.created_at.desc()).limit(12).all()
+    rows = []
+    for p in recent:
+        st = 'блок' if p.is_admin_blocked else ('оплата' if p.is_paid else 'без оплаты')
+        rows.append(
+            f'''<tr class="{"blocked" if p.is_admin_blocked else ""}">
+            <td class="mono"><a href="{url_for('admin_user_detail', user_id=p.id)}">{html_module.escape(p.id[:10])}…</a></td>
+            <td>{html_module.escape(p.name or '')}</td>
+            <td>{html_module.escape(p.city or '—')}</td>
+            <td>{p.created_at.strftime('%d.%m.%Y %H:%M') if p.created_at else '—'}</td>
+            <td>{html_module.escape(st)}</td></tr>'''
+        )
+    nav = _admin_nav('dash')
+    return f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Админ — обзор</title>
+        <style>{ADMIN_PANEL_CSS}</style>
+    </head>
+    <body>
+        <nav class="admin-nav">{nav}</nav>
+        <div class="wrap">
+            <h1>Обзор</h1>
+            <div class="stats">
+                <div class="stat"><b>{n_profiles}</b> анкет в базе</div>
+                <div class="stat"><b>{n_pending}</b> ожидают оплаты</div>
+                <div class="stat"><b>{n_blocked}</b> заблокировано</div>
+            </div>
+            <h2>Последние анкеты</h2>
+            <table><tr><th>ID</th><th>Имя</th><th>Город</th><th>Создана</th><th>Статус</th></tr>
+            {''.join(rows) or '<tr><td colspan="5">Нет данных</td></tr>'}
+            </table>
+        </div>
+    </body>
+    </html>
+    '''
+
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    q = (request.args.get('q') or '').strip()
+    try:
+        page = max(1, int(request.args.get('page', 1) or 1))
+    except ValueError:
+        page = 1
+    per_page = 40
+    query = Profile.query
+    if q:
+        like = f'%{q}%'
+        query = query.filter(
+            or_(Profile.id.like(like), Profile.name.like(like), Profile.creation_ip.like(like))
+        )
+    total = query.count()
+    items = query.order_by(Profile.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    rows = []
+    for p in items:
+        rows.append(
+            f'''<tr class="{"blocked" if p.is_admin_blocked else ""}">
+            <td class="mono"><a href="{url_for('admin_user_detail', user_id=p.id)}">{html_module.escape(p.id)}</a></td>
+            <td>{html_module.escape(p.name or '')}</td>
+            <td>{p.age}</td>
+            <td>{html_module.escape(p.creation_ip or '—')}</td>
+            <td>{'да' if p.is_paid else '—'}</td>
+            <td>{'да' if p.is_admin_blocked else '—'}</td>
+            <td>{p.created_at.strftime('%d.%m.%Y %H:%M') if p.created_at else '—'}</td>
+        </tr>'''
+        )
+    pages = max(1, (total + per_page - 1) // per_page)
+    pager = ''
+    if page > 1:
+        pager += f'<a class="btn btn-secondary" href="{url_for("admin_users", page=page - 1, q=q)}">← Назад</a> '
+    if page < pages:
+        pager += f'<a class="btn btn-secondary" href="{url_for("admin_users", page=page + 1, q=q)}">Вперёд →</a>'
+    nav = _admin_nav('users')
+    return f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользователи</title><style>{ADMIN_PANEL_CSS}</style></head>
+    <body>
+        <nav class="admin-nav">{nav}</nav>
+        <div class="wrap">
+            <h1>Анкеты (пользователи)</h1>
+            <form method="get" style="margin-bottom:16px;">
+                <input type="search" name="q" value="{html_module.escape(q)}" placeholder="ID, имя или IP">
+                <button type="submit" class="btn">Искать</button>
+            </form>
+            <p>Всего по фильтру: <strong>{total}</strong>, страница {page} из {pages}</p>
+            <p>{pager}</p>
+            <table>
+                <tr><th>ID</th><th>Имя</th><th>Возраст</th><th>IP при создании</th><th>Оплата</th><th>Блок</th><th>Создана</th></tr>
+                {''.join(rows) or '<tr><td colspan="7">Ничего не найдено</td></tr>'}
+            </table>
+            <p>{pager}</p>
+        </div>
+    </body>
+    </html>
+    '''
+
+
+@app.route('/admin/pending')
+@admin_required
+def admin_pending():
+    pending = PendingProfile.query.order_by(PendingProfile.created_at.desc()).limit(200).all()
+    rows = []
+    for p in pending:
+        rows.append(
+            f'''<tr>
+            <td class="mono">{html_module.escape(p.id)}</td>
+            <td>{html_module.escape(p.name or '')}</td>
+            <td>{html_module.escape(p.creation_ip or '—')}</td>
+            <td>{p.created_at.strftime('%d.%m.%Y %H:%M') if p.created_at else '—'}</td>
+            <td><form class="inline" method="post" action="{url_for('admin_pending_delete', user_id=p.id)}"
+                onsubmit="return confirm('Удалить временную анкету?');"><button type="submit" class="btn btn-danger">Удалить</button></form></td>
+        </tr>'''
+        )
+    nav = _admin_nav('pending')
+    return f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ожидают оплаты</title><style>{ADMIN_PANEL_CSS}</style></head>
+    <body>
+        <nav class="admin-nav">{nav}</nav>
+        <div class="wrap">
+            <h1>Временные анкеты (до оплаты)</h1>
+            <table><tr><th>ID</th><th>Имя</th><th>IP</th><th>Создана</th><th></th></tr>
+            {''.join(rows) or '<tr><td colspan="5">Нет записей</td></tr>'}
+            </table>
+        </div>
+    </body>
+    </html>
+    '''
+
+
+@app.route('/admin/pending/<user_id>/delete', methods=['POST'])
+@admin_required
+def admin_pending_delete(user_id):
+    p = PendingProfile.query.get(user_id)
+    if p:
+        if p.photo:
+            try:
+                photo_path = os.path.join(app.config['UPLOAD_FOLDER'], p.photo)
+                if os.path.exists(photo_path):
+                    os.remove(photo_path)
+            except OSError:
+                pass
+        db.session.delete(p)
+        db.session.commit()
+    return redirect(url_for('admin_pending'))
+
+
+@app.route('/admin/user/<user_id>')
+@admin_required
+def admin_user_detail(user_id):
+    p = Profile.query.get(user_id)
+    if not p:
+        abort(404)
+    likes_out = Like.query.filter_by(user_id=user_id).count()
+    likes_in = Like.query.filter_by(liked_id=user_id).count()
+    matches = Match.query.filter(or_(Match.user1_id == user_id, Match.user2_id == user_id)).count()
+    payments = Payment.query.filter_by(user_id=user_id).order_by(Payment.created_at.desc()).limit(15).all()
+    pay_rows = []
+    for pay in payments:
+        pay_rows.append(
+            f'''<tr><td>{pay.id}</td><td>{pay.amount}</td><td>{html_module.escape(pay.status)}</td>
+            <td>{pay.created_at.strftime('%d.%m.%Y %H:%M') if pay.created_at else '—'}</td></tr>'''
+        )
+    block_badge = (
+        '<span class="badge badge-bad">Заблокирован</span>'
+        if p.is_admin_blocked
+        else '<span class="badge badge-ok">Доступ разрешён</span>'
+    )
+    nav = _admin_nav('users')
+    if not p.is_admin_blocked:
+        form_block = f'''<form method="post" action="{url_for('admin_user_block', user_id=user_id)}" style="margin-top:12px;"
+            onsubmit="return confirm('Заблокировать пользователя?');">
+            <button type="submit" class="btn btn-danger">Заблокировать доступ</button></form>'''
+    else:
+        form_block = f'''<form method="post" action="{url_for('admin_user_unblock', user_id=user_id)}" style="margin-top:12px;">
+            <button type="submit" class="btn btn-secondary">Снять блокировку</button></form>'''
+    photo_url = html_module.escape(get_photo_url(p))
+    return f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{html_module.escape(p.name)} — карточка</title><style>{ADMIN_PANEL_CSS}</style></head>
+    <body>
+        <nav class="admin-nav">{nav}</nav>
+        <div class="wrap">
+            <p><a href="{url_for('admin_users')}">← К списку</a></p>
+            <h1>{html_module.escape(p.name)} {block_badge}</h1>
+            <p class="mono"><strong>ID:</strong> {html_module.escape(p.id)}</p>
+            <p><img src="{photo_url}" alt="" style="max-width:200px;border-radius:8px;"></p>
+            <table>
+                <tr><th>Возраст</th><td>{p.age}</td></tr>
+                <tr><th>Пол</th><td>{html_module.escape(p.gender or '—')}</td></tr>
+                <tr><th>Город</th><td>{html_module.escape(p.city or '—')}</td></tr>
+                <tr><th>Место</th><td>{html_module.escape(p.venue or '—')}</td></tr>
+                <tr><th>Увлечения</th><td>{html_module.escape(p.hobbies or '—')}</td></tr>
+                <tr><th>Цель</th><td>{html_module.escape(p.goal or '—')}</td></tr>
+                <tr><th>IP при создании</th><td>{html_module.escape(p.creation_ip or '—')}</td></tr>
+                <tr><th>Оплачено</th><td>{'Да' if p.is_paid else 'Нет'}</td></tr>
+                <tr><th>«Удивить» оплачено</th><td>{'Да' if p.surprise_feature_paid else 'Нет'}</td></tr>
+                <tr><th>Координаты</th><td>{p.latitude if p.latitude is not None else '—'}, {p.longitude if p.longitude is not None else '—'}</td></tr>
+            </table>
+            <h2>Статистика</h2>
+            <div class="stats">
+                <div class="stat"><b>{likes_out}</b> лайков поставил</div>
+                <div class="stat"><b>{likes_in}</b> лайков получил</div>
+                <div class="stat"><b>{matches}</b> мэтчей</div>
+            </div>
+            {form_block}
+            <h2>Последние платежи</h2>
+            <table><tr><th>№</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr>
+            {''.join(pay_rows) or '<tr><td colspan="4">Нет платежей</td></tr>'}
+            </table>
+        </div>
+    </body>
+    </html>
+    '''
+
+
+@app.route('/admin/user/<user_id>/block', methods=['POST'])
+@admin_required
+def admin_user_block(user_id):
+    p = Profile.query.get(user_id)
+    if p:
+        p.is_admin_blocked = True
+        db.session.commit()
+    return redirect(url_for('admin_user_detail', user_id=user_id))
+
+
+@app.route('/admin/user/<user_id>/unblock', methods=['POST'])
+@admin_required
+def admin_user_unblock(user_id):
+    p = Profile.query.get(user_id)
+    if p:
+        p.is_admin_blocked = False
+        db.session.commit()
+    return redirect(url_for('admin_user_detail', user_id=user_id))
+
+
+@app.route('/admin/payments')
+@admin_required
+def admin_payments():
+    """Админ-панель для просмотра платежей"""
+    payments = Payment.query.order_by(Payment.created_at.desc()).limit(50).all()
+    nav = _admin_nav('pay')
+    return f'''
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Админ — платежи</title>
+        <style>{ADMIN_PANEL_CSS}</style>
+    </head>
+    <body>
+        <nav class="admin-nav">{nav}</nav>
+        <div class="wrap">
+        <h1>Платежи</h1>
+        <p><strong>Тестовый режим ЮKassa:</strong> {"Да" if YOOKASSA_TEST_MODE else "Нет"}</p>
 
         <table>
             <tr>
@@ -10695,8 +11133,7 @@ def admin_payments():
             </tr>
             {_generate_payment_rows(payments)}
         </table>
-
-        <p><a href="/">← На главную</a></p>
+        </div>
     </body>
     </html>
     '''
@@ -11219,3 +11656,4 @@ if __name__ == '__main__':
 
     socketio.run(app, host='0.0.0.0', port=5000
                  , debug=True, allow_unsafe_werkzeug=True)
+
